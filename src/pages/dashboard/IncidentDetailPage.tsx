@@ -6277,6 +6277,50 @@ const IncidentDetailPage = () => {
       });
     });
 
+    // ── Attribute-change steps ────────────────────────────────────────────
+    // Severity / status / assignee / title / TLP edits DO produce revisions,
+    // but the raw "Changes" diff cards are off by default so those edits were
+    // invisible in the timeline. Derive a readable sentence step per changed
+    // attribute from consecutive revisions. Only when the Changes filter is
+    // off, otherwise the full diff card already covers it.
+    if (!revisionsFilterOn && revisions.length > 1) {
+      const ATTRIBUTE_LABELS: Record<string, string> = {
+        severity: 'severity',
+        status: 'status',
+        assignee: 'assignee',
+        title: 'title',
+        tlp: 'TLP',
+      };
+      const attributeText = (value: any): string => {
+        const str = typeof value === 'string' ? value.trim() : (value == null ? '' : String(value));
+        if (!str) return 'none';
+        return str.length > 60 ? `${str.slice(0, 60)}…` : str;
+      };
+      for (let idx = 0; idx < revisions.length - 1; idx++) {
+        const current = parsedRevisions[idx];
+        const previous = parsedRevisions[idx + 1];
+        if (!current || !previous) continue;
+        const ts = normalizeToMs(revisions[idx]?.edited ?? revisions[idx]?.created);
+        if (!(ts > 0)) continue;
+        Object.keys(ATTRIBUTE_LABELS).forEach((field, fieldIdx) => {
+          const before = attributeText(current[field] === undefined ? '' : previous[field]);
+          const after = attributeText(current[field]);
+          if (previous[field] === undefined && current[field] === undefined) return;
+          if (before === after) return;
+          items.push({
+            type: 'step',
+            kind: 'attribute-changed',
+            // Stagger so multiple attributes changed in one save keep order.
+            timestamp: ts + fieldIdx,
+            id: `step-attr-${idx}-${field}`,
+            label: `changed ${ATTRIBUTE_LABELS[field]} to ${after}`,
+            detail: `from ${before}`,
+            actor: revisions[idx]?.updated_by ? String(revisions[idx].updated_by) : undefined,
+          });
+        });
+      }
+    }
+
     // Synthetic "Incident created" step — fallback only when there are NO
     // revisions to render the full creation card from.
     if (revisions.length === 0 && incident?.createdTs) {
