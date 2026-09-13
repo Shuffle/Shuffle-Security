@@ -119,7 +119,7 @@ import CollapsibleContent from '@/components/incidents/CollapsibleContent';
 import { UserHoverCard, resolveUserAvatar } from '@/components/incidents/UserHoverCard';
 import { TaskKanbanBoard } from '@/components/incidents/TaskKanbanBoard';
 import { MentionInput } from '@/components/incidents/MentionInput';
-import { DeferredTextField, DeferredMentionInput } from '@/components/incidents/DeferredTextField';
+import { DeferredTextField, DeferredMentionInput, DebouncedMentionInput } from '@/components/incidents/DeferredTextField';
 import { MarkdownDescriptionEditor } from '@/components/incidents/MarkdownDescriptionEditor';
 import { SafeMarkdown } from '@/components/shared/SafeMarkdown';
 import { TaskDateTimePicker } from '@/components/incidents/TaskDateTimePicker';
@@ -5590,9 +5590,9 @@ const IncidentDetailPage = () => {
     switch (field.type) {
       case 'text':
         return wrap(
-          <TextField
-            value={value || ''}
-            onChange={(e) => handleCustomFieldChange(field, e.target.value)}
+          <DeferredTextField
+            value={typeof value === 'string' ? value : value == null ? '' : String(value)}
+            onCommit={(next) => handleCustomFieldChange(field, next)}
             placeholder={placeholder}
             fullWidth
             size="small"
@@ -5601,10 +5601,10 @@ const IncidentDetailPage = () => {
         );
       case 'number':
         return wrap(
-          <TextField
+          <DeferredTextField
             type="number"
-            value={value ?? ''}
-            onChange={(e) => handleCustomFieldChange(field, Number(e.target.value))}
+            value={value == null ? '' : String(value)}
+            onCommit={(next) => handleCustomFieldChange(field, next === '' ? '' : Number(next))}
             placeholder={placeholder}
             fullWidth
             size="small"
@@ -6058,12 +6058,13 @@ const IncidentDetailPage = () => {
               </Box>
             )}
             <Box data-tour="incident-comment-input" sx={{ position: 'relative' }}>
-              <MentionInput
+              <DebouncedMentionInput
                 value={newComment}
-                onChange={setNewComment}
-                onSubmit={() => {
-                  if (newComment.trim() || commentAttachments.length > 0) {
-                    handleAddComment();
+                onChangeDebounced={setNewComment}
+                onSubmitValue={(text) => {
+                  if (text.trim() || commentAttachments.length > 0) {
+                    setNewComment(text);
+                    handleAddComment(text);
                   }
                 }}
                 size="small"

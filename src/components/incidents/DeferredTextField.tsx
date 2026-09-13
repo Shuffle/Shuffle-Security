@@ -70,3 +70,75 @@ export const DeferredMentionInput = ({ value, onCommit, onBlur, ...props }: Defe
     />
   );
 };
+
+type DebouncedMentionInputProps = Omit<TextFieldProps, 'value' | 'onChange' | 'onSubmit'> & {
+  value: string;
+  onChangeDebounced: (value: string) => void;
+  onSubmitValue?: (value: string) => void;
+  delay?: number;
+};
+
+/**
+ * Mention input that keeps typing local and pushes the value upwards on a
+ * short debounce, so draft saving / send buttons still work without
+ * re-rendering the whole page on every keystroke.
+ */
+export const DebouncedMentionInput = ({
+  value,
+  onChangeDebounced,
+  onSubmitValue,
+  delay = 250,
+  onBlur,
+  ...props
+}: DebouncedMentionInputProps) => {
+  const [draft, setDraft] = useState(value);
+  const draftRef = useRef(value);
+  const dirty = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!dirty.current && value !== draftRef.current) {
+      draftRef.current = value;
+      setDraft(value);
+    }
+  }, [value]);
+
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+
+  const flush = () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    dirty.current = false;
+    if (draftRef.current !== value) onChangeDebounced(draftRef.current);
+  };
+
+  return (
+    <MentionInput
+      {...props}
+      value={draft}
+      onChange={(next) => {
+        dirty.current = true;
+        draftRef.current = next;
+        setDraft(next);
+        if (timer.current) clearTimeout(timer.current);
+        timer.current = setTimeout(() => {
+          timer.current = null;
+          dirty.current = false;
+          onChangeDebounced(draftRef.current);
+        }, delay);
+      }}
+      onSubmit={() => {
+        flush();
+        onSubmitValue?.(draftRef.current);
+      }}
+      onBlur={(event) => {
+        flush();
+        onBlur?.(event);
+      }}
+    />
+  );
+};
