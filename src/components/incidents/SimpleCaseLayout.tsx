@@ -58,6 +58,7 @@ export const SimpleCaseLayout = ({
   const refs = useRef<Record<SectionKey, HTMLElement | null>>({
     narrative: null,
     tasks: null,
+    customFields: null,
     observables: null,
     correlations: null,
   });
