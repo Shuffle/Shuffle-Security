@@ -10275,20 +10275,47 @@ const IncidentDetailPage = () => {
             {visibleTasks.length === 0 && (
               <Typography sx={{ color: 'hsl(var(--muted-foreground))', fontSize: '0.85rem', mb: 2 }}>No tasks yet.</Typography>
             )}
-            {visibleTasks.map((task) => (
-              <Box key={task.id} data-simple-task-id={task.id} sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, py: 0.7, scrollMarginTop: 100 }}>
-                <Checkbox checked={task.completed} onChange={() => handleToggleTask(task.id)} size="small" sx={{ p: 0.25, mt: 0.1 }} />
-                <TextField
-                  value={task.title}
-                  onChange={(event) => handleUpdateTaskTitle(task.id, event.target.value)}
-                  variant="standard"
-                  fullWidth
-                  multiline
-                  slotProps={{ input: { disableUnderline: true } }}
-                  sx={{ '& textarea, & input': { fontSize: '0.88rem', lineHeight: 1.55, textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))' } }}
-                />
-              </Box>
-            ))}
+            {visibleTasks.map((task) => {
+              const expanded = simpleExpandedTaskIds.includes(task.id);
+              return (
+                <Box key={task.id} data-simple-task-id={task.id} sx={{ py: 0.7, scrollMarginTop: 100 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                    <Checkbox checked={task.completed} onChange={() => handleToggleTask(task.id)} size="small" sx={{ p: 0.25, mt: 0.1 }} />
+                    <TextField
+                      value={task.title}
+                      onChange={(event) => handleUpdateTaskTitle(task.id, event.target.value)}
+                      variant="standard"
+                      fullWidth
+                      multiline
+                      slotProps={{ input: { disableUnderline: true } }}
+                      sx={{ '& textarea, & input': { fontSize: '0.88rem', lineHeight: 1.55, textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))' } }}
+                    />
+                    <IconButton
+                      size="small"
+                      onClick={() => toggleSimpleTaskExpanded(task.id)}
+                      aria-label={expanded ? 'Hide task description' : 'Show task description'}
+                      sx={{ p: 0.25, mt: 0.1, color: 'hsl(var(--muted-foreground))' }}
+                    >
+                      {expanded ? <ExpandLessIcon size={16} /> : <ExpandMoreIcon size={16} />}
+                    </IconButton>
+                  </Box>
+                  {expanded && (
+                    <Box sx={{ pl: 4, pr: 4.5, pt: 0.3 }}>
+                      <TextField
+                        value={task.description || ''}
+                        onChange={(event) => handleUpdateTaskDescription(task.id, event.target.value)}
+                        variant="standard"
+                        fullWidth
+                        multiline
+                        placeholder="Add a description"
+                        slotProps={{ input: { disableUnderline: true } }}
+                        sx={{ '& textarea': { fontSize: '0.82rem', lineHeight: 1.6, color: 'hsl(var(--muted-foreground))' } }}
+                      />
+                    </Box>
+                  )}
+                </Box>
+              );
+            })}
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mt: 1 }}>
               <AddIcon size={16} style={{ color: 'hsl(var(--muted-foreground))' }} />
               <TextField
