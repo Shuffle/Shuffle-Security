@@ -68,11 +68,11 @@ export const SimpleCaseLayout = ({
   };
 
   const openTasks = taskItems.filter((task) => !task.completed && !task.disabled);
-  const sectionData: Array<{ key: SectionKey; label: string; count?: number }> = [
-    { key: 'narrative', label: narrativeLabel },
-    { key: 'tasks', label: 'Tasks', count: openTasks.length },
-    { key: 'observables', label: 'Observables', count: observableCount },
-    { key: 'correlations', label: 'Correlations', count: correlationCount },
+  const sectionData: Array<{ key: SectionKey; label: string; count?: number; icon: typeof FileText }> = [
+    { key: 'narrative', label: narrativeLabel, icon: SECTION_ICONS.narrative },
+    { key: 'tasks', label: 'Tasks', count: openTasks.length, icon: SECTION_ICONS.tasks },
+    { key: 'observables', label: 'Observables', count: observableCount, icon: SECTION_ICONS.observables },
+    { key: 'correlations', label: 'Correlations', count: correlationCount, icon: SECTION_ICONS.correlations },
   ];
 
   const sectionSx = {
