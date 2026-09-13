@@ -1041,6 +1041,8 @@ const IncidentDetailPage = () => {
   // to the new comment when it's submitted. Cleared after submit / cancel.
   const [replyingTo, setReplyingTo] = useState<{ id: string; label: string; preview: string } | null>(null);
   const commentInputRef = useRef<HTMLDivElement>(null);
+  // Simple-view timeline feed: always parked at the newest (bottom) entry.
+  const simpleFeedRef = useRef<HTMLDivElement | null>(null);
   const [commentUploading, setCommentUploading] = useState(false);
   const handleCommentAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -6130,7 +6132,7 @@ const IncidentDetailPage = () => {
           <Box sx={{ flexShrink: 0, mb: 1 }}>
             {renderTimelineActionsChip(isSimple)}
           </Box>
-          <Box sx={{ flex: 1, overflowY: 'auto', pb: '150px' }}>
+          <Box ref={simpleFeedRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 0 }}>
             {renderTimelineFeedItems(variant)}
           </Box>
           {renderTimelineInputArea(isSimple)}
