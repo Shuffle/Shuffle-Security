@@ -3884,7 +3884,7 @@ const IncidentDetailPage = () => {
     setEnrichments(reParsed.enrichments || []);
     setEditedStakeholders(reParsed.stakeholders || []);
     setEditedLabels(reParsed.labels || []);
-    setActivity(reParsed.activity || []);
+    setActivity(mergePendingActivity(reParsed.activity || []));
 
     // Compute what is STILL missing after we folded revisions into the base
     // and overlaid live edits. Only these should surface as "missing" in the
