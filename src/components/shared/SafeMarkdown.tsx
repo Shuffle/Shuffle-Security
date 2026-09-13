@@ -1,55 +1,66 @@
 /**
- * SafeMarkdown — renders a markdown string as sanitized HTML.
+ * SafeMarkdown — renders a markdown string with the SAME renderer and config
+ * used for documentation (`ShuffleMarkdown`), so plugins, link handling and
+ * sanitization stay identical everywhere.
  *
- * Markdown is parsed with react-markdown + remark-gfm (tables, strikethrough,
- * task lists) and then hardened with rehype-sanitize, so pasted content from
- * an email or a report can never inject script, iframe or event handlers.
+ * Strictness guarantees (defense in depth):
+ *  - Raw HTML is never enabled (no rehype-raw) and rehype-sanitize runs on the
+ *    resulting tree, so script/iframe/style/event handlers can never appear.
+ *  - Link and image URLs are additionally checked here: only http(s), mailto,
+ *    relative app paths and `data:image/*` are allowed. Anything else
+ *    (javascript:, vbscript:, data:text/html, ...) is rendered as plain text.
+ *  - Nothing may set styles: inline `style` is not part of the sanitizer
+ *    schema, and our own components only apply theme tokens.
  *
- * Images are supported. Images stored in the Shuffle file API are fetched with
- * the current session so they render without exposing the file content URL to
- * an unauthenticated request.
+ * Images stored in the Shuffle file API are fetched with the current session
+ * (same approach as the email renderer) so they render without an
+ * unauthenticated request to the file content URL.
  */
 
 import { useEffect, useState } from 'react';
 import { Box, BoxProps } from '@mui/material';
-import ReactMarkdown from 'react-markdown';
-import type { Components } from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
+import { ShuffleMarkdown } from '@/components/shared/Markdown';
 import { getApiUrl, getAuthHeader } from '@/Shuffle-MCPs/api';
-
-// Allow inline images (including data URIs written by a paste) while keeping
-// the rest of the default GitHub-flavoured sanitizer schema intact.
-const schema = {
-  ...defaultSchema,
-  protocols: {
-    ...defaultSchema.protocols,
-    src: [...(defaultSchema.protocols?.src || []), 'data', 'blob'],
-  },
-  attributes: {
-    ...defaultSchema.attributes,
-    img: [...(defaultSchema.attributes?.img || []), 'alt', 'title', 'width', 'height'],
-  },
-};
 
 const isApiFileUrl = (src: string) => src.includes('/api/v1/files/');
 
+/** Only allow URLs that cannot execute script when rendered. */
+const isSafeUrl = (raw?: unknown): raw is string => {
+  if (typeof raw !== 'string') return false;
+  const url = raw.trim();
+  if (!url) return false;
+  // Relative paths and fragments are fine.
+  if (/^[/#?]/.test(url)) return true;
+  // Scheme-less values (e.g. "example.com/x") never execute.
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(url)) return true;
+  return /^(https?:|mailto:)/i.test(url);
+};
+
+/** Images may additionally be inline image data (pasted screenshots). */
+const isSafeImageUrl = (raw?: unknown): raw is string => {
+  if (typeof raw !== 'string') return false;
+  const url = raw.trim();
+  if (/^data:image\/(png|jpe?g|gif|webp|avif);base64,/i.test(url)) return true;
+  return isSafeUrl(url);
+};
+
 /** Image that loads Shuffle file-API images through the authenticated session. */
-const MarkdownImage = ({ src, alt, title }: { src?: string; alt?: string; title?: string }) => {
+const MarkdownImage = ({ src, alt, title }: { src?: unknown; alt?: string; title?: string }) => {
+  const safeSrc = isSafeImageUrl(src) ? src.trim() : undefined;
   const [resolved, setResolved] = useState<string | undefined>(
-    src && isApiFileUrl(src) ? undefined : src,
+    safeSrc && isApiFileUrl(safeSrc) ? undefined : safeSrc,
   );
 
   useEffect(() => {
-    if (!src || !isApiFileUrl(src)) {
-      setResolved(src);
+    if (!safeSrc || !isApiFileUrl(safeSrc)) {
+      setResolved(safeSrc);
       return;
     }
     let objectUrl = '';
     let cancelled = false;
     (async () => {
       try {
-        const url = src.startsWith('http') ? src : getApiUrl(src);
+        const url = safeSrc.startsWith('http') ? safeSrc : getApiUrl(safeSrc);
         const resp = await fetch(url, { credentials: 'include', headers: getAuthHeader() });
         if (!resp.ok) return;
         const blob = await resp.blob();
@@ -64,7 +75,7 @@ const MarkdownImage = ({ src, alt, title }: { src?: string; alt?: string; title?
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [src]);
+  }, [safeSrc]);
 
   if (!resolved) {
     return (
@@ -82,25 +93,28 @@ const MarkdownImage = ({ src, alt, title }: { src?: string; alt?: string; title?
       src={resolved}
       alt={alt || ''}
       title={title}
+      loading="lazy"
       style={{ maxWidth: '100%', height: 'auto', borderRadius: 6, display: 'block', margin: '12px 0' }}
     />
   );
 };
 
-const components: Components = {
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer nofollow"
-      style={{ color: 'hsl(var(--primary))', textDecoration: 'underline' }}
-    >
-      {children}
-    </a>
-  ),
-  img: ({ src, alt, title }) => (
-    <MarkdownImage src={typeof src === 'string' ? src : undefined} alt={alt} title={title} />
-  ),
+const components = {
+  a: ({ href, children }: any) =>
+    isSafeUrl(href) ? (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer nofollow"
+        onClick={(event) => event.stopPropagation()}
+        style={{ color: 'hsl(var(--primary))', textDecoration: 'underline' }}
+      >
+        {children}
+      </a>
+    ) : (
+      <span>{children}</span>
+    ),
+  img: ({ src, alt, title }: any) => <MarkdownImage src={src} alt={alt} title={title} />,
 };
 
 interface SafeMarkdownProps extends Omit<BoxProps, 'children'> {
@@ -108,57 +122,8 @@ interface SafeMarkdownProps extends Omit<BoxProps, 'children'> {
 }
 
 export const SafeMarkdown = ({ text, sx, ...boxProps }: SafeMarkdownProps) => (
-  <Box
-    {...boxProps}
-    sx={{
-      fontSize: '0.95rem',
-      lineHeight: 1.8,
-      color: 'inherit',
-      wordBreak: 'break-word',
-      '& p': { m: 0, mb: 1.5 },
-      '& p:last-child': { mb: 0 },
-      '& h1, & h2, & h3, & h4': { mt: 2.5, mb: 1, fontWeight: 600, lineHeight: 1.3 },
-      '& h1': { fontSize: '1.35rem' },
-      '& h2': { fontSize: '1.15rem' },
-      '& h3': { fontSize: '1rem' },
-      '& ul, & ol': { pl: 3, mb: 1.5 },
-      '& li': { mb: 0.5 },
-      '& blockquote': {
-        m: 0,
-        mb: 1.5,
-        pl: 2,
-        borderLeft: '2px solid hsl(var(--border))',
-        color: 'hsl(var(--muted-foreground))',
-      },
-      '& code': {
-        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-        fontSize: '0.88em',
-        px: 0.5,
-        borderRadius: '3px',
-        bgcolor: 'hsl(var(--muted))',
-      },
-      '& pre': {
-        p: 1.5,
-        borderRadius: 1,
-        bgcolor: 'hsl(var(--muted))',
-        overflow: 'auto',
-        mb: 1.5,
-      },
-      '& pre code': { bgcolor: 'transparent', px: 0 },
-      '& table': { borderCollapse: 'collapse', mb: 1.5, maxWidth: '100%' },
-      '& th, & td': { textAlign: 'left', px: 1, py: 0.5, verticalAlign: 'top' },
-      '& th': { color: 'hsl(var(--muted-foreground))', fontWeight: 600 },
-      '& hr': { border: 0, borderTop: '1px solid hsl(var(--border))', my: 2 },
-      ...sx,
-    }}
-  >
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[[rehypeSanitize, schema]]}
-      components={components}
-    >
-      {text}
-    </ReactMarkdown>
+  <Box {...boxProps} sx={{ fontSize: '0.95rem', lineHeight: 1.8, ...sx }}>
+    <ShuffleMarkdown components={components}>{text}</ShuffleMarkdown>
   </Box>
 );
 
