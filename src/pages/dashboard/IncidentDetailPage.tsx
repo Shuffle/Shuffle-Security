@@ -5979,7 +5979,10 @@ const IncidentDetailPage = () => {
 
 
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }} ref={commentInputRef}>
-            {replyingTo && (
+            {/* The simple view keeps threads one level deep and bumps the
+                conversation to the bottom when it gets an answer, so the
+                "Replying to" banner adds nothing there. */}
+            {replyingTo && !isSimple && (
               <Box
                 sx={{
                   display: 'flex',
@@ -6852,8 +6855,35 @@ const IncidentDetailPage = () => {
       return text.slice(0, 80);
     };
 
+    // Build canonical-id set first so reply targets can be resolved to the
+    // root of their conversation.
+    const allKeys = new Set(items.map(getItemKey));
+    const parentByKey = new Map<string, string>();
+    for (const it of items) {
+      if (it.type !== 'manual') continue;
+      const parentId = (it.data as any)?.replyToId;
+      if (parentId) parentByKey.set(getItemKey(it), String(parentId));
+    }
+    // Simple mode allows a single level of replies only: replying to a reply
+    // attaches to the conversation's root item instead of nesting deeper.
+    const resolveRootKey = (key: string): string => {
+      let cur = key;
+      for (let i = 0; i < 20; i++) {
+        const parent = parentByKey.get(cur);
+        if (!parent || !allKeys.has(parent)) break;
+        cur = parent;
+      }
+      return cur;
+    };
+    const replyTargetKey = (it: TimelineItem): string => {
+      const key = getItemKey(it);
+      return variant === 'simple' ? resolveRootKey(key) : key;
+    };
+
     const startReplyTo = (it: TimelineItem) => {
-      setReplyingTo({ id: getItemKey(it), label: getItemLabel(it), preview: getItemPreview(it) });
+      const targetKey = replyTargetKey(it);
+      const target = items.find((candidate) => getItemKey(candidate) === targetKey) || it;
+      setReplyingTo({ id: targetKey, label: getItemLabel(target), preview: getItemPreview(target) });
       // Scroll the input into view + focus it so the user can immediately type.
       // The reply banner re-renders the input, so retry for a few frames until
       // the textarea actually exists and takes focus.
@@ -6873,14 +6903,16 @@ const IncidentDetailPage = () => {
       setTimeout(tryFocus, 0);
     };
 
-    // Build canonical-id set + replies-by-parent map. Only manual items can
-    // *be* replies; any timeline item can be a parent.
-    const allKeys = new Set(items.map(getItemKey));
+    // Group replies under their parent. Only manual items can *be* replies;
+    // any timeline item can be a parent. In simple mode every reply is pulled
+    // up to the root of its conversation so threads stay one level deep.
     const repliesByParent = new Map<string, TimelineItem[]>();
     for (const it of items) {
       if (it.type !== 'manual') continue;
-      const parentId = it.data.replyToId;
-      if (!parentId || !allKeys.has(parentId)) continue;
+      const rawParent = it.data.replyToId;
+      if (!rawParent || !allKeys.has(rawParent)) continue;
+      const parentId = variant === 'simple' ? resolveRootKey(String(rawParent)) : String(rawParent);
+      if (parentId === getItemKey(it)) continue;
       const arr = repliesByParent.get(parentId) || [];
       arr.push(it);
       repliesByParent.set(parentId, arr);
@@ -6895,6 +6927,22 @@ const IncidentDetailPage = () => {
       const parentId = it.data.replyToId;
       return !parentId || !allKeys.has(parentId);
     });
+
+    // Simple mode reads oldest-first, so a conversation that just received an
+    // answer moves to the bottom: order threads by their newest reply.
+    if (variant === 'simple') {
+      const threadTs = (it: TimelineItem): number => {
+        const replies = repliesByParent.get(getItemKey(it)) || [];
+        return replies.reduce((max, r) => Math.max(max, r.timestamp), it.timestamp);
+      };
+      topLevel.sort((a, b) => {
+        const aCreate = isCreationItem(a);
+        const bCreate = isCreationItem(b);
+        if (aCreate && !bCreate) return -1;
+        if (bCreate && !aCreate) return 1;
+        return threadTs(a) - threadTs(b);
+      });
+    }
 
     const renderItem = (item: TimelineItem, opts: { isReply?: boolean } = {}): React.ReactNode => {
       const { isReply = false } = opts;
@@ -8545,7 +8593,7 @@ const IncidentDetailPage = () => {
             variant="caption"
             sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'inherit', lineHeight: 1 }}
           >
-            {isClickable ? 'Checking your message for observables — view run' : 'Checking your message for observables…'}
+            {isClickable ? 'Checking observables.. — view run' : 'Checking observables..'}
           </Typography>
         </Box>
       );
