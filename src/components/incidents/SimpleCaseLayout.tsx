@@ -9,8 +9,12 @@ interface SimpleCaseLayoutProps {
   narrative: ReactNode;
   timeline: ReactNode;
   tasks: ReactNode;
+  /** Optional custom fields block, rendered below Tasks when the case has any. */
+  customFields?: ReactNode;
   observables: ReactNode;
   correlations: ReactNode;
+  /** Configuration controls (share access, actions menu) shown above Contents. */
+  contentsActions?: ReactNode;
   taskItems: IncidentTask[];
   observableCount: number;
   correlationCount: number;
