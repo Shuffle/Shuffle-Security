@@ -47,7 +47,9 @@ export const SimpleCaseLayout = ({
   taskItems,
   observableCount,
   correlationCount,
+  relatedIncidents,
 }: SimpleCaseLayoutProps) => {
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<SectionKey>('narrative');
   const refs = useRef<Record<SectionKey, HTMLElement | null>>({
     narrative: null,
