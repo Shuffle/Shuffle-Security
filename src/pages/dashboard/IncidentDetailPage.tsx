@@ -1127,6 +1127,8 @@ const IncidentDetailPage = () => {
   
   // Description editing state
   const [isEditingDescription, setIsEditingDescription] = useState(false);
+  // Simple view: the email renderer sits above the description and starts collapsed.
+  const [simpleEmailOpen, setSimpleEmailOpen] = useState(false);
   const [descriptionView, setDescriptionView] = useState<'rendered' | 'readable' | 'raw'>('readable');
   const [rawDescriptionHtml, setRawDescriptionHtml] = useState('');
   
