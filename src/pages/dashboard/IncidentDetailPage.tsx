@@ -10554,16 +10554,37 @@ const IncidentDetailPage = () => {
           </Box>
         );
 
+        // Manual observables plus automated enrichments, deduplicated by
+        // type+value (case-insensitive) so the simple view matches the count
+        // shown in the Overview rail.
+        const simpleObservableRows = (() => {
+          const rows: Array<{ type: string; value: string }> = [
+            ...editedObservables
+              .filter((observable) => !observable.archived)
+              .map((observable) => ({ type: observable.type || 'unknown', value: observable.value || '' })),
+            ...enrichments.map((enr) => ({ type: enr.type || 'unknown', value: enr.value || enr.data || '' })),
+          ];
+          const seen = new Set<string>();
+          return rows.filter((row) => {
+            if (!row.value) return false;
+            if (isObservableIgnored(row.type, row.value)) return false;
+            const key = `${row.type.toLowerCase()}::${row.value.toLowerCase()}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        })();
+
         const simpleObservables = (
           <Box>
-            {editedObservables.filter((observable) => !observable.archived && !isObservableIgnored(observable.type, observable.value)).map((observable, index) => (
+            {simpleObservableRows.map((observable, index) => (
               <Box key={`${observable.type}-${observable.value}-${index}`} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 0.8 }}>
                 <Typography sx={{ width: 110, flexShrink: 0, color: 'hsl(var(--muted-foreground))', fontSize: '0.72rem', textTransform: 'uppercase' }}>{observable.type}</Typography>
                 <Typography sx={{ minWidth: 0, flex: 1, fontFamily: 'monospace', fontSize: '0.82rem', overflowWrap: 'anywhere' }}>{observable.value}</Typography>
                 <ObservableLookupMenu type={observable.type} value={observable.value} />
               </Box>
             ))}
-            {visibleObservablesCount === 0 && <Typography sx={{ color: 'hsl(var(--muted-foreground))', fontSize: '0.85rem' }}>No observables found.</Typography>}
+            {simpleObservableRows.length === 0 && <Typography sx={{ color: 'hsl(var(--muted-foreground))', fontSize: '0.85rem' }}>No observables found.</Typography>}
             <Button size="small" onClick={() => setActiveTab(2)} sx={{ mt: 1, px: 0, textTransform: 'none', fontSize: '0.78rem' }}>Manage observables</Button>
           </Box>
         );
