@@ -9,8 +9,12 @@ interface SimpleCaseLayoutProps {
   narrative: ReactNode;
   timeline: ReactNode;
   tasks: ReactNode;
+  /** Optional custom fields block, rendered below Tasks when the case has any. */
+  customFields?: ReactNode;
   observables: ReactNode;
   correlations: ReactNode;
+  /** Configuration controls (share access, actions menu) shown above Contents. */
+  contentsActions?: ReactNode;
   taskItems: IncidentTask[];
   observableCount: number;
   correlationCount: number;
@@ -32,8 +36,10 @@ export const SimpleCaseLayout = ({
   narrative,
   timeline,
   tasks,
+  customFields,
   observables,
   correlations,
+  contentsActions,
   taskItems,
   observableCount,
   correlationCount,
@@ -162,6 +168,12 @@ export const SimpleCaseLayout = ({
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Tasks</Typography>
           {tasks}
         </Box>
+        {customFields && (
+          <Box id="simple-case-custom-fields" sx={sectionSx}>
+            <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Custom Fields</Typography>
+            {customFields}
+          </Box>
+        )}
         <Box id="simple-case-observables" ref={(node: HTMLElement | null) => { refs.current.observables = node; }} data-simple-section="observables" sx={sectionSx}>
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Observables</Typography>
           {observables}
@@ -173,6 +185,11 @@ export const SimpleCaseLayout = ({
       </Box>
 
       <Box component="nav" aria-label="Case contents" sx={{ display: { xs: 'none', lg: 'block' }, order: 3, position: 'sticky', top: 24, minWidth: 0 }}>
+        {contentsActions && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 2.5 }}>
+            {contentsActions}
+          </Box>
+        )}
         <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', mb: 1.25 }}>
           Contents
         </Typography>

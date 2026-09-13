@@ -57,6 +57,9 @@ import { useAppDetail } from '@/Shuffle-MCPs/AppDetailContext';
 import { useDemo } from '@/context/DemoContext';
 import { forceCreateSingleDemoIncidentReturningKey, isDemoActive, handleDemoAgentComment, getDemoCorrelations } from '@/services/demoMode';
 import { DATASTORE_CATEGORIES, getDatastoreItem, getDatastoreItemPublic, setDatastoreItem, deleteDatastoreItem, getDatastoreByCategory } from '@/Shuffle-MCPs/datastore';
+import type { DatastoreItem, RBACConfig } from '@/Shuffle-MCPs/datastore';
+import { ShareAccessModal } from '@/components/common/ShareAccessModal';
+import { IncidentActionsMenu } from '@/components/incidents/IncidentActionsMenu';
 import IncidentReportDialog from '@/components/incidents/IncidentReportDialog';
 import type { GenerateReportInput } from '@/services/incidentReports';
 import { API_CONFIG, getApiUrl, getAuthHeader, getShuffleCoreUrl, getShuffleCoreWorkflowUrl } from '@/Shuffle-MCPs/api';
@@ -5466,6 +5469,59 @@ const IncidentDetailPage = () => {
     },
   };
 
+  // Share (RBAC) for the incident itself — same access model as datastore keys
+  // on /admin/datastore. The RBAC lives on the datastore item, so read the
+  // stored item on open and write it back untouched apart from the rbac block.
+  const [simpleShareOpen, setSimpleShareOpen] = useState(false);
+  const [simpleShareLoading, setSimpleShareLoading] = useState(false);
+  const [simpleShareItem, setSimpleShareItem] = useState<DatastoreItem | null>(null);
+  const shareTargetOrgId = crossOrgId || userInfo?.active_org?.id || '';
+
+  const openSimpleShare = async () => {
+    if (!id) return;
+    setSimpleShareLoading(true);
+    try {
+      const result = await getDatastoreItem(id, DATASTORE_CATEGORIES.INCIDENTS, crossOrgId || undefined);
+      const item = result.item || result.data?.[0] || null;
+      if (!item) {
+        toast.error('Could not load access settings for this incident');
+        return;
+      }
+      setSimpleShareItem(item);
+      setSimpleShareOpen(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not load access settings');
+    } finally {
+      setSimpleShareLoading(false);
+    }
+  };
+
+  const handleSaveSimpleShare = async (rbac: RBACConfig | null) => {
+    if (!simpleShareItem || !shareTargetOrgId) throw new Error('Incident is not loaded yet');
+    const response = await fetch(getApiUrl(`/api/v1/orgs/${shareTargetOrgId}/set_cache`), {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...getAuthHeader(shareTargetOrgId),
+      },
+      body: JSON.stringify({
+        org_id: shareTargetOrgId,
+        key: simpleShareItem.key,
+        value: simpleShareItem.value,
+        category: simpleShareItem.category || DATASTORE_CATEGORIES.INCIDENTS,
+        rbac: rbac || undefined,
+      }),
+    });
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({} as Record<string, string>));
+      throw new Error(errData.reason || `Failed to update access: ${response.status}`);
+    }
+    setSimpleShareItem((prev) => (prev ? { ...prev, rbac: rbac || undefined } : prev));
+    toast.success('Access updated');
+  };
+
   const renderCustomField = (field: CustomField) => {
     const value = editedCustomFields[field.key];
 
@@ -10412,19 +10468,84 @@ const IncidentDetailPage = () => {
           </Box>
         );
 
+        // Custom fields: defined org fields plus any keys present on the
+        // incident data without a definition. Rendered only when there is
+        // something to show.
+        const simpleCustomFieldDefs = (() => {
+          const definedFieldKeys = new Set(customFields.map((f) => f.key));
+          const dynamicFields: CustomField[] = Object.keys(editedCustomFields)
+            .filter((k) => !definedFieldKeys.has(k))
+            .map((key) => ({
+              name: key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+              key,
+              type: typeof editedCustomFields[key] === 'boolean' ? 'boolean' as const :
+                    typeof editedCustomFields[key] === 'number' ? 'number' as const : 'text' as const,
+              required: false,
+            }));
+          return [...customFields, ...dynamicFields];
+        })();
+
+        const simpleCustomFields = simpleCustomFieldDefs.length > 0 ? (
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, columnGap: 2.5, rowGap: 2.5 }}>
+            {simpleCustomFieldDefs.map((field) => renderCustomField(field))}
+          </Box>
+        ) : null;
+
+        const simpleContentsActions = isPublicView ? null : (
+          <>
+            <Button
+              size="small"
+              onClick={openSimpleShare}
+              disabled={simpleShareLoading}
+              sx={{ minHeight: 32, px: 1, textTransform: 'none', fontSize: '0.78rem', color: 'hsl(var(--muted-foreground))' }}
+            >
+              Share
+            </Button>
+            {incident && (
+              <IncidentActionsMenu
+                incident={{
+                  id: incident.id,
+                  title: editedTitle || incident.title || '',
+                  source: incident.source,
+                  status: editedStatus || incident.status,
+                  rawOCSF: incident.rawOCSF,
+                  customFields: editedCustomFields,
+                }}
+                crossOrgId={crossOrgId}
+                sharedOrgs={sharedOrgs}
+              />
+            )}
+          </>
+        );
+
         return (
-          <SimpleCaseLayout
-            narrativeLabel={simpleHasEmail ? 'Email' : 'Description'}
-            overview={simpleOverview}
-            narrative={simpleNarrative}
-            timeline={renderTimelinePanel('simple')}
-            tasks={simpleTasks}
-            observables={simpleObservables}
-            correlations={simpleCorrelations}
-            taskItems={visibleTasks}
-            observableCount={visibleObservablesCount}
-            correlationCount={visibleCorrelations.length}
-          />
+          <>
+            <SimpleCaseLayout
+              narrativeLabel={simpleHasEmail ? 'Email' : 'Description'}
+              overview={simpleOverview}
+              narrative={simpleNarrative}
+              timeline={renderTimelinePanel('simple')}
+              tasks={simpleTasks}
+              customFields={simpleCustomFields}
+              observables={simpleObservables}
+              correlations={simpleCorrelations}
+              contentsActions={simpleContentsActions}
+              taskItems={visibleTasks}
+              observableCount={visibleObservablesCount}
+              correlationCount={visibleCorrelations.length}
+            />
+            {simpleShareItem && (
+              <ShareAccessModal
+                open={simpleShareOpen}
+                onClose={() => setSimpleShareOpen(false)}
+                resourceType="key"
+                resourceName={editedTitle || incident?.title || simpleShareItem.key}
+                parentName={simpleShareItem.category || DATASTORE_CATEGORIES.INCIDENTS}
+                initialRBAC={simpleShareItem.rbac}
+                onSave={handleSaveSimpleShare}
+              />
+            )}
+          </>
         );
       })()}
       {activeTab === 1 && (
