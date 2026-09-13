@@ -6856,11 +6856,22 @@ const IncidentDetailPage = () => {
     const startReplyTo = (it: TimelineItem) => {
       setReplyingTo({ id: getItemKey(it), label: getItemLabel(it), preview: getItemPreview(it) });
       // Scroll the input into view + focus it so the user can immediately type.
-      setTimeout(() => {
+      // The reply banner re-renders the input, so retry for a few frames until
+      // the textarea actually exists and takes focus.
+      let attempts = 0;
+      const tryFocus = () => {
+        attempts += 1;
         commentInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const ta = commentInputRef.current?.querySelector('textarea');
-        (ta as HTMLTextAreaElement | null)?.focus();
-      }, 50);
+        const ta = commentInputRef.current?.querySelector('textarea') as HTMLTextAreaElement | null;
+        if (ta) {
+          ta.focus();
+          const len = ta.value.length;
+          try { ta.setSelectionRange(len, len); } catch { /* ignore */ }
+          if (document.activeElement === ta) return;
+        }
+        if (attempts < 12) setTimeout(tryFocus, 50);
+      };
+      setTimeout(tryFocus, 0);
     };
 
     // Build canonical-id set + replies-by-parent map. Only manual items can
