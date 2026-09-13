@@ -26,12 +26,13 @@ interface SimpleCaseLayoutProps {
   relatedIncidents?: LinkedIncidentSummary[];
 }
 
-const SECTIONS = ['narrative', 'tasks', 'observables', 'correlations'] as const;
+const SECTIONS = ['narrative', 'tasks', 'customFields', 'observables', 'correlations'] as const;
 type SectionKey = typeof SECTIONS[number];
 
 const SECTION_ICONS: Record<SectionKey, typeof FileText> = {
   narrative: FileText,
   tasks: ListChecks,
+  customFields: ListChecks,
   observables: ScanEye,
   correlations: GitBranch,
 };
