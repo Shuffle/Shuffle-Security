@@ -5964,7 +5964,7 @@ const IncidentDetailPage = () => {
       );
     }
     return (
-      <Box sx={{ p: { xs: 1, sm: 2 }, borderBottom: isSimple ? 'none' : '1px solid hsl(var(--border-subtle))' }}>
+      <Box sx={{ p: isSimple ? 0 : { xs: 1, sm: 2 }, borderBottom: isSimple ? 'none' : '1px solid hsl(var(--border-subtle))' }}>
         <Box sx={{ display: 'flex', gap: 1 }}>
           {/* The simple view drops the avatar next to the input — the column is
               narrow and the spacing-first layout reads cleaner without it. */}
