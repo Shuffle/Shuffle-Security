@@ -5934,8 +5934,9 @@ const IncidentDetailPage = () => {
       { key: 'observables' as const, label: 'Observables', count: visibleObservablesCount },
       { key: 'correlations' as const, label: 'Correlations', count: visibleCorrelations.length },
     ];
-    const activeCount = filterDefs.filter(f => isFilterActive(f.key)).length;
-    const allActive = activeCount === filterDefs.length;
+    const totalCount = filterDefs.reduce((sum, f) => sum + f.count, 0);
+    const shownCount = filterDefs.filter(f => isFilterActive(f.key)).reduce((sum, f) => sum + f.count, 0);
+    const allActive = activeTimelineFilters.size === filterDefs.length;
     return (
       <Tooltip title="Filter timeline" arrow>
         <Chip
@@ -5955,7 +5956,7 @@ const IncidentDetailPage = () => {
                   border: allActive ? 'none' : '1px solid rgba(255, 102, 0, 0.35)',
                 }}
               >
-                {allActive ? 'All' : `${activeCount}/${filterDefs.length}`}
+                {allActive ? `${totalCount}` : `${shownCount}/${totalCount}`}
               </Box>
             </Box>
           }
