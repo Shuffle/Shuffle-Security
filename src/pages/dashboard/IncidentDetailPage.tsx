@@ -10245,8 +10245,17 @@ const IncidentDetailPage = () => {
         ) : (
           <Box
             onClick={() => !isPublicView && setIsEditingDescription(true)}
-            sx={{ minHeight: 120, cursor: isPublicView ? 'default' : 'text', color: 'hsl(var(--foreground))' }}
+            sx={{
+              minHeight: 120,
+              cursor: isPublicView ? 'default' : 'text',
+              color: 'hsl(var(--foreground))',
+              // Extend the clickable area down over the gap before Tasks
+              // without changing the visual spacing.
+              pb: { xs: 4, md: 7 },
+              mb: { xs: -4, md: -7 },
+            }}
           >
+
             {isEditingDescription ? (
               <DeferredMentionInput
                 value={editedMessage}
