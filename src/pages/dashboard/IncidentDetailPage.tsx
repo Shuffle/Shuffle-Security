@@ -10796,6 +10796,7 @@ const IncidentDetailPage = () => {
               overview={simpleOverview}
               narrative={simpleNarrative}
               timeline={renderTimelinePanel('simple')}
+              timelineActions={renderTimelineActionsChip(true)}
               tasks={simpleTasks}
               customFields={simpleCustomFields}
               observables={simpleObservables}
