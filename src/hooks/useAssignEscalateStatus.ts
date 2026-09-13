@@ -75,7 +75,11 @@ const isOrgActive = (
     (w) => labels.includes(w.name) && w.background_processing === true,
   );
   if (!matchingWorkflow) return false;
-  if (cfg === CATEGORY_CONFIG_MISSING) return true;
+  // No category_config at all means no "Run workflow" automation exists on the
+  // incidents category, so nothing ever fires. Reporting "ready" here is what
+  // produced the "readiness says enabled but zero runs" mismatch, so a missing
+  // config is now treated as NOT ready.
+  if (cfg === CATEGORY_CONFIG_MISSING) return false;
   const categoryConfig = (cfg as CategoryConfig | null | undefined) ?? null;
   const wfAutomation = categoryConfig?.automations?.find((a) => a.name === 'Run workflow');
   if (!wfAutomation || !wfAutomation.enabled) return false;
