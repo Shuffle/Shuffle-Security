@@ -227,6 +227,9 @@ export const MarkdownDescriptionEditor = ({
     const href = linkUrl.trim();
     if (!href) {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    } else if (!isSafeHref(href)) {
+      // Ignore anything that could execute (javascript:, data:text/html, ...).
+      return;
     } else {
       editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
     }
