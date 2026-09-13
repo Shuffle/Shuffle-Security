@@ -287,6 +287,22 @@ const formatCompactTime = (timestamp: number): string => {
   return `${Math.floor(days / 365)}y`;
 };
 
+/**
+ * Turn a timeline step label into a human sentence fragment that reads
+ * naturally after a username ("frikky completed"). Without an actor we keep
+ * the original standalone label.
+ */
+const stepVerbLabel = (label: string, hasActor: boolean): string => {
+  if (!hasActor) return label;
+  const map: Record<string, string> = {
+    'Task created': 'created',
+    'Task completed': 'completed',
+    'Task moved': 'moved',
+    'Incident created': 'created this incident',
+  };
+  return map[label] || label.toLowerCase();
+};
+
 const formatDuration = (ms: number): string => {
   // Guard against NaN/undefined/negative — callers sometimes pass a diff of
   // two timestamps where one side is missing, which propagates as NaN and
@@ -6822,7 +6838,13 @@ const IncidentDetailPage = () => {
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
                   <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.73rem' }}>
-                    {showAsCreation ? 'Incident created' : `Change #${revisionNumber(item.idx)}`}
+                    {showAsCreation
+                      ? 'Incident created'
+                      : isSimple
+                        ? (diff && diff.changed.length === 1
+                          ? `changed ${diff.changed[0].field} to ${truncateValue(diff.changed[0].to)}`
+                          : `made ${totalChanges || 0} change${totalChanges === 1 ? '' : 's'}`)
+                        : `Change #${revisionNumber(item.idx)}`}
                   </Typography>
                   {isLatest && !showAsCreation && (
                     <Chip label="Latest" size="small" variant="outlined" sx={{ height: 16, fontSize: '0.58rem', bgcolor: 'transparent', borderColor: 'hsl(var(--border))', color: 'text.secondary', fontWeight: 600 }} />
