@@ -121,6 +121,10 @@ const GlobalAgentDrawer = ({ sideshift }: GlobalAgentDrawerProps = {}) => {
     }
   }, [isAgentDisabled, location.search, location.pathname, navigate]);
 
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <AskAiWidget
       open={open}
