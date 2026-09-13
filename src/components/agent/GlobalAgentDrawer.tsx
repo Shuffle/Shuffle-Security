@@ -32,23 +32,13 @@ export interface GlobalAgentDrawerProps {
 }
 
 const GlobalAgentDrawer = ({ sideshift }: GlobalAgentDrawerProps = {}) => {
-  const [open, setOpen] = useState(() => {
-    try {
-      if (typeof window === 'undefined') return false;
-      if (isAgentRoute(window.location.pathname)) return false;
-      return localStorage.getItem('shuffle_agent_drawer_open') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [initialTab, setInitialTab] = useState<AgentRunDrawerTab>(() => {
-    try {
-      if (typeof window === 'undefined') return 'run';
-      const saved = localStorage.getItem('shuffle_agent_drawer_tab');
-      if (saved === 'run' || saved === 'permissions' || saved === 'localLLM') return saved;
-    } catch { /* ignore */ }
-    return 'run';
-  });
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const [open, setOpen] = useState(false);
+  const [initialTab, setInitialTab] = useState<AgentRunDrawerTab>('run');
   const [defaultInput, setDefaultInput] = useState<string>('');
   const location = useLocation();
   const navigate = useNavigate();
