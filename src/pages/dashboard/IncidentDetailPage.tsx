@@ -6860,8 +6860,8 @@ const IncidentDetailPage = () => {
                   )}
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                  {rev.updated_by && (
-                    <UserHoverCard username={String(rev.updated_by)} maxChars={isSimple ? 12 : 24} />
+                  {rev.updated_by && !isSimple && (
+                    <UserHoverCard username={String(rev.updated_by)} maxChars={24} />
                   )}
                   <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: isSimple ? '0.6rem' : '0.65rem' }}>
                     {item.timestamp ? (isSimple ? formatCompactTime(item.timestamp) : formatRelativeTime(item.timestamp)) : 'Unknown'}
