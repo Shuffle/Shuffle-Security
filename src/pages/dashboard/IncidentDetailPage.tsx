@@ -7597,7 +7597,7 @@ const IncidentDetailPage = () => {
               borderRadius: isSimple ? 1 : 999,
               bgcolor: pillBg,
               border: isSimple ? 'none' : `1px solid ${pillBorder}`,
-              mb: isSimple ? 1 : 0,
+              mb: isSimple ? 1.375 : 0,
               maxWidth: '100%',
               minWidth: 0,
               overflow: 'hidden',
@@ -7728,6 +7728,7 @@ const IncidentDetailPage = () => {
                     flex: '1 1 100%',
                     order: 2,
                     minWidth: 0,
+                    pl: 1.25,
                   }}
                 >
                   <Checkbox
@@ -7777,7 +7778,7 @@ const IncidentDetailPage = () => {
                     whiteSpace: isSimple ? 'normal' : 'nowrap',
                     lineHeight: 1.4,
                     minWidth: 0,
-                    ...(isSimple ? { flex: '1 1 100%', order: 2 } : { flex: '1 1 auto' }),
+                    ...(isSimple ? { flex: '1 1 100%', order: 2, pl: 1.25 } : { flex: '1 1 auto' }),
                   }}
                   title={item.detail}
                 >
