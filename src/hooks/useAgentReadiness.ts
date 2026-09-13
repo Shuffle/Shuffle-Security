@@ -142,7 +142,8 @@ export const useAgentReadiness = (orgId?: string): AgentReadinessStatus => {
   // Automation Readiness banner. Any consumer that reads agentReadiness.active
   // now agrees with that banner by construction (no more "AI Agent is on but
   // Assign & Escalate is off" mismatches).
-  const assign = useAssignEscalateStatus();
+  const assignOptions = useMemo(() => (orgId ? { orgIds: [orgId] } : undefined), [orgId]);
+  const assign = useAssignEscalateStatus(assignOptions);
   const serverActive = assign.active;
   const active = optimistic !== null ? optimistic : serverActive;
 
@@ -150,9 +151,9 @@ export const useAgentReadiness = (orgId?: string): AgentReadinessStatus => {
   const refetchAll = useCallback(async () => {
     await Promise.allSettled([
       refetchWorkflows(),
-      queryClient.invalidateQueries({ queryKey: ['agent-readiness-category-config'] }),
+      queryClient.invalidateQueries({ queryKey: ['agent-readiness-category-config', orgId || 'active'] }),
     ]);
-  }, [refetchWorkflows, queryClient]);
+  }, [refetchWorkflows, queryClient, orgId]);
 
   const enable = useCallback(async () => {
     setOptimistic(true);
