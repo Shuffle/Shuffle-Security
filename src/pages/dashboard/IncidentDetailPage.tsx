@@ -267,6 +267,26 @@ const formatRelativeTime = (timestamp: number): string => {
   return formatTimestamp(ms);
 };
 
+/**
+ * Ultra-compact relative time for the simple timeline, where the timestamp
+ * is secondary information and must not eat horizontal space.
+ * "now", "5m", "3h", "2d", "12w", then a short date.
+ */
+const formatCompactTime = (timestamp: number): string => {
+  const ms = normalizeToMs(timestamp);
+  if (!ms) return '';
+  const diff = Date.now() - ms;
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(diff / 3600000);
+  const days = Math.floor(diff / 86400000);
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m`;
+  if (hours < 24) return `${hours}h`;
+  if (days < 7) return `${days}d`;
+  if (days < 365) return `${Math.floor(days / 7)}w`;
+  return `${Math.floor(days / 365)}y`;
+};
+
 const formatDuration = (ms: number): string => {
   // Guard against NaN/undefined/negative — callers sometimes pass a diff of
   // two timestamps where one side is missing, which propagates as NaN and
