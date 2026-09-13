@@ -10,6 +10,8 @@ interface SimpleCaseLayoutProps {
   overview?: ReactNode;
   narrative: ReactNode;
   timeline: ReactNode;
+  /** Filter/count control rendered on the same line as the Timeline title. */
+  timelineActions?: ReactNode;
   tasks: ReactNode;
   /** Optional custom fields block, rendered below Tasks when the case has any. */
   customFields?: ReactNode;
