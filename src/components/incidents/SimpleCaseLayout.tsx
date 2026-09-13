@@ -139,7 +139,21 @@ export const SimpleCaseLayout = ({
       </Box>
 
       <Box sx={{ order: { xs: 1, md: 2 }, minWidth: 0, maxWidth: 820, width: '100%', mx: 'auto' }}>
-        {overview}
+        {/* Overview (source, title, severity/status/assignee) stays pinned to
+            the top of the center column while the body scrolls. */}
+        {overview && (
+          <Box
+            sx={{
+              position: 'sticky',
+              top: 0,
+              zIndex: 3,
+              bgcolor: 'hsl(var(--background))',
+              pt: 1,
+            }}
+          >
+            {overview}
+          </Box>
+        )}
         <Box id="simple-case-narrative" ref={(node: HTMLElement | null) => { refs.current.narrative = node; }} data-simple-section="narrative" sx={sectionSx}>
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>{narrativeLabel}</Typography>
           {narrative}
