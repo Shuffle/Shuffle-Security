@@ -59,7 +59,6 @@ import { forceCreateSingleDemoIncidentReturningKey, isDemoActive, handleDemoAgen
 import { DATASTORE_CATEGORIES, getDatastoreItem, getDatastoreItemPublic, setDatastoreItem, deleteDatastoreItem, getDatastoreByCategory } from '@/Shuffle-MCPs/datastore';
 import type { DatastoreItem, RBACConfig } from '@/Shuffle-MCPs/datastore';
 import { ShareAccessModal } from '@/components/common/ShareAccessModal';
-import { IncidentActionsMenu } from '@/components/incidents/IncidentActionsMenu';
 import IncidentReportDialog from '@/components/incidents/IncidentReportDialog';
 import type { GenerateReportInput } from '@/services/incidentReports';
 import { API_CONFIG, getApiUrl, getAuthHeader, getShuffleCoreUrl, getShuffleCoreWorkflowUrl } from '@/Shuffle-MCPs/api';
@@ -8972,8 +8971,9 @@ const IncidentDetailPage = () => {
         );
       })()}
 
-      {/* Compact Header */}
-      <Box sx={{ mb: 2 }}>
+      {/* Compact Header — hidden in the Simple view, where the overview column
+          already carries the title, severity, status, assignee and timestamp. */}
+      <Box sx={{ mb: 2, display: isSupportUser && activeTab === 7 ? 'none' : 'block' }}>
         <Box
           sx={{
             display: 'flex',
@@ -10145,9 +10145,10 @@ const IncidentDetailPage = () => {
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: 2, mt: 2 }}>
         {/* Left content area */}
         <Box sx={{ flex: 1, minWidth: 0, order: { xs: 1, lg: 0 } }}>
-          {/* Modern Pill Tabs */}
-          <Box sx={{ 
-            display: 'flex', 
+          {/* Modern Pill Tabs — hidden in the Simple view */}
+          <Box sx={{
+            display: isSupportUser && activeTab === 7 ? 'none' : 'flex',
+
             alignItems: 'center', 
             justifyContent: 'space-between',
             mb: 2,
@@ -10493,30 +10494,38 @@ const IncidentDetailPage = () => {
 
         const simpleContentsActions = isPublicView ? null : (
           <>
+            <Tooltip title="Share access">
+              <IconButton
+                size="small"
+                onClick={openSimpleShare}
+                disabled={simpleShareLoading}
+                aria-label="Share access"
+                sx={{ width: 32, height: 32, color: 'hsl(var(--muted-foreground))' }}
+              >
+                <PeopleIcon size={16} />
+              </IconButton>
+            </Tooltip>
+            {/* Same actions menu as the detailed header, so both stay identical */}
+            <Tooltip title="Actions">
+              <IconButton
+                size="small"
+                onClick={(e) => setActionsMenuAnchor(e.currentTarget)}
+                aria-label="Actions"
+                sx={{ width: 32, height: 32, color: 'hsl(var(--muted-foreground))' }}
+              >
+                <MoreVertIcon size={18} />
+              </IconButton>
+            </Tooltip>
             <Button
               size="small"
-              onClick={openSimpleShare}
-              disabled={simpleShareLoading}
-              sx={{ minHeight: 32, px: 1, textTransform: 'none', fontSize: '0.78rem', color: 'hsl(var(--muted-foreground))' }}
+              onClick={() => setActiveTab(0)}
+              sx={{ minHeight: 32, px: 1, ml: 'auto', textTransform: 'none', fontSize: '0.78rem', color: 'hsl(var(--muted-foreground))' }}
             >
-              Share
+              Detailed view
             </Button>
-            {incident && (
-              <IncidentActionsMenu
-                incident={{
-                  id: incident.id,
-                  title: editedTitle || incident.title || '',
-                  source: incident.source,
-                  status: editedStatus || incident.status,
-                  rawOCSF: incident.rawOCSF,
-                  customFields: editedCustomFields,
-                }}
-                crossOrgId={crossOrgId}
-                sharedOrgs={sharedOrgs}
-              />
-            )}
           </>
         );
+
 
         return (
           <>
