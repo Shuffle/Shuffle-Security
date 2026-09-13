@@ -6058,12 +6058,13 @@ const IncidentDetailPage = () => {
               </Box>
             )}
             <Box data-tour="incident-comment-input" sx={{ position: 'relative' }}>
-              <MentionInput
+              <DebouncedMentionInput
                 value={newComment}
-                onChange={setNewComment}
-                onSubmit={() => {
-                  if (newComment.trim() || commentAttachments.length > 0) {
-                    handleAddComment();
+                onChangeDebounced={setNewComment}
+                onSubmitValue={(text) => {
+                  if (text.trim() || commentAttachments.length > 0) {
+                    setNewComment(text);
+                    handleAddComment(text);
                   }
                 }}
                 size="small"
