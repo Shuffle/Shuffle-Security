@@ -982,6 +982,40 @@ const IncidentDetailPage = () => {
   const [commentAttachments, setCommentAttachments] = useState<FileAttachment[]>([]);
   const commentFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Locally added timeline entries (comments, agent asks) live here until the
+  // backend echoes them back. A background poll or re-parse can return an
+  // activity list that was assembled before our write landed, which used to
+  // make a fresh comment disappear and pop back seconds later. Merging keeps
+  // the local entry visible until the server confirms it — or until the write
+  // fails, in which case it is dropped so the server stays the source of truth.
+  const pendingLocalActivityRef = useRef<ActivityItem[]>([]);
+  const trackPendingActivity = useCallback((item: ActivityItem) => {
+    pendingLocalActivityRef.current = [
+      ...pendingLocalActivityRef.current.filter((p) => p.id !== item.id),
+      item,
+    ];
+  }, []);
+  const dropPendingActivity = useCallback((itemId: string) => {
+    pendingLocalActivityRef.current = pendingLocalActivityRef.current.filter((p) => p.id !== itemId);
+  }, []);
+  const mergePendingActivity = useCallback((serverActivity: ActivityItem[]): ActivityItem[] => {
+    const pending = pendingLocalActivityRef.current;
+    if (pending.length === 0) return serverActivity;
+    const list = Array.isArray(serverActivity) ? serverActivity : [];
+    const serverIds = new Set(list.map((a) => a.id).filter(Boolean));
+    const signature = (a: ActivityItem) => `${a.type}|${a.user || ''}|${(a.content || '').trim()}`;
+    const serverSignatures = new Set(list.map(signature));
+    const stillPending = pending.filter((p) => {
+      if (p.id && serverIds.has(p.id)) return false;
+      if (serverSignatures.has(signature(p))) return false;
+      // Safety valve: never hold a local-only entry for more than 2 minutes.
+      return Date.now() - (p.timestamp || 0) < 120_000;
+    });
+    pendingLocalActivityRef.current = stillPending;
+    if (stillPending.length === 0) return list;
+    return [...list, ...stillPending];
+  }, []);
+
   // "Ask the agent" popover state — quick way to send an @AIAgent question
   // from the incident header without scrolling down to the comment box.
   const [askAgentAnchor, setAskAgentAnchor] = useState<HTMLElement | null>(null);
