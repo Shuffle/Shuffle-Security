@@ -7669,8 +7669,12 @@ const IncidentDetailPage = () => {
                   <Checkbox
                     size="small"
                     checked={!!tasks.find((t) => t.id === item.taskId)?.completed}
-                    onChange={(e) => {
+                    onMouseDown={(e) => { e.stopPropagation(); }}
+                    onClick={(e) => {
+                      // The surrounding pill navigates to the Tasks tab; keep the
+                      // checkbox click local so it only toggles the task.
                       e.stopPropagation();
+                      e.preventDefault();
                       if (item.taskId) handleToggleTask(item.taskId);
                     }}
                     icon={<SquareIcon size={16} />}
