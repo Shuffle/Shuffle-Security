@@ -10149,8 +10149,9 @@ const IncidentDetailPage = () => {
           </Box>
         );
 
-        // Overview block at the top of the center column: source + title, then
-        // the three fields that matter most (severity, status, assignee).
+        // Overview block at the top of the center column: source icon + title,
+        // then the three fields that matter most (severity, status, assignee)
+        // plus the incident timestamp, all aligned with the icon rather than indented.
         const simpleOverview = (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 4 }}>
             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
@@ -10173,7 +10174,7 @@ const IncidentDetailPage = () => {
                 sx={{ '& textarea, & input': { fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.25, color: 'hsl(var(--foreground))' } }}
               />
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, flexWrap: 'wrap', pl: { sm: 6 }, ...(isPublicView && { pointerEvents: 'none' }) }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, flexWrap: 'wrap', ...(isPublicView && { pointerEvents: 'none' }) }}>
               <FormControl size="small" variant="standard">
                 <Select
                   value={editedSeverity}
@@ -10252,6 +10253,13 @@ const IncidentDetailPage = () => {
                   ))}
                 </Select>
               </FormControl>
+              {!!incident?.created && (
+                <Tooltip title={formatTimestamp(incident.created)} placement="top">
+                  <Typography sx={{ fontSize: '0.78rem', color: 'hsl(var(--muted-foreground))', cursor: 'default' }}>
+                    {formatRelativeTime(incident.created)}
+                  </Typography>
+                </Tooltip>
+              )}
             </Box>
           </Box>
         );
