@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Box, Button, Typography } from '@mui/material';
+import { FileText, ListChecks, ScanEye, GitBranch } from 'lucide-react';
 import type { IncidentTask } from '@/config/ocsfIncidentSchema';
 
 interface SimpleCaseLayoutProps {
