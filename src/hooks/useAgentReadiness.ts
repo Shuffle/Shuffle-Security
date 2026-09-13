@@ -159,6 +159,7 @@ export const useAgentReadiness = (orgId?: string): AgentReadinessStatus => {
     setOptimistic(true);
     setIsEnabling(true);
     try {
+      const orgHeaders: Record<string, string> = orgId ? { 'Org-Id': orgId } : {};
       // Step 1: ensure the Assign & Escalate workflow exists.
       let workflowId = matchingWorkflow?.id || null;
       if (!workflowId) {
@@ -168,7 +169,7 @@ export const useAgentReadiness = (orgId?: string): AgentReadinessStatus => {
             fetch(getApiUrl('/api/v2/workflows/generate'), {
               method: 'POST',
               credentials: 'include',
-              headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+              headers: { ...getAuthHeader(), ...orgHeaders, 'Content-Type': 'application/json' },
               // schedule-based — no apps required
               body: JSON.stringify({ label, category: 'cases' }),
             }).then(async (r) => {
@@ -176,6 +177,7 @@ export const useAgentReadiness = (orgId?: string): AgentReadinessStatus => {
             }),
           ),
         );
+
         for (const r of results) {
           if (r.status !== 'fulfilled' || !r.value) continue;
           const body: any = r.value;
