@@ -904,6 +904,8 @@ const IncidentDetailPage = () => {
   // Correlations tab without losing track of which item they followed.
   const [flashedObsKey, setFlashedObsKey] = useState<string | null>(null);
   const [flashedCorrelationKey, setFlashedCorrelationKey] = useState<string | null>(null);
+  const [flashedTaskId, setFlashedTaskId] = useState<string | null>(null);
+  const flashedTaskTimerRef = useRef<any>(null);
   const flashedObsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashedCorrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track the user's most recent keystroke so background polls can defer
@@ -1305,7 +1307,14 @@ const IncidentDetailPage = () => {
          setRawJsonText(JSON.stringify((incident as any)?.rawOCSF || {}, null, 2));
          setSelectedRevisionIdx(null);
        }
-       return tab;
+      // Switching tabs while scrolled to the bottom of a long tab (e.g. the
+      // simple timeline) would otherwise leave the new tab scrolled past its
+      // content. Always start the new tab at the top; any focus helper that
+      // runs after this scrolls its own target into view.
+      if (prev !== tab) {
+        try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch { /* ignore */ }
+      }
+      return tab;
      });
      try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, tab === 7 ? 'simple' : 'detailed'); } catch { /* ignore */ }
      const newParams = new URLSearchParams(searchParams);
@@ -1339,10 +1348,13 @@ const IncidentDetailPage = () => {
      * Jump to the Tasks tab and scroll to the task card matching the given id.
      * Used by clickable task pills in the timeline.
      */
-    const focusTaskFromTimeline = (taskId: string | null) => {
-      setActiveTab(1);
-      if (!taskId) return;
-      setTimeout(() => {
+     const focusTaskFromTimeline = (taskId: string | null) => {
+       setActiveTab(1);
+       if (!taskId) return;
+       setFlashedTaskId(taskId);
+       if (flashedTaskTimerRef.current) clearTimeout(flashedTaskTimerRef.current);
+       flashedTaskTimerRef.current = setTimeout(() => setFlashedTaskId(null), 2200);
+       setTimeout(() => {
         try {
           const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(taskId) : taskId;
           const el = document.querySelector(`[data-task-id="${escaped}"]`) as HTMLElement | null;
@@ -10748,6 +10760,7 @@ const IncidentDetailPage = () => {
           onTasksChange={setTasks}
           incidentId={id || 'new'}
           currentUser={currentUsername || 'You'}
+          highlightTaskId={flashedTaskId}
         />
       )}
 

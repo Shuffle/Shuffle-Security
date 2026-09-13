@@ -77,6 +77,8 @@ interface TaskKanbanBoardProps {
   onTasksChange: (next: IncidentTask[]) => void;
   incidentId: string;
   currentUser: string;
+  /** Task id to briefly flash, e.g. when the user clicked it in the timeline. */
+  highlightTaskId?: string | null;
 }
 
 /**
@@ -91,6 +93,7 @@ export const TaskKanbanBoard = ({
   onTasksChange,
   incidentId,
   currentUser,
+  highlightTaskId = null,
 }: TaskKanbanBoardProps) => {
   const taskStatuses = useTaskStatuses();
   const laneKeys = useMemo(() => taskStatuses.map((s) => s.key), [taskStatuses]);
@@ -346,6 +349,7 @@ export const TaskKanbanBoard = ({
                       {renderDropSlot(idx)}
                       <Box
                         data-task-id={task.id}
+                        className={highlightTaskId === task.id ? 'incident-new-flash' : undefined}
                         draggable
                         onDragStart={() => setDraggedTaskId(task.id)}
                         onDragEnd={() => {
