@@ -6837,7 +6837,10 @@ const IncidentDetailPage = () => {
               </Avatar>
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.73rem' }}>
+                  {isSimple && rev.updated_by && (
+                    <UserHoverCard username={String(rev.updated_by)} maxChars={12} />
+                  )}
+                  <Typography variant="caption" sx={{ fontWeight: isSimple ? 500 : 600, fontSize: '0.73rem', color: isSimple ? 'text.secondary' : undefined }}>
                     {showAsCreation
                       ? 'Incident created'
                       : isSimple
@@ -6846,13 +6849,13 @@ const IncidentDetailPage = () => {
                           : `made ${totalChanges || 0} change${totalChanges === 1 ? '' : 's'}`)
                         : `Change #${revisionNumber(item.idx)}`}
                   </Typography>
-                  {isLatest && !showAsCreation && (
+                  {isLatest && !showAsCreation && !isSimple && (
                     <Chip label="Latest" size="small" variant="outlined" sx={{ height: 16, fontSize: '0.58rem', bgcolor: 'transparent', borderColor: 'hsl(var(--border))', color: 'text.secondary', fontWeight: 600 }} />
                   )}
-                  {isFirst && !isLatest && !showAsCreation && (
+                  {isFirst && !isLatest && !showAsCreation && !isSimple && (
                     <Chip label="Initial" size="small" variant="outlined" sx={{ height: 16, fontSize: '0.58rem', bgcolor: 'transparent', borderColor: 'hsl(var(--border-subtle))', color: 'text.secondary', fontWeight: 600 }} />
                   )}
-                  {totalChanges > 0 && !showAsCreation && (
+                  {totalChanges > 0 && !showAsCreation && !isSimple && (
                     <Chip label={`${totalChanges} change${totalChanges !== 1 ? 's' : ''}`} size="small" variant="outlined" sx={{ height: 16, fontSize: '0.58rem', bgcolor: 'transparent', borderColor: 'hsl(var(--border))', color: 'text.secondary' }} />
                   )}
                 </Box>
