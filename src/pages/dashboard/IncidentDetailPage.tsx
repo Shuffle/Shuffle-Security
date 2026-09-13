@@ -7305,6 +7305,7 @@ const IncidentDetailPage = () => {
                 {timeAgo}
               </Typography>
             )}
+            {replyButtonCompact}
             
           </Box>
         );
