@@ -9998,16 +9998,7 @@ const IncidentDetailPage = () => {
               <Divider />
               {/* Resync */}
               {(() => {
-                const product = incident?.rawOCSF?.product || incident?.rawOCSF?.metadata?.product;
-                const productName = product?.name;
-                const productId = product?.id;
-                const productUid = product?.uid;
-                const placeholderProduct = !!(productName && (productName === productId || productName === productUid));
-                let resyncReason = '';
-                if (isSaving) resyncReason = 'Saving in progress — please wait';
-                else if (!incident?.source) resyncReason = 'No source app recorded — cannot resync';
-                else if (incident?.source === 'Tenzir') resyncReason = 'Tenzir-ingested incidents cannot be resynced';
-                else if (placeholderProduct) resyncReason = 'Source product metadata is incomplete — cannot resync';
+                const resyncReason = getResyncBlockedReason(incident, isSaving);
                 const resyncDisabled = !!resyncReason;
                 const resyncItem = (
                   <MenuItem
@@ -10040,8 +10031,10 @@ const IncidentDetailPage = () => {
                             app_name: source,
                           }),
                         });
-                        if (!response.ok) {
-                          toast.error('Resync failed');
+                        const responseBody = await response.json().catch(() => null);
+                        const failureReason = extractResyncFailureReason(responseBody);
+                        if (!response.ok || responseBody?.success === false) {
+                          toast.error(failureReason ? `Resync failed: ${failureReason}` : 'Resync failed', { duration: 10000 });
                           setIsResyncing(false);
                           resyncState.remove(incident.id);
                           return;
