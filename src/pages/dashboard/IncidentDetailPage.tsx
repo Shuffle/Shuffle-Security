@@ -10495,30 +10495,38 @@ const IncidentDetailPage = () => {
 
         const simpleContentsActions = isPublicView ? null : (
           <>
+            <Tooltip title="Share access">
+              <IconButton
+                size="small"
+                onClick={openSimpleShare}
+                disabled={simpleShareLoading}
+                aria-label="Share access"
+                sx={{ width: 32, height: 32, color: 'hsl(var(--muted-foreground))' }}
+              >
+                <PeopleIcon size={16} />
+              </IconButton>
+            </Tooltip>
+            {/* Same actions menu as the detailed header, so both stay identical */}
+            <Tooltip title="Actions">
+              <IconButton
+                size="small"
+                onClick={(e) => setActionsMenuAnchor(e.currentTarget)}
+                aria-label="Actions"
+                sx={{ width: 32, height: 32, color: 'hsl(var(--muted-foreground))' }}
+              >
+                <MoreVertIcon size={18} />
+              </IconButton>
+            </Tooltip>
             <Button
               size="small"
-              onClick={openSimpleShare}
-              disabled={simpleShareLoading}
-              sx={{ minHeight: 32, px: 1, textTransform: 'none', fontSize: '0.78rem', color: 'hsl(var(--muted-foreground))' }}
+              onClick={() => setActiveTab(0)}
+              sx={{ minHeight: 32, px: 1, ml: 'auto', textTransform: 'none', fontSize: '0.78rem', color: 'hsl(var(--muted-foreground))' }}
             >
-              Share
+              Detailed view
             </Button>
-            {incident && (
-              <IncidentActionsMenu
-                incident={{
-                  id: incident.id,
-                  title: editedTitle || incident.title || '',
-                  source: incident.source,
-                  status: editedStatus || incident.status,
-                  rawOCSF: incident.rawOCSF,
-                  customFields: editedCustomFields,
-                }}
-                crossOrgId={crossOrgId}
-                sharedOrgs={sharedOrgs}
-              />
-            )}
           </>
         );
+
 
         return (
           <>
