@@ -6835,14 +6835,12 @@ const IncidentDetailPage = () => {
                   )}
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                  <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.65rem' }}>
-                    {item.timestamp ? formatRelativeTime(item.timestamp) : 'Unknown'}
-                  </Typography>
                   {rev.updated_by && (
-                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>
-                      by {rev.updated_by}
-                    </Typography>
+                    <UserHoverCard username={String(rev.updated_by)} maxChars={isSimple ? 12 : 24} />
                   )}
+                  <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: isSimple ? '0.6rem' : '0.65rem' }}>
+                    {item.timestamp ? (isSimple ? formatCompactTime(item.timestamp) : formatRelativeTime(item.timestamp)) : 'Unknown'}
+                  </Typography>
                 </Box>
               </Box>
               {replyButton}
@@ -7357,12 +7355,12 @@ const IncidentDetailPage = () => {
             sx={{
               display: 'flex',
               alignItems: 'center',
-              flexWrap: 'nowrap',
-              gap: 1,
-              px: 1.25,
-              py: 0.5,
-              ml: 0.5,
-              borderRadius: 999,
+              flexWrap: isSimple ? 'wrap' : 'nowrap',
+              gap: isSimple ? 0.5 : 1,
+              px: isSimple ? 0 : 1.25,
+              py: isSimple ? 0.25 : 0.5,
+              ml: isSimple ? 0 : 0.5,
+              borderRadius: isSimple ? 1 : 999,
               bgcolor: pillBg,
               border: isSimple ? 'none' : `1px solid ${pillBorder}`,
               mb: isSimple ? 1 : 0,
@@ -7387,9 +7385,20 @@ const IncidentDetailPage = () => {
                 the label for non-observable steps that still benefit from a
                 short text marker. */}
             {item.label && item.kind !== 'observable-added' && (
-              <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: pillColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                {item.label}
-              </Typography>
+              isSimple ? (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flexShrink: 0 }}>
+                  {item.actor && (
+                    <UserHoverCard username={item.actor} maxChars={12} />
+                  )}
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                    {stepVerbLabel(item.label, !!item.actor)}
+                  </Typography>
+                </Box>
+              ) : (
+                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: pillColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {item.label}
+                </Typography>
+              )
             )}
             {isIocPill && (
               <Typography
@@ -7478,13 +7487,14 @@ const IncidentDetailPage = () => {
             ) : item.detail && (
               <Typography
                 sx={{
-                  fontSize: '0.7rem',
-                  color: isIocPill ? 'hsl(var(--destructive))' : 'text.secondary',
+                  fontSize: isSimple ? '0.75rem' : '0.7rem',
+                  color: isIocPill ? 'hsl(var(--destructive))' : (isSimple ? 'hsl(var(--foreground))' : 'text.secondary'),
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  whiteSpace: isSimple ? 'normal' : 'nowrap',
+                  lineHeight: 1.4,
                   minWidth: 0,
-                  flex: '1 1 auto',
+                  ...(isSimple ? { flex: '1 1 100%', order: 2 } : { flex: '1 1 auto' }),
                 }}
                 title={item.detail}
               >
@@ -7552,8 +7562,8 @@ const IncidentDetailPage = () => {
                 </Typography>
               </Tooltip>
             )}
-            <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', ml: 'auto', pl: 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
-              {item.timestamp ? formatRelativeTime(item.timestamp) : ''}
+            <Typography sx={{ fontSize: isSimple ? '0.6rem' : '0.65rem', color: 'text.disabled', ml: 'auto', pl: isSimple ? 0.5 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
+              {item.timestamp ? (isSimple ? formatCompactTime(item.timestamp) : formatRelativeTime(item.timestamp)) : ''}
             </Typography>
           </Box>
         );
@@ -7635,9 +7645,14 @@ const IncidentDetailPage = () => {
                     '& .MuiChip-label': { px: 0.6 },
                   }}
                 />
-                <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', ml: 'auto' }}>
-                  {actItem.user ? `by ${actItem.user} · ` : ''}{formatRelativeTime(actItem.timestamp)}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
+                  {actItem.user && (
+                    <UserHoverCard username={actItem.user} maxChars={isSimple ? 12 : 24} />
+                  )}
+                  <Typography sx={{ fontSize: isSimple ? '0.6rem' : '0.65rem', color: 'text.disabled' }}>
+                    {isSimple ? formatCompactTime(actItem.timestamp) : formatRelativeTime(actItem.timestamp)}
+                  </Typography>
+                </Box>
               </Box>
               <Typography sx={{ fontSize: '0.78rem', color: 'hsl(var(--foreground))', mt: 0.25, whiteSpace: 'pre-wrap' }}>
                 {decodeHtmlEntities(actItem.content || '')}
@@ -7666,11 +7681,13 @@ const IncidentDetailPage = () => {
           sx={{
             display: 'flex',
             gap: 1.5,
-            p: 1.5,
+            p: isSimple ? 0.5 : 1.5,
             borderRadius: 1.5,
             bgcolor: isDeleted
               ? 'hsl(var(--muted) / 0.3)'
-              : actItem.type === 'comment' ? 'rgba(255, 102, 0, 0.05)' : 'hsl(var(--muted) / 0.5)',
+              : isSimple
+                ? 'transparent'
+                : actItem.type === 'comment' ? 'rgba(255, 102, 0, 0.05)' : 'hsl(var(--muted) / 0.5)',
             border: isSimple ? 'none' : '1px solid',
             borderColor: isSimple
               ? 'transparent'
@@ -7704,7 +7721,9 @@ const IncidentDetailPage = () => {
                     ? 'hsl(var(--border-subtle))'
                     : avatarInfo.isAgent
                       ? 'hsl(var(--primary) / 0.18)'
-                      : actItem.type === 'comment' ? 'rgba(255, 102, 0, 0.2)' : 'rgba(255,255,255,0.08)',
+                      : isSimple
+                        ? 'hsl(var(--muted) / 0.6)'
+                        : actItem.type === 'comment' ? 'rgba(255, 102, 0, 0.2)' : 'rgba(255,255,255,0.08)',
                 }}
               >
                 {getActivityIcon(actItem.type)}
@@ -7716,9 +7735,10 @@ const IncidentDetailPage = () => {
               <UserHoverCard
                 username={actItem.user}
                 isAgent={(actItem as any).is_agent === true}
+                maxChars={isSimple ? 12 : undefined}
               />
-              <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.65rem' }}>
-                {formatRelativeTime(actItem.timestamp)}
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: isSimple ? '0.6rem' : '0.65rem' }}>
+                {isSimple ? formatCompactTime(actItem.timestamp) : formatRelativeTime(actItem.timestamp)}
               </Typography>
               {isReply && actItem.replyToLabel && (
                 <Chip
@@ -7730,9 +7750,9 @@ const IncidentDetailPage = () => {
                     height: 18,
                     fontSize: '0.6rem',
                     bgcolor: 'transparent',
-                    borderColor: 'rgba(255, 102, 0, 0.3)',
+                    borderColor: isSimple ? 'hsl(var(--border-subtle))' : 'rgba(255, 102, 0, 0.3)',
                     color: 'text.secondary',
-                    '& .MuiChip-icon': { color: '#ff6600', ml: 0.5 },
+                    '& .MuiChip-icon': { color: isSimple ? 'hsl(var(--muted-foreground))' : '#ff6600', ml: 0.5 },
                   }}
                 />
               )}
@@ -8367,9 +8387,11 @@ const IncidentDetailPage = () => {
           {node}
           <Box
             sx={{
-              ml: cappedDepth === 0 ? 4 : 3,
-              pl: 2,
-              borderLeft: '2px solid rgba(255, 102, 0, 0.25)',
+              ml: variant === 'simple' ? 1 : (cappedDepth === 0 ? 4 : 3),
+              pl: variant === 'simple' ? 1 : 2,
+              borderLeft: variant === 'simple'
+                ? '1px solid hsl(var(--border-subtle))'
+                : '2px solid rgba(255, 102, 0, 0.25)',
               display: 'flex',
               flexDirection: 'column',
               gap: 1,
