@@ -249,7 +249,7 @@ export const useAgentReadiness = (orgId?: string): AgentReadinessStatus => {
       await fetch(getApiUrl('/api/v2/datastore/automate'), {
         method: 'POST',
         credentials: 'include',
-        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeader(), ...orgHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -260,7 +260,7 @@ export const useAgentReadiness = (orgId?: string): AgentReadinessStatus => {
       // past any timeout, and the generate API already confirmed success.
       // Only clear once the server-side state catches up (handled below).
     }
-  }, [labels, matchingWorkflow, refetchWorkflows, refetchAll]);
+  }, [labels, matchingWorkflow, refetchWorkflows, refetchAll, orgId]);
 
   // Clear optimistic flag once the server agrees we're active, so we never
   // flicker back to "not enabled" after a successful enable().
