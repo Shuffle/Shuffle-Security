@@ -1280,30 +1280,23 @@ const IncidentDetailPage = () => {
     const t = searchParams.get('tab');
     if (t) {
       const idx = TAB_NAMES.indexOf(t as any);
-      if (idx === 7 && !isSupportUser) return 0;
       return idx >= 0 ? idx : 0;
     }
-    if (!isSupportUser) return 0;
-    return readPreferredViewMode() === 'detailed' ? 0 : 7;
+    const preferred = readPreferredViewMode();
+    if (preferred === 'simple') return 7;
+    if (preferred === 'detailed') return 0;
+    // No stored choice yet: support users start in Simple, everyone else Detailed.
+    return isSupportUser ? 7 : 0;
   })();
    const [activeTab, setActiveTabState] = useState(initialTab);
    useEffect(() => {
      const requestedTab = searchParams.get('tab');
-     if (activeTab === 7 && !isSupportUser) {
-       setActiveTabState(0);
-       const newParams = new URLSearchParams(searchParams);
-       newParams.set('tab', 'details');
-       const paramStr = newParams.toString();
-       window.history.replaceState(null, '', `${window.location.pathname}${paramStr ? '?' + paramStr : ''}`);
-       return;
-     }
-     if (!requestedTab && isSupportUser && activeTab === 0 && readPreferredViewMode() !== 'detailed') {
+     if (!requestedTab && activeTab === 0 && readPreferredViewMode() === 'simple') {
        setActiveTabState(7);
      }
      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [activeTab, isSupportUser, searchParams]);
    const setActiveTab = (tab: number) => {
-     if (tab === 7 && !isSupportUser) return;
      // Leaving the Raw OCSF tab (index 4) while previewing an older revision:
      // revert the editor back to the live incident OCSF so unsaved revision
      // previews do not persist across tab switches.
@@ -1314,9 +1307,7 @@ const IncidentDetailPage = () => {
        }
        return tab;
      });
-     if (isSupportUser) {
-       try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, tab === 7 ? 'simple' : 'detailed'); } catch { /* ignore */ }
-     }
+     try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, tab === 7 ? 'simple' : 'detailed'); } catch { /* ignore */ }
      const newParams = new URLSearchParams(searchParams);
       if (tab === 7) { newParams.delete('tab'); } else { newParams.set('tab', TAB_NAMES[tab] || ''); }
      const paramStr = newParams.toString();
@@ -9110,7 +9101,7 @@ const IncidentDetailPage = () => {
 
       {/* Compact Header — hidden in the Simple view, where the overview column
           already carries the title, severity, status, assignee and timestamp. */}
-      <Box sx={{ mb: 2, display: isSupportUser && activeTab === 7 ? 'none' : 'block' }}>
+      <Box sx={{ mb: 2, display: activeTab === 7 ? 'none' : 'block' }}>
         <Box
           sx={{
             display: 'flex',
@@ -10277,7 +10268,7 @@ const IncidentDetailPage = () => {
         <Box sx={{ flex: 1, minWidth: 0, order: { xs: 1, lg: 0 } }}>
           {/* Modern Pill Tabs — hidden in the Simple view */}
           <Box sx={{
-            display: isSupportUser && activeTab === 7 ? 'none' : 'flex',
+            display: activeTab === 7 ? 'none' : 'flex',
 
             alignItems: 'center', 
             justifyContent: 'space-between',
@@ -10293,7 +10284,7 @@ const IncidentDetailPage = () => {
               value={String(activeTab)}
               onChange={(v) => setActiveTab(Number(v))}
               options={[
-                ...(isSupportUser ? [{ value: '7', label: 'Simple', dataTour: 'incident-tab-simple' }] : []),
+                { value: '7', label: 'Simple', dataTour: 'incident-tab-simple' },
                 { value: '0', label: 'Detailed', dataTour: 'incident-tab-details' },
                 { value: '1', label: 'Tasks', dataTour: 'incident-tab-tasks', count: visibleTasks.length > 0 ? visibleTasks.length : undefined, title: visibleTasks.length > 0 ? `${visibleTasks.filter(t => t.completed).length}/${visibleTasks.length} completed` : undefined },
                 { value: '2', label: 'Observables', dataTour: 'incident-tab-observables', count: visibleObservablesCount > 0 ? visibleObservablesCount : undefined },
@@ -10362,7 +10353,7 @@ const IncidentDetailPage = () => {
 
           {/* Tab Content */}
       <Box sx={isPublicView ? { pointerEvents: 'none', '& input, & textarea, & select, & button:not([data-public-ok])': { opacity: 0.7 } } : {}}>
-      {isSupportUser && activeTab === 7 && (() => {
+      {activeTab === 7 && (() => {
         const simpleHasEmail = !!incident && isEmailContent(editedMessage || '', rawDescriptionHtml || '', incident.rawOCSF);
         // When the case came in as an email we show the email renderer above the
         // description, collapsed by default, so the description stays available
