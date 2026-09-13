@@ -27,12 +27,15 @@ export const useIncidentWorkflowRuns = (
   incidentKey?: string,
   hasInFlight = false,
   window: IncidentRunsWindow = {},
+  /** Org the incident lives in. Required for sub-org incidents, otherwise the
+   *  search runs against the active org and returns nothing. */
+  orgId?: string,
 ) => {
   const isDetailContext = !!incidentKey;
   const { startTime, endTime } = window;
 
   const { data: allRuns = [], isLoading, error, refetch } = useQuery<AgentRun[]>({
-    queryKey: [...WORKFLOW_RUNS_QUERY_KEY, incidentKey || '_global', startTime || '', endTime || ''],
+    queryKey: [...WORKFLOW_RUNS_QUERY_KEY, incidentKey || '_global', startTime || '', endTime || '', orgId || 'active'],
     queryFn: async () => {
       // Empty workflow_id → search across every workflow the user can see.
       const result = await searchAgentActivity({
@@ -40,6 +43,7 @@ export const useIncidentWorkflowRuns = (
         limit: 100,
         startTime,
         endTime,
+        ...(orgId ? { orgId } : {}),
       });
       return result.success ? result.runs : [];
     },
