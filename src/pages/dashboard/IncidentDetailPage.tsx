@@ -7895,6 +7895,32 @@ const IncidentDetailPage = () => {
       const isMergeItem = (actItem.type as string) === 'system'
         && typeof actItem.id === 'string'
         && (actItem.id.startsWith('merge-in-') || actItem.id.startsWith('merge-'));
+      // In the narrow simple timeline the avatar sits on the header row and
+      // the message text uses the full column width underneath it, instead of
+      // being squeezed into a column beside the avatar.
+      const avatarNode = (() => {
+        const avatarInfo = resolveUserAvatar(actItem.user, users, (actItem as any).is_agent === true);
+        return (
+          <Avatar
+            src={!isDeleted && avatarInfo.src ? avatarInfo.src : undefined}
+            sx={{
+              width: isSimple ? 20 : 24,
+              height: isSimple ? 20 : 24,
+              flexShrink: 0,
+              bgcolor: isDeleted
+                ? 'hsl(var(--border-subtle))'
+                : avatarInfo.isAgent
+                  ? 'hsl(var(--primary) / 0.18)'
+                  : isSimple
+                    ? 'hsl(var(--muted) / 0.6)'
+                    : actItem.type === 'comment' ? 'rgba(255, 102, 0, 0.2)' : 'rgba(255,255,255,0.08)',
+            }}
+          >
+            {getActivityIcon(actItem.type)}
+          </Avatar>
+        );
+      })();
+
       return (
         <Box
           key={actItem.id}
@@ -7903,7 +7929,8 @@ const IncidentDetailPage = () => {
           onClick={isMergeItem ? () => focusRelatedIncident(mergeSourceIdFromId) : undefined}
           sx={{
             display: 'flex',
-            gap: 1.5,
+            flexDirection: isSimple ? 'column' : 'row',
+            gap: isSimple ? 0.5 : 1.5,
             p: isSimple ? 0.5 : 1.5,
             borderRadius: 1.5,
             bgcolor: isDeleted
@@ -7932,29 +7959,10 @@ const IncidentDetailPage = () => {
             '&:hover .reply-btn': { opacity: 1 },
           }}
         >
-          {(() => {
-            const avatarInfo = resolveUserAvatar(actItem.user, users, (actItem as any).is_agent === true);
-            return (
-              <Avatar
-                src={!isDeleted && avatarInfo.src ? avatarInfo.src : undefined}
-                sx={{
-                  width: 24,
-                  height: 24,
-                  bgcolor: isDeleted
-                    ? 'hsl(var(--border-subtle))'
-                    : avatarInfo.isAgent
-                      ? 'hsl(var(--primary) / 0.18)'
-                      : isSimple
-                        ? 'hsl(var(--muted) / 0.6)'
-                        : actItem.type === 'comment' ? 'rgba(255, 102, 0, 0.2)' : 'rgba(255,255,255,0.08)',
-                }}
-              >
-                {getActivityIcon(actItem.type)}
-              </Avatar>
-            );
-          })()}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.25 }}>
+          {!isSimple && avatarNode}
+          <Box sx={{ flex: isSimple ? 'none' : 1, width: isSimple ? '100%' : undefined, minWidth: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: isSimple ? 0.75 : 1, mb: 0.25 }}>
+              {isSimple && avatarNode}
               <UserHoverCard
                 username={actItem.user}
                 isAgent={(actItem as any).is_agent === true}
