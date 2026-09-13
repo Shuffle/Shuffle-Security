@@ -25,11 +25,13 @@ export interface AskAiButtonProps {
    * Default: true ("This is for now just for support users").
    */
   requireSupport?: boolean;
+  /** Whether Ask AI is in Beta on this page, enabling it for normal users */
+  isBeta?: boolean;
   /** Current URL pathname. Automatically disables button on /agents and /agent */
   pathname?: string;
   /** Custom button label. Default: "Ask AI". */
   label?: string;
-  /** Tag label in the button. Default: "Support only". Set to null to hide tag. */
+  /** Tag label in the button. When undefined, defaults to "Beta" if isBeta is true, else "Support". Set to null to hide tag. */
   tagLabel?: string | null;
   /** Optional context name or subtitle shown in tooltip (e.g. "Shuffle Incidents MCP") */
   contextHint?: string;
@@ -46,9 +48,10 @@ export const AskAiButton: React.FC<AskAiButtonProps> = ({
   isOpen = false,
   isSupport,
   requireSupport = true,
+  isBeta = false,
   pathname,
   label = 'Ask AI',
-  tagLabel = 'Support only',
+  tagLabel,
   contextHint,
   tooltipTitle,
   sx,
@@ -68,13 +71,16 @@ export const AskAiButton: React.FC<AskAiButtonProps> = ({
   // Check support status (prop or fallback to localStorage)
   const isEffectiveSupport = isSupport !== undefined ? isSupport : isSupportUser();
 
-  if (requireSupport && !isEffectiveSupport) {
+  const effectiveRequireSupport = isBeta ? false : requireSupport;
+  if (effectiveRequireSupport && !isEffectiveSupport) {
     return null;
   }
 
   if (hideWhenOpen && isOpen) {
     return null;
   }
+
+  const effectiveTagLabel = tagLabel !== undefined ? tagLabel : (isBeta ? 'Beta' : 'Support');
 
   const effectiveTooltip =
     tooltipTitle !== undefined
@@ -98,45 +104,39 @@ export const AskAiButton: React.FC<AskAiButtonProps> = ({
       <Tooltip title={effectiveTooltip} arrow placement="top-end">
         <ButtonBase
           onClick={(e) => {
-            e.currentTarget.blur();
             onClick?.();
           }}
-          focusRipple
-          aria-label={`${label}${tagLabel ? ` (${tagLabel})` : ''}`}
-          sx={[
-            {
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 1.25,
-              px: 2.25,
-              py: 1.25,
-              borderRadius: '9999px',
-              bgcolor: 'hsl(var(--card))',
-              color: 'hsl(var(--foreground))',
-              border: '1px solid hsl(var(--border))',
-              boxShadow:
-                '0 4px 20px -2px rgba(0, 0, 0, 0.35), 0 2px 6px -1px rgba(0, 0, 0, 0.16)',
-              backdropFilter: 'blur(10px)',
-              cursor: 'pointer',
-              userSelect: 'none',
-              transition:
-                'transform 160ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease',
-              '&:hover': {
-                transform: 'translateY(-2px)',
-                bgcolor: 'hsl(var(--card) / 0.95)',
-                borderColor: 'hsla(var(--primary) / 0.45)',
-                boxShadow:
-                  '0 8px 26px -4px hsla(var(--primary) / 0.25), 0 4px 10px -2px rgba(0, 0, 0, 0.2)',
-              },
-              '&:active': {
-                transform: 'translateY(0)',
-                boxShadow: '0 2px 10px -2px rgba(0, 0, 0, 0.25)',
-              },
+          aria-label={label}
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 1.25,
+            px: 2,
+            py: 1.25,
+            borderRadius: '9999px',
+            bgcolor: 'hsl(var(--card))',
+            color: 'hsl(var(--card-foreground))',
+            border: '1px solid hsl(var(--border))',
+            boxShadow: '0 4px 18px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08)',
+            cursor: 'pointer',
+            transition: 'all 160ms cubic-bezier(0.4, 0, 0.2, 1)',
+            userSelect: 'none',
+            backdropFilter: 'blur(8px)',
+            '&:hover': {
+              bgcolor: 'hsl(var(--accent))',
+              color: 'hsl(var(--accent-foreground))',
+              borderColor: 'hsl(var(--primary))',
+              boxShadow: '0 6px 24px rgba(0, 0, 0, 0.18), 0 3px 8px rgba(0, 0, 0, 0.12)',
+              transform: 'translateY(-1px)',
             },
-            ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
-          ]}
+            '&:active': {
+              transform: 'translateY(0px)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.12)',
+            },
+            ...sx,
+          }}
         >
-          {/* AI Icon with subtle glow */}
+          {/* Agent Icon Badge */}
           <Box
             sx={{
               display: 'flex',
@@ -144,8 +144,8 @@ export const AskAiButton: React.FC<AskAiButtonProps> = ({
               justifyContent: 'center',
               width: 24,
               height: 24,
-              borderRadius: '50%',
-              bgcolor: 'hsla(var(--primary) / 0.14)',
+              borderRadius: '9999px',
+              bgcolor: 'hsla(var(--primary) / 0.15)',
               color: 'hsl(var(--primary))',
               flexShrink: 0,
             }}
@@ -170,8 +170,8 @@ export const AskAiButton: React.FC<AskAiButtonProps> = ({
             {label}
           </Typography>
 
-          {/* "Support only" tag */}
-          {tagLabel && (
+          {/* Chip tag */}
+          {effectiveTagLabel && (
             <Box
               component="span"
               sx={{
@@ -179,9 +179,9 @@ export const AskAiButton: React.FC<AskAiButtonProps> = ({
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.04em',
-                color: 'hsl(var(--primary))',
-                bgcolor: 'hsla(var(--primary) / 0.12)',
-                border: '1px solid hsla(var(--primary) / 0.26)',
+                color: isBeta ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))',
+                bgcolor: isBeta ? 'hsla(var(--primary) / 0.12)' : 'hsla(var(--muted-foreground) / 0.12)',
+                border: isBeta ? '1px solid hsla(var(--primary) / 0.26)' : '1px solid hsla(var(--muted-foreground) / 0.24)',
                 px: 0.9,
                 py: 0.25,
                 borderRadius: '9999px',
@@ -189,7 +189,7 @@ export const AskAiButton: React.FC<AskAiButtonProps> = ({
                 flexShrink: 0,
               }}
             >
-              {tagLabel}
+              {effectiveTagLabel}
             </Box>
           )}
         </ButtonBase>

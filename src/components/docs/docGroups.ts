@@ -27,7 +27,7 @@ export const DOC_GROUPS: DocGroupDefinition[] = [
     id: 'security',
     label: 'Security',
     description: 'Incident triage, vulnerability management, host posture, and response.',
-    slugs: ['incidents', 'vulnerabilities', 'monitors', 'host-monitors'],
+    slugs: ['incidents', 'vulnerabilities', 'monitors', 'host-monitors', 'detection', 'sigma'],
   },
   {
     id: 'infrastructure',

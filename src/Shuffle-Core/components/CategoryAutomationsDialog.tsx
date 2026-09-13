@@ -220,7 +220,7 @@ const DEFAULT_INCIDENT_AI_PROMPTS: string[] = [
 - Generate structured tasks in JSON format: {"tasks": [{"assignee": "AI Agent", "title": "Title of task", "category": "triage/investigation/containment/recovery/communication/documentation", "completed": false, "createdBy": "ai-agent@shuffler.io"}]}.
 - Document findings, timeline, and MITRE ATT&CK techniques in activity and comments. Tackle tasks one by one, self-assigning and completing them as progress is made.
 
-Update the internal shuffle datastore with the same key and category 'shuffle-security_incidents'. ONLY send the modified fields in JSON format. Do NOT overwrite unrelated fields.`,
+Update the internal shuffle datastore with the same key and category 'shuffle-security_incidents'. CRITICAL: You MUST ONLY send the specific fields that require a change. NEVER send or echo unchanged fields (such as unchanged tasks, activity, severity, or metadata). Do NOT overwrite unrelated fields.`,
 ];
 const DEFAULT_INCIDENT_AI_APPS: string[][] = [['48793430d21468f9e371ace402efcd8e', 'b82668d868f6dc7ac1dc14caa92c674b']];
 

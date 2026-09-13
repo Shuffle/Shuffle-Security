@@ -1272,7 +1272,7 @@ const SCOPED_CSS = `
   /* Severity / status tokens (used for enabled/active indicators) */
   --severity-low: 142 71% 45%;
   --severity-medium: 45 93% 47%;
-  --severity-high: 25 95% 53%;
+  --severity-high: 12 92% 52%;
   --severity-critical: 0 84% 60%;
   --severity-info: 210 100% 56%;
 
@@ -1307,7 +1307,7 @@ body:not(.dark) .${SCOPE_CLASS}:not(.dark),
   --border: 0 0% 78%;
   --severity-low: 142 72% 31%;
   --severity-medium: 38 92% 33%;
-  --severity-high: 25 95% 48%;
+  --severity-high: 12 88% 46%;
   --severity-critical: 0 72% 51%;
   --severity-info: 215 90% 45%;
 }
@@ -1415,7 +1415,7 @@ const DEFAULT_INCIDENT_AI_AGENT_PROMPT = `Triage, investigate, and respond holis
 - Generate structured tasks in JSON format: {"tasks": [{"assignee": "AI Agent", "title": "Title of task", "category": "triage/investigation/containment/recovery/communication/documentation", "completed": false, "createdBy": "ai-agent@shuffler.io"}]}.
 - Document findings, timeline, and MITRE ATT&CK techniques in activity and comments. Tackle tasks one by one, self-assigning and completing them as progress is made.
 
-Update the internal shuffle datastore with the same key and category 'shuffle-security_incidents'. ONLY send the modified fields in JSON format. Do NOT overwrite unrelated fields.`;
+Update the internal shuffle datastore with the same key and category 'shuffle-security_incidents'. CRITICAL: You MUST ONLY send the specific fields that require a change. NEVER send or echo unchanged fields (such as unchanged tasks, activity, severity, or metadata). Do NOT overwrite unrelated fields.`;
 
 export const setAiAgentIncidentAutomation = async (enabled: boolean): Promise<boolean> => {
   const orgId = getActiveOrgId();

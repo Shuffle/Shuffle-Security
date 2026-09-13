@@ -682,12 +682,12 @@ export const AskAiSidePanel: React.FC<AskAiSidePanelProps> = ({
                 px: 0.75,
                 py: 0.2,
                 borderRadius: '4px',
-                bgcolor: 'hsl(var(--muted))',
-                color: 'hsl(var(--muted-foreground))',
-                border: '1px solid hsl(var(--border))',
+                bgcolor: context.isBeta ? 'hsla(var(--primary) / 0.12)' : 'hsl(var(--muted))',
+                color: context.isBeta ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))',
+                border: context.isBeta ? '1px solid hsla(var(--primary) / 0.26)' : '1px solid hsl(var(--border))',
               }}
             >
-              {isLoggedIn ? (isSupport ? 'Support' : 'Agent') : 'Guest'}
+              {context.isBeta ? 'Beta' : (isLoggedIn ? (isSupport ? 'Support' : 'Agent') : 'Guest')}
             </Box>
           </Box>
 

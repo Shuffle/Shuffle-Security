@@ -111,7 +111,7 @@ const lightTokenStyle: ShuffleTokenStyle = {
   "--border-subtle": "0 0% 86%",
   "--input": "0 0% 94%",
   "--severity-critical": "0 84% 60%",
-  "--severity-high": "25 95% 53%",
+  "--severity-high": "12 92% 52%",
   "--severity-medium": "45 93% 47%",
   "--severity-low": "142 71% 45%",
   "--severity-info": "210 100% 56%",

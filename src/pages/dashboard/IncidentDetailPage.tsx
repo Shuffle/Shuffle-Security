@@ -6376,6 +6376,7 @@ const IncidentDetailPage = () => {
   // Builder for the unified timeline items (revisions + agent runs + comments).
   // Returns an array of JSX nodes (or a single empty-state node).
   const renderTimelineFeedItems = (variant: 'sidebar' | 'inline' | 'simple' = 'sidebar') => {
+    const isSimple = variant === 'simple';
     type StepKind = 'task-created' | 'task-completed' | 'task-status-changed' | 'observable-added' | 'correlation-found' | 'incident-created' | 'routing-matched' | 'attribute-changed';
     type TimelineItem =
       | { type: 'revision'; timestamp: number; data: any; idx: number; parsedCurrent: any; parsedPrevious: any | null }
@@ -6891,8 +6892,8 @@ const IncidentDetailPage = () => {
         const valueHash = cheapHash(stableRevisionValueString(rev?.value));
         return `rev-${explicitId || `${ts}-${valueHash}`}-${it.idx}`;
       }
-      if (it.type === 'agent') return `agent-${it.data.execution_id}`;
-      if (it.type === 'workflow-exec') return `wfexec-${it.data.execution_id}`;
+      if (it.type === 'agent') return `agent-${it.data.execution_id || (it.data as any).id || it.timestamp}`;
+      if (it.type === 'workflow-exec') return `wfexec-${it.data.execution_id || (it.data as any).id || it.timestamp}`;
       if (it.type === 'step') return it.id;
       return it.data.id;
     };
@@ -6901,8 +6902,14 @@ const IncidentDetailPage = () => {
         if (it.idx === revisions.length - 1 && !isOnlyRevisionsFilter) return 'Incident created';
         return `Change #${revisionNumber(it.idx)}`;
       }
-      if (it.type === 'agent') return 'Agent run';
-      if (it.type === 'workflow-exec') return 'Workflow run';
+      if (it.type === 'agent') {
+        const wfName = (it.data as any)?.workflow?.name;
+        return wfName || 'AI Agent';
+      }
+      if (it.type === 'workflow-exec') {
+        const wfName = (it.data as any)?.workflow?.name || (it.data as any)?.workflow_name;
+        return wfName || 'Workflow run';
+      }
       if (it.type === 'step') return it.label;
       return `${it.data.user || 'Comment'}`;
     };
@@ -6911,9 +6918,16 @@ const IncidentDetailPage = () => {
         const t = it.parsedCurrent?.title || it.parsedCurrent?.finding_info?.title || '';
         return String(t).slice(0, 80);
       }
-      if (it.type === 'agent' || it.type === 'workflow-exec') {
+      if (it.type === 'agent') {
         const r: any = it.data;
-        return String(r.run_input || r.summary || r.status || '').slice(0, 80);
+        const title = getRunTitle(r);
+        return String(title || r.run_input || r.summary || r.status || '').slice(0, 80);
+      }
+      if (it.type === 'workflow-exec') {
+        const r: any = it.data;
+        const name = r.workflow?.name || r.workflow_name || '';
+        const shortId = r.execution_id ? String(r.execution_id).slice(0, 8) : '';
+        return String(name ? `${name}${shortId ? ` · ${shortId}` : ''}` : shortId || r.status || '').slice(0, 80);
       }
       if (it.type === 'step') return (it.detail || '').slice(0, 80);
       const text = it.data.content && /<[a-z][\s\S]*>/i.test(it.data.content)
@@ -7023,24 +7037,32 @@ const IncidentDetailPage = () => {
 
       // Reply button — added to every item so users can start a thread off
       // any timeline event (revision, change step, agent run, or comment).
-      const makeReplyButton = (compact = false) => (
-        <Tooltip title="Reply to this in a new comment" arrow>
-          <IconButton
-            size="small"
-            onClick={(e) => { e.stopPropagation(); e.preventDefault(); startReplyTo(item); }}
-            onMouseDown={(e) => { e.stopPropagation(); }}
-            sx={{
-              width: compact ? 18 : 22,
-              height: compact ? 18 : 22,
-              flexShrink: 0,
-              color: 'text.disabled',
-              '&:hover': { color: '#ff6600', bgcolor: 'rgba(255, 102, 0, 0.08)' },
-            }}
-          >
-            <ReplyIcon size={compact ? 12 : 14} />
-          </IconButton>
-        </Tooltip>
-      );
+      // Invisible by default (opacity: 0) and revealed on row hover on the right.
+      const makeReplyButton = (compact = false) => {
+        const isCurrentReplyTarget = replyingTo?.id === itemKey;
+        return (
+          <Tooltip title="Reply to this in a new comment" arrow>
+            <IconButton
+              size="small"
+              className="timeline-reply-btn reply-btn"
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); startReplyTo(item); }}
+              onMouseDown={(e) => { e.stopPropagation(); }}
+              sx={{
+                width: compact ? 18 : 22,
+                height: compact ? 18 : 22,
+                flexShrink: 0,
+                color: isCurrentReplyTarget ? '#ff6600' : 'text.disabled',
+                opacity: isCurrentReplyTarget ? 1 : 0,
+                pointerEvents: isCurrentReplyTarget ? 'auto' : 'none',
+                transition: 'opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease',
+                '&:hover': { color: '#ff6600', bgcolor: 'rgba(255, 102, 0, 0.08)' },
+              }}
+            >
+              <ReplyIcon size={compact ? 12 : 14} />
+            </IconButton>
+          </Tooltip>
+        );
+      };
       const replyButton = makeReplyButton(false);
       const replyButtonCompact = makeReplyButton(true);
 
@@ -7108,13 +7130,19 @@ const IncidentDetailPage = () => {
                 bgcolor: 'hsl(var(--muted) / 0.4)',
                 borderColor: 'hsl(var(--border))',
               },
+              '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
+                opacity: 1,
+                pointerEvents: 'auto',
+              },
               ...(showAsCreation && { cursor: 'pointer' }),
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-              <Avatar sx={{ width: 24, height: 24, bgcolor: 'hsl(var(--muted) / 0.6)' }}>
-                <HistoryIcon size={14} style={{ color: 'hsl(var(--muted-foreground))' }} />
-              </Avatar>
+              {!isSimple && (
+                <Avatar sx={{ width: 24, height: 24, bgcolor: 'hsl(var(--muted) / 0.6)' }}>
+                  <HistoryIcon size={14} style={{ color: 'hsl(var(--muted-foreground))' }} />
+                </Avatar>
+              )}
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
                   {isSimple && rev.updated_by && (
@@ -7138,17 +7166,27 @@ const IncidentDetailPage = () => {
                   {totalChanges > 0 && !showAsCreation && !isSimple && (
                     <Chip label={`${totalChanges} change${totalChanges !== 1 ? 's' : ''}`} size="small" variant="outlined" sx={{ height: 16, fontSize: '0.58rem', bgcolor: 'transparent', borderColor: 'hsl(var(--border))', color: 'text.secondary' }} />
                   )}
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                  {rev.updated_by && !isSimple && (
-                    <UserHoverCard username={String(rev.updated_by)} maxChars={24} />
+                  {isSimple && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexShrink: 0 }}>
+                      <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.6rem' }}>
+                        {item.timestamp ? formatCompactTime(item.timestamp) : 'Unknown'}
+                      </Typography>
+                      {replyButtonCompact}
+                    </Box>
                   )}
-                  <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: isSimple ? '0.6rem' : '0.65rem' }}>
-                    {item.timestamp ? (isSimple ? formatCompactTime(item.timestamp) : formatRelativeTime(item.timestamp)) : 'Unknown'}
-                  </Typography>
                 </Box>
+                {!isSimple && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    {rev.updated_by && (
+                      <UserHoverCard username={String(rev.updated_by)} maxChars={24} />
+                    )}
+                    <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.65rem' }}>
+                      {item.timestamp ? formatRelativeTime(item.timestamp) : 'Unknown'}
+                    </Typography>
+                  </Box>
+                )}
               </Box>
-              {replyButton}
+              {!isSimple && replyButton}
               {rev.value && (
                 <Tooltip title="View revision data">
                   <IconButton
@@ -7176,7 +7214,7 @@ const IncidentDetailPage = () => {
             </Box>
 
             {showAsCreation && (initialTitle || initialDescription) && (
-              <Box sx={{ mt: 0.75, ml: isSimple ? 3 : 4, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              <Box sx={{ mt: 0.75, ml: isSimple ? 0 : 4, pl: isSimple ? 1.25 : 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                 {initialTitle && (
                   <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: 'hsl(var(--foreground))', lineHeight: 1.35 }}>
                     {decodeHtmlEntities(String(initialTitle))}
@@ -7200,7 +7238,7 @@ const IncidentDetailPage = () => {
             )}
 
             {diff && totalChanges > 0 && !showAsCreation && (
-              <Box sx={{ mt: 0.75, ml: isSimple ? 3 : 4, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+              <Box sx={{ mt: 0.75, ml: isSimple ? 0 : 4, pl: isSimple ? 1.25 : 0, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
                 {diff.changed.map(({ field, from, to }) => (
                   <Box key={field} sx={{ display: 'flex', flexDirection: 'column', gap: 0.15 }}>
                     <Typography sx={{ fontSize: '0.63rem', fontWeight: 600, color: 'hsl(var(--foreground))', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -7267,6 +7305,77 @@ const IncidentDetailPage = () => {
         const isFailed = status === 'FAILED' || status === 'ERROR' || status === 'ABORTED';
         const needsAttention = !!(statusCfg && (statusCfg as any).needsAttention);
         const isQuiet = !isFailed && !needsAttention;
+
+        if (isSimple) {
+          const actorName = run.workflow?.name || 'AI Agent';
+          const isRunning = status === 'EXECUTING' || status === 'RUNNING';
+          const failureInfo = isFailed ? getAgentFailureInfo(run) : null;
+          const outputDiagnosis = !skip.skipped && !isRunning && !isFailed && hasAgentOutputWarning(run) ? diagnoseAgentOutputWarning(run) : null;
+          const hasWarning = !skip.skipped && (isFailed || !!outputDiagnosis || needsAttention);
+          const verb = skip.skipped
+            ? 'skipped'
+            : isRunning
+              ? 'executing'
+              : isFailed
+                ? 'failed'
+                : hasWarning
+                  ? 'needs attention'
+                  : 'finished';
+          const timeText = run.started_at ? formatCompactTime(normalizeToMs(run.started_at)) : '';
+          const detailText = skip.skipped
+            ? (skip.reason || 'Skipped — agent did not run')
+            : failureInfo
+              ? (failureInfo.reason || 'Failed — needs attention')
+              : outputDiagnosis
+                ? outputDiagnosis.title
+                : (title && title !== actorName ? `${title}${duration ? ` · ${duration}` : ''}` : (duration ? `Execution · ${duration}` : (run.execution_id ? `Execution ${String(run.execution_id).slice(0, 8)}` : '')));
+
+          return (
+            <Box
+              key={`agent-${run.execution_id || run.started_at}`}
+              data-timeline-compact="true"
+              onClick={() => setSelectedAgentRun(run)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 0.5,
+                px: 0,
+                py: 0.25,
+                borderRadius: 0,
+                bgcolor: 'transparent',
+                border: 'none',
+                mb: 1.375,
+                cursor: 'pointer',
+                '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
+                  opacity: 1,
+                  pointerEvents: 'auto',
+                },
+              }}
+            >
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                {actorName}
+              </Typography>
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                {verb}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexShrink: 0 }}>
+                {timeText && (
+                  <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', whiteSpace: 'nowrap' }}>
+                    {timeText}
+                  </Typography>
+                )}
+                {replyButtonCompact}
+              </Box>
+              {detailText && (
+                <Typography sx={{ fontSize: '0.75rem', color: 'hsl(var(--foreground))', flex: '1 1 100%', order: 2, pl: 1.25, lineHeight: 1.4 }}>
+                  {detailText}
+                </Typography>
+              )}
+            </Box>
+          );
+        }
+
         return (
           <Box
             key={`agent-${run.execution_id}`}
@@ -7282,25 +7391,27 @@ const IncidentDetailPage = () => {
               px: 1.25,
               py: 0.75,
               borderRadius: 1.5,
-              border: isSimple
-                ? 'none'
-                : skip.skipped
-                  ? '1px dashed hsl(var(--border))'
-                  : isQuiet
-                    ? '1px solid transparent'
-                    : '1px solid hsl(var(--border))',
+              border: skip.skipped
+                ? '1px dashed hsl(var(--border))'
+                : isQuiet
+                  ? '1px solid transparent'
+                  : '1px solid hsl(var(--border))',
               bgcolor: skip.skipped
                 ? 'hsl(var(--muted) / 0.2)'
                 : isQuiet
                   ? 'transparent'
                   : 'hsl(var(--card))',
-              mb: isSimple ? 1.5 : 0,
+              mb: 0,
               opacity: skip.skipped ? 0.85 : 1,
               cursor: 'pointer',
               transition: 'border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease',
               '&:hover': {
                 borderColor: 'hsl(var(--muted-foreground) / 0.4)',
                 bgcolor: 'hsl(var(--muted) / 0.3)',
+              },
+              '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
+                opacity: 1,
+                pointerEvents: 'auto',
               },
             }}
           >
@@ -7352,13 +7463,14 @@ const IncidentDetailPage = () => {
                 · {duration}
               </Typography>
             )}
-            {timeAgo && (
-              <Typography sx={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))', ml: 'auto', flexShrink: 0 }}>
-                {timeAgo}
-              </Typography>
-            )}
-            {replyButtonCompact}
-            
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexShrink: 0 }}>
+              {timeAgo && (
+                <Typography sx={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>
+                  {timeAgo}
+                </Typography>
+              )}
+              {replyButtonCompact}
+            </Box>
           </Box>
         );
       }
@@ -7393,6 +7505,83 @@ const IncidentDetailPage = () => {
             ? `${notifCount} notification${notifCount === 1 ? '' : 's'} created — may indicate an issue`
             : 'Executing for more than 5 minutes';
         const questionNotif = run.execution_id ? questionByExecId[String(run.execution_id)] : undefined;
+        if (isSimple) {
+          const verb = isFailed
+            ? 'failed'
+            : isRunning
+              ? 'executing'
+              : isWarning
+                ? 'needs attention'
+                : (status ? status.toLowerCase() : 'finished');
+          const timeText = startedMs > 0 ? formatCompactTime(startedMs) : (run.started_at ? formatCompactTime(normalizeToMs(run.started_at)) : '');
+          const detailText = isWarning
+            ? warnTitle
+            : isFailed
+              ? (shortId ? `Execution failed · ${shortId}` : 'Execution failed')
+              : isRunning
+                ? (shortId ? `Running · ${shortId}` : 'Running')
+                : (shortId ? `Execution ${shortId}` : '');
+
+          return (
+            <Box
+              key={`wfexec-${run.execution_id}`}
+              data-timeline-compact="true"
+              sx={{ display: 'flex', flexDirection: 'column' }}
+            >
+              <Box
+                onClick={async () => {
+                  if (run.execution_id) setSelectedWorkflowExecutionId(String(run.execution_id));
+                  else if (execUrl) await navigateToShuffleCore(execUrl, { newTab: true });
+                }}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: 0.5,
+                  px: 0,
+                  py: 0.25,
+                  borderRadius: 0,
+                  bgcolor: 'transparent',
+                  border: 'none',
+                  mb: 1.375,
+                  cursor: (run.execution_id || execUrl) ? 'pointer' : 'default',
+                  '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
+                    opacity: 1,
+                    pointerEvents: 'auto',
+                  },
+                }}
+              >
+                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                  {wfName}
+                </Typography>
+                <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                  {verb}
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexShrink: 0 }}>
+                  {timeText && (
+                    <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', whiteSpace: 'nowrap' }}>
+                      {timeText}
+                    </Typography>
+                  )}
+                  {replyButtonCompact}
+                </Box>
+                {detailText && (
+                  <Typography sx={{ fontSize: '0.75rem', color: 'hsl(var(--foreground))', flex: '1 1 100%', order: 2, pl: 1.25, lineHeight: 1.4 }}>
+                    {detailText}
+                  </Typography>
+                )}
+              </Box>
+              {questionNotif && (
+                <InlineAgentQuestion
+                  notification={questionNotif}
+                  onOpenDetails={openAgentRunDetails}
+                  onSubmitted={() => { refreshAgentNotifications(); refetchWorkflowRuns(); refetchAgentRuns(); }}
+                />
+              )}
+            </Box>
+          );
+        }
+
         return (
           <Box
             key={`wfexec-${run.execution_id}`}
@@ -7421,14 +7610,12 @@ const IncidentDetailPage = () => {
               boxSizing: 'border-box',
               lineHeight: 1,
               borderRadius: 1.5,
-              border: isSimple
-                ? 'none'
-                : isFailed
-                  ? '1px solid hsl(var(--destructive) / 0.5)'
-                  : isWarning
-                    ? '1px solid hsl(var(--severity-medium) / 0.6)'
-                    : '1px solid transparent',
-              mb: isSimple ? 1.5 : 0,
+              border: isFailed
+                ? '1px solid hsl(var(--destructive) / 0.5)'
+                : isWarning
+                  ? '1px solid hsl(var(--severity-medium) / 0.6)'
+                  : '1px solid transparent',
+              mb: 0,
               bgcolor: isWarning ? 'hsl(var(--severity-medium) / 0.08)' : 'transparent',
               cursor: execUrl ? 'pointer' : 'default',
               transition: 'border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease',
@@ -7440,6 +7627,10 @@ const IncidentDetailPage = () => {
                   '& .wf-status-icon svg *': { stroke: 'hsl(var(--severity-low))' },
                   '& .wf-status-text': { color: 'hsl(var(--severity-low))' },
                 }),
+              },
+              '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
+                opacity: 1,
+                pointerEvents: 'auto',
               },
             }}
           >
@@ -7473,12 +7664,14 @@ const IncidentDetailPage = () => {
                 </Box>
               </Tooltip>
             )}
-            {timeAgo && (
-              <Typography sx={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))', ml: 'auto', flexShrink: 0 }}>
-                {timeAgo}
-              </Typography>
-            )}
-            {replyButtonCompact}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexShrink: 0 }}>
+              {timeAgo && (
+                <Typography sx={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap' }}>
+                  {timeAgo}
+                </Typography>
+              )}
+              {replyButtonCompact}
+            </Box>
           </Box>
           {questionNotif && (
             <InlineAgentQuestion
@@ -7677,6 +7870,10 @@ const IncidentDetailPage = () => {
               overflow: 'hidden',
               cursor: isClickable ? 'pointer' : 'default',
               transition: 'background-color 0.15s ease, border-color 0.15s ease',
+              '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
+                opacity: 1,
+                pointerEvents: 'auto',
+              },
               ...(isClickable && {
                 '&:hover': {
                   bgcolor: pillBgHover,
@@ -7921,10 +8118,12 @@ const IncidentDetailPage = () => {
                 </Typography>
               </Tooltip>
             )}
-            <Typography sx={{ fontSize: isSimple ? '0.6rem' : '0.65rem', color: 'text.disabled', ml: 'auto', pl: isSimple ? 0.5 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
-              {item.timestamp ? (isSimple ? formatCompactTime(item.timestamp) : formatRelativeTime(item.timestamp)) : ''}
-            </Typography>
-            {replyButtonCompact}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexShrink: 0 }}>
+              <Typography sx={{ fontSize: isSimple ? '0.6rem' : '0.65rem', color: 'text.disabled', pl: isSimple ? 0.5 : 1, whiteSpace: 'nowrap' }}>
+                {item.timestamp ? (isSimple ? formatCompactTime(item.timestamp) : formatRelativeTime(item.timestamp)) : ''}
+              </Typography>
+              {replyButtonCompact}
+            </Box>
           </Box>
         );
 
@@ -7959,9 +8158,69 @@ const IncidentDetailPage = () => {
       const timeRemaining = Math.max(0, Math.ceil((5 * 60 * 1000 - messageAge) / 60000));
 
       // Status activities are system-generated resolution events.
-      // They cannot be modified or replied to — render a distinct,
-      // resolution-themed badge instead of the comment-style card.
+      // Rendered with a severity-colored checkmark next to the title and
+      // generous spacing so closure stands out in the timeline.
       if (isStatusActivity) {
+        const currentSeverity = (editedSeverity || incident?.severity || 'medium').toLowerCase();
+        const sevColor = severityColors[currentSeverity] || `hsl(var(--severity-${currentSeverity}, var(--severity-medium)))`;
+
+        if (isSimple) {
+          return (
+            <Box
+              key={actItem.id}
+              id={actItem.id ? `activity-item-${actItem.id}` : undefined}
+              className={!!actItem.id && newlyArrivedActivity.has(actItem.id) ? 'incident-new-flash' : undefined}
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0.5,
+                px: 0,
+                py: 1,
+                mt: 3,
+                mb: 3,
+                bgcolor: 'transparent',
+                border: 'none',
+                '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
+                  opacity: 1,
+                  pointerEvents: 'auto',
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap', width: '100%' }}>
+                <CheckCircleIcon size={14} style={{ color: sevColor, flexShrink: 0 }} />
+                <Typography sx={{ fontSize: '0.73rem', fontWeight: 600, color: 'hsl(var(--foreground))', letterSpacing: 0.3, textTransform: 'uppercase' }}>
+                  Incident resolution
+                </Typography>
+                <Chip
+                  label="System event"
+                  size="small"
+                  sx={{
+                    height: 16,
+                    fontSize: '0.58rem',
+                    fontWeight: 600,
+                    bgcolor: 'transparent',
+                    border: '1px solid hsl(var(--border-subtle))',
+                    color: 'text.secondary',
+                    '& .MuiChip-label': { px: 0.6 },
+                  }}
+                />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
+                  {actItem.user && (
+                    <UserHoverCard username={actItem.user} maxChars={12} />
+                  )}
+                  <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled' }}>
+                    {formatCompactTime(actItem.timestamp)}
+                  </Typography>
+                  {replyButtonCompact}
+                </Box>
+              </Box>
+              <Typography sx={{ fontSize: '0.78rem', color: 'hsl(var(--foreground))', mt: 0.5, pl: 0, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                {decodeHtmlEntities(actItem.content || '')}
+              </Typography>
+            </Box>
+          );
+        }
+
         return (
           <Box
             key={actItem.id}
@@ -7975,17 +8234,21 @@ const IncidentDetailPage = () => {
               py: 1,
               borderRadius: 1.5,
               bgcolor: 'transparent',
-              border: isSimple ? 'none' : '1px solid hsl(var(--border-subtle))',
-              mb: isSimple ? 1.5 : 0,
+              border: '1px solid hsl(var(--border-subtle))',
+              mb: 0,
               transition: 'background-color 0.15s ease, border-color 0.15s ease',
               '&:hover': {
                 bgcolor: 'hsl(var(--muted) / 0.4)',
                 borderColor: 'hsl(var(--border))',
               },
+              '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
+                opacity: 1,
+                pointerEvents: 'auto',
+              },
             }}
           >
-            <Avatar sx={{ width: 22, height: 22, bgcolor: 'hsl(var(--muted) / 0.6)', color: 'hsl(var(--muted-foreground))' }}>
-              <CheckCircleIcon size={14} />
+            <Avatar sx={{ width: 22, height: 22, bgcolor: 'hsl(var(--muted) / 0.6)', color: sevColor }}>
+              <CheckCircleIcon size={14} style={{ color: sevColor }} />
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
@@ -8007,10 +8270,10 @@ const IncidentDetailPage = () => {
                 />
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto' }}>
                   {actItem.user && (
-                    <UserHoverCard username={actItem.user} maxChars={isSimple ? 12 : 24} />
+                    <UserHoverCard username={actItem.user} maxChars={24} />
                   )}
-                  <Typography sx={{ fontSize: isSimple ? '0.6rem' : '0.65rem', color: 'text.disabled' }}>
-                    {isSimple ? formatCompactTime(actItem.timestamp) : formatRelativeTime(actItem.timestamp)}
+                  <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled' }}>
+                    {formatRelativeTime(actItem.timestamp)}
                   </Typography>
                   {replyButtonCompact}
                 </Box>
@@ -8095,7 +8358,7 @@ const IncidentDetailPage = () => {
               },
             }),
             '&:hover .delete-btn': { opacity: 1 },
-            '&:hover .reply-btn': { opacity: 1 },
+            '&:hover .reply-btn, &:focus-within .reply-btn, &:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': { opacity: 1, pointerEvents: 'auto' },
           }}
         >
           {!isSimple && avatarNode}
@@ -8175,7 +8438,8 @@ const IncidentDetailPage = () => {
                 position: 'absolute',
                 top: 4,
                 right: canDelete ? 28 : 4,
-                opacity: 0,
+                opacity: replyingTo?.id === itemKey ? 1 : 0,
+                pointerEvents: replyingTo?.id === itemKey ? 'auto' : 'none',
                 transition: 'opacity 0.2s',
                 display: 'flex',
                 alignItems: 'center',
@@ -8337,205 +8601,282 @@ const IncidentDetailPage = () => {
       commentId?: string,
       rerunCount: number = 0,
       lastActionTs: number = 0,
-    ) => (
-      <Box
-        key={`ai-processing-${key}`}
-        sx={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 0.75,
-          alignSelf: 'flex-start',
-          pl: 0.4,
-          pr: 1,
-          py: 0.4,
-          borderRadius: 999,
-          fontSize: '0.7rem',
-          background: timedOut ? 'hsl(var(--muted) / 0.4)' : 'var(--agent-gradient-subtle)',
-          border: '1px solid',
-          borderColor: timedOut ? 'hsl(var(--border))' : 'rgba(156, 90, 242, 0.35)',
-          color: timedOut ? 'text.secondary' : 'text.primary',
-          maxWidth: '100%',
-        }}
-      >
-        {/* Left-side AI Agent badge — clickable, links to /agents. */}
-        <Tooltip title="Open Agent activity" arrow disableInteractive>
+    ) => {
+      if (isSimple) {
+        return (
           <Box
-            component={Link}
-            to="/agents"
-            onClick={(e) => e.stopPropagation()}
-            aria-label="Open Agent activity"
+            key={`ai-processing-${key}`}
             sx={{
-              width: 18,
-              height: 18,
-              borderRadius: '50%',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              background: 'rgba(0, 0, 0, 0.25)',
-              color: 'inherit',
-              textDecoration: 'none',
-              transition: 'background 0.15s ease, transform 0.15s ease',
-              '&:hover': {
-                background: 'rgba(0, 0, 0, 0.4)',
-                transform: 'scale(1.05)',
-              },
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0.25,
+              py: 0.25,
+              mb: 1.375,
+              bgcolor: 'transparent',
+              border: 'none',
             }}
           >
-            <AgentIcon size={11} style={{ opacity: timedOut ? 0.7 : 1 }} />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary' }}>
+                AI Agent
+              </Typography>
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary' }}>
+                {timedOut ? 'did not respond' : 'is responding'}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 0.75, pl: 1.25, fontSize: '0.75rem', color: 'hsl(var(--foreground))', lineHeight: 1.4 }}>
+              {timedOut ? (
+                <>
+                  <Tooltip
+                    title="No agent run or reply arrived for this mention within the timeout window. The backend did not report an error — open the debug view to inspect the execution."
+                    arrow
+                  >
+                    <span style={{ borderBottom: '1px dotted hsl(var(--border))', cursor: 'help' }}>
+                      No agent response
+                    </span>
+                  </Tooltip>
+                  {(rerunCount > 0 || lastActionTs > 0) && (
+                    <Box component="span" sx={{ color: 'text.disabled', fontSize: '0.65rem' }}>
+                      {rerunCount > 0 && `· ${rerunCount} rerun${rerunCount === 1 ? '' : 's'}`}
+                      {lastActionTs > 0 && ` · ${formatRelativeShort(Date.now() - normalizeTs(lastActionTs))}`}
+                    </Box>
+                  )}
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const latestRun: any = [...(allIncidentWorkflowRuns || [])]
+                        .sort((a: any, b: any) => normalizeToMs(b?.started_at) - normalizeToMs(a?.started_at))[0];
+                      const execId = latestRun?.execution_id;
+                      if (execId) {
+                        window.dispatchEvent(new CustomEvent('workflow-run:open', {
+                          detail: {
+                            executionId: String(execId),
+                            workflowId: latestRun?.workflow_id || latestRun?.workflow?.id || undefined,
+                          },
+                        }));
+                      } else {
+                        openAgentDrawer('run');
+                      }
+                    }}
+                    sx={{
+                      fontWeight: 500,
+                      color: 'text.secondary',
+                      background: 'transparent',
+                      border: 'none',
+                      p: 0,
+                      borderBottom: '1px dashed hsl(var(--border))',
+                      cursor: 'pointer',
+                      fontSize: '0.72rem',
+                      '&:hover': {
+                        color: 'hsl(var(--foreground))',
+                        borderBottomColor: 'hsl(var(--foreground))',
+                      },
+                    }}
+                  >
+                    Debug
+                  </Box>
+                  {commentId && (
+                    <Box
+                      component="button"
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleRerunAgent(commentId); }}
+                      sx={{
+                        fontWeight: 500,
+                        color: 'text.secondary',
+                        background: 'transparent',
+                        border: 'none',
+                        p: 0,
+                        borderBottom: '1px dashed hsl(var(--border))',
+                        cursor: 'pointer',
+                        fontSize: '0.72rem',
+                        '&:hover': {
+                          color: 'hsl(var(--foreground))',
+                          borderBottomColor: 'hsl(var(--foreground))',
+                        },
+                      }}
+                    >
+                      Rerun
+                    </Box>
+                  )}
+                </>
+              ) : !agentReadiness.active && !agentReadiness.isLoading ? (
+                <>
+                  <span>AI Agent automation is off —</span>
+                  <Box
+                    component="button"
+                    type="button"
+                    disabled={agentReadiness.isEnabling}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        await agentReadiness.enable();
+                        toast.success('AI Agent automation enabled');
+                        if (commentId) {
+                          try {
+                            await handleRerunAgent(commentId);
+                          } catch (rerr) {
+                            console.warn('[AskAgent] Auto-rerun after enable failed:', rerr);
+                          }
+                        }
+                      } catch {
+                        toast.error('Failed to enable AI Agent automation');
+                      }
+                    }}
+                    sx={{
+                      fontWeight: 500,
+                      color: 'text.secondary',
+                      background: 'transparent',
+                      border: 'none',
+                      p: 0,
+                      cursor: agentReadiness.isEnabling ? 'default' : 'pointer',
+                      borderBottom: '1px dashed hsl(var(--border))',
+                      fontSize: '0.72rem',
+                      '&:hover': {
+                        color: 'hsl(var(--foreground))',
+                        borderBottomColor: 'hsl(var(--foreground))',
+                      },
+                    }}
+                  >
+                    {agentReadiness.isEnabling ? 'Enabling…' : 'Enable now'}
+                  </Box>
+                </>
+              ) : toolsSummary ? (
+                <>
+                  <span>Processing using {toolsSummary}</span>
+                </>
+              ) : (
+                <>
+                  <span>Answering without tools</span>
+                </>
+              )}
+            </Box>
           </Box>
-        </Tooltip>
-        {!timedOut && agentReadiness.active && (
-          <CircularProgress
-            size={10}
-            thickness={6}
-            sx={{ color: 'rgba(156, 90, 242, 0.9)', flexShrink: 0 }}
-          />
-        )}
-        <Typography
-          variant="caption"
+        );
+      }
+
+      return (
+        <Box
+          key={`ai-processing-${key}`}
           sx={{
-            fontSize: '0.7rem',
-            fontWeight: 500,
-            color: 'inherit',
-            lineHeight: 1,
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 0.5,
-            minWidth: 0,
+            gap: 0.75,
+            alignSelf: 'flex-start',
+            pl: 0.4,
+            pr: 1,
+            py: 0.4,
+            borderRadius: 999,
+            fontSize: '0.7rem',
+            background: timedOut ? 'hsl(var(--muted) / 0.4)' : 'var(--agent-gradient-subtle)',
+            border: '1px solid',
+            borderColor: timedOut ? 'hsl(var(--border))' : 'rgba(156, 90, 242, 0.35)',
+            color: timedOut ? 'text.secondary' : 'text.primary',
+            maxWidth: '100%',
           }}
         >
-          {timedOut ? (
-            <>
-              {/* This state is INFERRED: no agent run and no agent reply have
-                  landed for this mention within the timeout window. It does
-                  not mean the backend reported a timeout, so always offer a
-                  way to inspect the underlying execution. */}
-              <Tooltip
-                title="No agent run or reply arrived for this mention within the timeout window. The backend did not report an error — open the debug view to inspect the execution."
-                arrow
-              >
-                <span style={{ borderBottom: '1px dotted hsl(var(--border))', cursor: 'help' }}>
-                  No agent response
-                </span>
-              </Tooltip>
-              {(rerunCount > 0 || lastActionTs > 0) && (
-                <Box
-                  component="span"
-                  sx={{
-                    color: 'text.secondary',
-                    fontWeight: 400,
-                    fontSize: '0.65rem',
-                  }}
+          {/* Left-side AI Agent badge — clickable, links to /agents. */}
+          <Tooltip title="Open Agent activity" arrow disableInteractive>
+            <Box
+              component={Link}
+              to="/agents"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Open Agent activity"
+              sx={{
+                width: 18,
+                height: 18,
+                borderRadius: '50%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                background: 'rgba(0, 0, 0, 0.25)',
+                color: 'inherit',
+                textDecoration: 'none',
+                transition: 'background 0.15s ease, transform 0.15s ease',
+                '&:hover': {
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  transform: 'scale(1.05)',
+                },
+              }}
+            >
+              <AgentIcon size={11} style={{ opacity: timedOut ? 0.7 : 1 }} />
+            </Box>
+          </Tooltip>
+          {!timedOut && agentReadiness.active && (
+            <CircularProgress
+              size={10}
+              thickness={6}
+              sx={{ color: 'rgba(156, 90, 242, 0.9)', flexShrink: 0 }}
+            />
+          )}
+          <Typography
+            variant="caption"
+            sx={{
+              fontSize: '0.7rem',
+              fontWeight: 500,
+              color: 'inherit',
+              lineHeight: 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.5,
+              minWidth: 0,
+            }}
+          >
+            {timedOut ? (
+              <>
+                {/* This state is INFERRED: no agent run and no agent reply have
+                    landed for this mention within the timeout window. It does
+                    not mean the backend reported a timeout, so always offer a
+                    way to inspect the underlying execution. */}
+                <Tooltip
+                  title="No agent run or reply arrived for this mention within the timeout window. The backend did not report an error — open the debug view to inspect the execution."
+                  arrow
                 >
-                  {rerunCount > 0 && `· ${rerunCount} rerun${rerunCount === 1 ? '' : 's'}`}
-                  {lastActionTs > 0 && ` · ${formatRelativeShort(Date.now() - normalizeTs(lastActionTs))}`}
-                </Box>
-              )}
-              <Box
-                component="button"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Prefer the actual execution when one exists — that is the
-                  // only place the real failure/latency is visible. Fall back
-                  // to the agent sidebar when nothing was ever recorded.
-                  const latestRun: any = [...(allIncidentWorkflowRuns || [])]
-                    .sort((a: any, b: any) => normalizeToMs(b?.started_at) - normalizeToMs(a?.started_at))[0];
-                  const execId = latestRun?.execution_id;
-                  if (execId) {
-                    window.dispatchEvent(new CustomEvent('workflow-run:open', {
-                      detail: {
-                        executionId: String(execId),
-                        workflowId: latestRun?.workflow_id || latestRun?.workflow?.id || undefined,
-                      },
-                    }));
-                  } else {
-                    openAgentDrawer('run');
-                  }
-                }}
-                sx={{
-                  ml: 0.5,
-                  fontWeight: 600,
-                  color: 'rgba(236, 81, 124, 0.95)',
-                  background: 'transparent',
-                  border: 'none',
-                  p: 0,
-                  borderBottom: '1px dashed rgba(236, 81, 124, 0.5)',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    color: 'rgba(236, 81, 124, 1)',
-                    borderBottomColor: 'rgba(236, 81, 124, 0.9)',
-                  },
-                }}
-              >
-                Debug
-              </Box>
-            </>
-          ) : !agentReadiness.active && !agentReadiness.isLoading ? (
-
-            <>
-              <span>AI Agent automation is off —</span>
-              <Box
-                component="button"
-                type="button"
-                disabled={agentReadiness.isEnabling}
-                onClick={async (e) => {
-                  e.stopPropagation();
-                  try {
-                    await agentReadiness.enable();
-                    toast.success('AI Agent automation enabled');
-                    // The original @AIAgent comment was posted while the
-                    // automation was off, so the backend never picked it up.
-                    // Nudge the activity item (append a rerun_timestamp) so
-                    // the now-active "Run workflow" automation fires for it.
-                    if (commentId) {
-                      try {
-                        await handleRerunAgent(commentId);
-                      } catch (rerr) {
-                        console.warn('[AskAgent] Auto-rerun after enable failed:', rerr);
-                      }
-                    }
-                  } catch {
-                    toast.error('Failed to enable AI Agent automation');
-                  }
-                }}
-                sx={{
-                  fontWeight: 600,
-                  color: 'rgba(236, 81, 124, 0.95)',
-                  background: 'transparent',
-                  border: 'none',
-                  p: 0,
-                  cursor: agentReadiness.isEnabling ? 'default' : 'pointer',
-                  borderBottom: '1px dashed rgba(236, 81, 124, 0.5)',
-                  '&:hover': {
-                    color: 'rgba(236, 81, 124, 1)',
-                    borderBottomColor: 'rgba(236, 81, 124, 0.9)',
-                  },
-                }}
-              >
-                {agentReadiness.isEnabling ? 'Enabling…' : 'Enable now'}
-              </Box>
-            </>
-          ) : toolsSummary ? (
-            <>
-              <span>Processing using the tools</span>
-              <Tooltip
-                title={`${enabledAgentTools.map(formatToolName).join(', ')} — click to manage`}
-                arrow
-                disableInteractive
-              >
+                  <span style={{ borderBottom: '1px dotted hsl(var(--border))', cursor: 'help' }}>
+                    No agent response
+                  </span>
+                </Tooltip>
+                {(rerunCount > 0 || lastActionTs > 0) && (
+                  <Box
+                    component="span"
+                    sx={{
+                      color: 'text.secondary',
+                      fontWeight: 400,
+                      fontSize: '0.65rem',
+                    }}
+                  >
+                    {rerunCount > 0 && `· ${rerunCount} rerun${rerunCount === 1 ? '' : 's'}`}
+                    {lastActionTs > 0 && ` · ${formatRelativeShort(Date.now() - normalizeTs(lastActionTs))}`}
+                  </Box>
+                )}
                 <Box
                   component="button"
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); openAgentDrawer('permissions'); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Prefer the actual execution when one exists — that is the
+                    // only place the real failure/latency is visible. Fall back
+                    // to the agent sidebar when nothing was ever recorded.
+                    const latestRun: any = [...(allIncidentWorkflowRuns || [])]
+                      .sort((a: any, b: any) => normalizeToMs(b?.started_at) - normalizeToMs(a?.started_at))[0];
+                    const execId = latestRun?.execution_id;
+                    if (execId) {
+                      window.dispatchEvent(new CustomEvent('workflow-run:open', {
+                        detail: {
+                          executionId: String(execId),
+                          workflowId: latestRun?.workflow_id || latestRun?.workflow?.id || undefined,
+                        },
+                      }));
+                    } else {
+                      openAgentDrawer('run');
+                    }
+                  }}
                   sx={{
+                    ml: 0.5,
                     fontWeight: 600,
                     color: 'rgba(236, 81, 124, 0.95)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                    maxWidth: 220,
                     background: 'transparent',
                     border: 'none',
                     p: 0,
@@ -8547,70 +8888,149 @@ const IncidentDetailPage = () => {
                     },
                   }}
                 >
-                  {toolsSummary}
+                  Debug
                 </Box>
-              </Tooltip>
-            </>
-          ) : (
-            <>
-              <span>Answering without tools — limited capability.</span>
-              <span style={{ marginLeft: 4 }} />
-              <Box
-                component="button"
-                type="button"
-                onClick={(e) => { e.stopPropagation(); openAgentDrawer('permissions', { openToolPicker: true }); }}
-                sx={{
-                  fontWeight: 600,
-                  color: 'rgba(236, 81, 124, 0.95)',
-                  background: 'transparent',
-                  border: 'none',
-                  p: 0,
-                  borderBottom: '1px dashed rgba(236, 81, 124, 0.5)',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    color: 'rgba(236, 81, 124, 1)',
-                    borderBottomColor: 'rgba(236, 81, 124, 0.9)',
-                  },
-                }}
-              >
-                Assign tools
-              </Box>
-            </>
+              </>
+            ) : !agentReadiness.active && !agentReadiness.isLoading ? (
+
+              <>
+                <span>AI Agent automation is off —</span>
+                <Box
+                  component="button"
+                  type="button"
+                  disabled={agentReadiness.isEnabling}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    try {
+                      await agentReadiness.enable();
+                      toast.success('AI Agent automation enabled');
+                      // The original @AIAgent comment was posted while the
+                      // automation was off, so the backend never picked it up.
+                      // Nudge the activity item (append a rerun_timestamp) so
+                      // the now-active "Run workflow" automation fires for it.
+                      if (commentId) {
+                        try {
+                          await handleRerunAgent(commentId);
+                        } catch (rerr) {
+                          console.warn('[AskAgent] Auto-rerun after enable failed:', rerr);
+                        }
+                      }
+                    } catch {
+                      toast.error('Failed to enable AI Agent automation');
+                    }
+                  }}
+                  sx={{
+                    fontWeight: 600,
+                    color: 'rgba(236, 81, 124, 0.95)',
+                    background: 'transparent',
+                    border: 'none',
+                    p: 0,
+                    cursor: agentReadiness.isEnabling ? 'default' : 'pointer',
+                    borderBottom: '1px dashed rgba(236, 81, 124, 0.5)',
+                    '&:hover': {
+                      color: 'rgba(236, 81, 124, 1)',
+                      borderBottomColor: 'rgba(236, 81, 124, 0.9)',
+                    },
+                  }}
+                >
+                  {agentReadiness.isEnabling ? 'Enabling…' : 'Enable now'}
+                </Box>
+              </>
+            ) : toolsSummary ? (
+              <>
+                <span>Processing using the tools</span>
+                <Tooltip
+                  title={`${enabledAgentTools.map(formatToolName).join(', ')} — click to manage`}
+                  arrow
+                  disableInteractive
+                >
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); openAgentDrawer('permissions'); }}
+                    sx={{
+                      fontWeight: 600,
+                      color: 'rgba(236, 81, 124, 0.95)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      maxWidth: 220,
+                      background: 'transparent',
+                      border: 'none',
+                      p: 0,
+                      borderBottom: '1px dashed rgba(236, 81, 124, 0.5)',
+                      cursor: 'pointer',
+                      '&:hover': {
+                        color: 'rgba(236, 81, 124, 1)',
+                        borderBottomColor: 'rgba(236, 81, 124, 0.9)',
+                      },
+                    }}
+                  >
+                    {toolsSummary}
+                  </Box>
+                </Tooltip>
+              </>
+            ) : (
+              <>
+                <span>Answering without tools — limited capability.</span>
+                <span style={{ marginLeft: 4 }} />
+                <Box
+                  component="button"
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); openAgentDrawer('permissions', { openToolPicker: true }); }}
+                  sx={{
+                    fontWeight: 600,
+                    color: 'rgba(236, 81, 124, 0.95)',
+                    background: 'transparent',
+                    border: 'none',
+                    p: 0,
+                    borderBottom: '1px dashed rgba(236, 81, 124, 0.5)',
+                    cursor: 'pointer',
+                    '&:hover': {
+                      color: 'rgba(236, 81, 124, 1)',
+                      borderBottomColor: 'rgba(236, 81, 124, 0.9)',
+                    },
+                  }}
+                >
+                  Assign tools
+                </Box>
+              </>
+            )}
+          </Typography>
+          {timedOut && commentId && (
+            <Box
+              component="button"
+              onClick={(e) => { e.stopPropagation(); handleRerunAgent(commentId); }}
+              sx={{
+                ml: 0.5,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.25,
+                px: 0.75,
+                py: 0.2,
+                borderRadius: 999,
+                border: '1px solid hsl(var(--border))',
+                background: 'hsl(var(--background))',
+                color: 'text.primary',
+                fontSize: '0.68rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                lineHeight: 1,
+                transition: 'background 0.15s ease, border-color 0.15s ease',
+                '&:hover': {
+                  background: 'hsl(var(--muted) / 0.6)',
+                  borderColor: 'rgba(156, 90, 242, 0.5)',
+                },
+              }}
+              aria-label="Rerun AI Agent"
+            >
+              <RefreshIcon size={11} />
+              Rerun
+            </Box>
           )}
-        </Typography>
-        {timedOut && commentId && (
-          <Box
-            component="button"
-            onClick={(e) => { e.stopPropagation(); handleRerunAgent(commentId); }}
-            sx={{
-              ml: 0.5,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 0.25,
-              px: 0.75,
-              py: 0.2,
-              borderRadius: 999,
-              border: '1px solid hsl(var(--border))',
-              background: 'hsl(var(--background))',
-              color: 'text.primary',
-              fontSize: '0.68rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-              lineHeight: 1,
-              transition: 'background 0.15s ease, border-color 0.15s ease',
-              '&:hover': {
-                background: 'hsl(var(--muted) / 0.6)',
-                borderColor: 'rgba(156, 90, 242, 0.5)',
-              },
-            }}
-            aria-label="Rerun AI Agent"
-          >
-            <RefreshIcon size={11} />
-            Rerun
-          </Box>
-        )}
-      </Box>
-    );
+        </Box>
+      );
+    };
 
     // Standardised "indicator check running" pill — same shape/placement as the
     // AI Agent processing pill so all in-flight loaders attach BELOW the
@@ -8624,6 +9044,44 @@ const IncidentDetailPage = () => {
 
       const execId = recentRun?.execution_id || '';
       const isClickable = !!execId;
+
+      if (isSimple) {
+        return (
+          <Box
+            key={`indicator-check-${key}`}
+            onClick={isClickable
+              ? () => {
+                  window.dispatchEvent(new CustomEvent('workflow-run:open', {
+                    detail: { executionId: String(execId), workflowId: wfId || undefined },
+                  }));
+                }
+              : undefined}
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0.25,
+              py: 0.25,
+              mb: 1.375,
+              bgcolor: 'transparent',
+              border: 'none',
+              cursor: isClickable ? 'pointer' : 'default',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary' }}>
+                Indicator check
+              </Typography>
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary' }}>
+                running
+              </Typography>
+            </Box>
+            <Typography sx={{ fontSize: '0.75rem', color: 'hsl(var(--foreground))', pl: 1.25, lineHeight: 1.4 }}>
+              Checking observables…
+            </Typography>
+          </Box>
+        );
+      }
+
       return (
         <Box
           key={`indicator-check-${key}`}
@@ -8806,56 +9264,83 @@ const IncidentDetailPage = () => {
       && !hasAgentActivity;
 
     const agentPredictionNode = showAgentPrediction ? (
-      <Box
-        key="ai-prediction-fresh"
-        sx={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 0.75,
-          alignSelf: 'flex-start',
-          pl: 0.4,
-          pr: 1,
-          py: 0.4,
-          borderRadius: 999,
-          fontSize: '0.7rem',
-          background: 'var(--agent-gradient-subtle)',
-          border: '1px solid rgba(156, 90, 242, 0.35)',
-          color: 'text.primary',
-          maxWidth: '100%',
-        }}
-      >
-        <Tooltip title="Open Agent activity" arrow disableInteractive>
-          <Box
-            component={Link}
-            to="/agents"
-            onClick={(e) => e.stopPropagation()}
-            aria-label="Open Agent activity"
-            sx={{
-              width: 18,
-              height: 18,
-              borderRadius: '50%',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              background: 'rgba(0, 0, 0, 0.25)',
-              color: 'inherit',
-              textDecoration: 'none',
-              transition: 'background 0.15s ease, transform 0.15s ease',
-              '&:hover': { background: 'rgba(0, 0, 0, 0.4)', transform: 'scale(1.05)' },
-            }}
-          >
-            <AgentIcon size={11} />
-          </Box>
-        </Tooltip>
-        <CircularProgress size={10} thickness={6} sx={{ color: 'rgba(156, 90, 242, 0.9)', flexShrink: 0 }} />
-        <Typography
-          variant="caption"
-          sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'inherit', lineHeight: 1 }}
+      isSimple ? (
+        <Box
+          key="ai-prediction-fresh"
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.25,
+            py: 0.25,
+            mb: 1.375,
+            bgcolor: 'transparent',
+            border: 'none',
+          }}
         >
-          AI Agent is likely running — waiting for the first update…
-        </Typography>
-      </Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary' }}>
+              AI Agent
+            </Typography>
+            <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary' }}>
+              is likely running
+            </Typography>
+          </Box>
+          <Typography sx={{ fontSize: '0.75rem', color: 'hsl(var(--foreground))', pl: 1.25, lineHeight: 1.4 }}>
+            Waiting for first update…
+          </Typography>
+        </Box>
+      ) : (
+        <Box
+          key="ai-prediction-fresh"
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.75,
+            alignSelf: 'flex-start',
+            pl: 0.4,
+            pr: 1,
+            py: 0.4,
+            borderRadius: 999,
+            fontSize: '0.7rem',
+            background: 'var(--agent-gradient-subtle)',
+            border: '1px solid rgba(156, 90, 242, 0.35)',
+            color: 'text.primary',
+            maxWidth: '100%',
+          }}
+        >
+          <Tooltip title="Open Agent activity" arrow disableInteractive>
+            <Box
+              component={Link}
+              to="/agents"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Open Agent activity"
+              sx={{
+                width: 18,
+                height: 18,
+                borderRadius: '50%',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                background: 'rgba(0, 0, 0, 0.25)',
+                color: 'inherit',
+                textDecoration: 'none',
+                transition: 'background 0.15s ease, transform 0.15s ease',
+                '&:hover': { background: 'rgba(0, 0, 0, 0.4)', transform: 'scale(1.05)' },
+              }}
+            >
+              <AgentIcon size={11} />
+            </Box>
+          </Tooltip>
+          <CircularProgress size={10} thickness={6} sx={{ color: 'rgba(156, 90, 242, 0.9)', flexShrink: 0 }} />
+          <Typography
+            variant="caption"
+            sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'inherit', lineHeight: 1 }}
+          >
+            AI Agent is likely running — waiting for the first update…
+          </Typography>
+        </Box>
+      )
     ) : null;
 
     // Any open agent Question scoped to this incident renders at the very top

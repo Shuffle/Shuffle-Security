@@ -128,7 +128,7 @@
 
     /* Severity colors - tuned for light mode contrast (>=4.5:1 on white) */
     --severity-critical: 0 72% 51%;
-    --severity-high: 25 95% 48%;
+    --severity-high: 12 88% 46%;
     --severity-medium: 38 92% 33%;
     --severity-low: 142 72% 31%;
     --severity-info: 215 90% 45%;
@@ -223,7 +223,7 @@
 
     /* Severity colors */
     --severity-critical: 0 84% 60%;
-    --severity-high: 25 95% 53%;
+    --severity-high: 12 92% 52%;
     --severity-medium: 45 93% 47%;
     --severity-low: 142 71% 45%;
     --severity-info: 210 100% 56%;

@@ -162,6 +162,18 @@ export const AskAiWidget: React.FC<AskAiWidgetProps> = ({
     (activeContext.buttonLabelFn ? activeContext.buttonLabelFn() : activeContext.buttonLabel) ||
     'Ask AI';
 
+  const isBeta = activeContext.isBeta === true;
+  const effectiveRequireSupport = isBeta ? false : requireSupport;
+  const defaultTag = isBeta ? 'Beta' : 'Support';
+  const effectiveTagLabel = buttonProps?.tagLabel !== undefined ? buttonProps.tagLabel : defaultTag;
+
+  // Auto-close if a non-support user navigates away from an enabled beta page to a support-only page
+  useEffect(() => {
+    if (effectiveRequireSupport && !isSupport && isDrawerOpen) {
+      setDrawerOpen(false);
+    }
+  }, [effectiveRequireSupport, isSupport, isDrawerOpen, setDrawerOpen]);
+
   // Context hint for floating button (e.g. "Shuffle Incidents MCP")
   const contextHint =
     activeContext?.apps && activeContext.apps.length > 0
@@ -180,10 +192,12 @@ export const AskAiWidget: React.FC<AskAiWidgetProps> = ({
           onClick={() => setDrawerOpen(!isDrawerOpen)}
           isOpen={isDrawerOpen}
           isSupport={isSupport}
-          requireSupport={requireSupport}
+          requireSupport={effectiveRequireSupport}
+          isBeta={isBeta}
           pathname={pathname}
           contextHint={contextHint}
           label={effectiveButtonLabel}
+          tagLabel={effectiveTagLabel}
           {...buttonProps}
         />
       )}

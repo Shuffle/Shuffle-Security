@@ -121,7 +121,7 @@ export const isKnownStatus = (status: string): boolean => {
 };
 export const severityColors: Record<string, string> = {
   critical: '#ef4444',
-  high: '#f97316',
+  high: '#ea3815',
   medium: '#eab308',
   low: '#22c55e',
   informational: '#3b82f6',

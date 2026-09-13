@@ -126,7 +126,11 @@ export const AskAiDrawer: React.FC<AskAiDrawerProps> = ({
   }, [resolvedContext.storageKey]);
 
   // Header Title
-  const effectiveTitle = title !== undefined ? title : resolvedContext.title;
+  const effectiveTitle =
+    title !== undefined
+      ? title
+      : (resolvedContext.headerTitleFn ? resolvedContext.headerTitleFn() : resolvedContext.headerTitle) ||
+        resolvedContext.title;
 
   // Header Subtitle with context info & optional reset button
   const effectiveSubtitle =

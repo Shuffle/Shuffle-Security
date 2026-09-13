@@ -53,6 +53,8 @@ export interface AgentContextRule {
   sourceCategory?: 'incidents' | 'vulnerabilities' | string;
   /** Explicit flag indicating this route lacks a dedicated MCP mapping */
   missingConfig?: boolean;
+  /** Whether Ask AI is in Beta and enabled for normal users on this page */
+  isBeta?: boolean | ((params: Record<string, string>, pathname: string) => boolean);
   /** Whether opening the panel should sideshift the page layout. Default: true */
   sideshift?: boolean;
   /** Optional function to transform/compose user prompt input before submission (e.g. injecting markdown context for doc pages) */
@@ -88,6 +90,8 @@ export interface AgentResolvedContext {
   originalDefaultPresetId?: string | null;
   /** True when no specific rule was configured for this route (fallback rule used) */
   missingConfig: boolean;
+  /** Whether Ask AI is in Beta and enabled for normal users on this page */
+  isBeta?: boolean;
   /** Whether opening the panel should sideshift the page layout */
   sideshift?: boolean;
   /** Optional function to transform/compose user prompt input before submission */
@@ -293,6 +297,29 @@ export const getDocPageDisplayName = (pathname: string, entityOverride?: string)
   return candidate.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
+/** Helper to extract documentation category name */
+export const getDocCategory = (pathname: string, entityOverride?: string): string => {
+  if (pathname.startsWith('/docs')) {
+    const slug = pathname.replace(/^\/docs\/?/, '').split('/')[0]?.split('#')[0]?.split('?')[0];
+    if (slug) {
+      const group = getDocGroup(slug);
+      if (group && group.label) {
+        return group.label;
+      }
+    } else {
+      return 'Documentation';
+    }
+  }
+
+  const clean = (entityOverride || '').trim();
+  if (clean && clean.toLowerCase() !== 'index' && clean.toLowerCase() !== 'documentation') {
+    const group = getDocGroup(clean);
+    if (group && group.label) return group.label;
+  }
+
+  return 'Documentation';
+};
+
 /**
  * Formats a clean, natural "Ask about X" label avoiding grammatical stutter like
  * "Ask about About", "Ask about How To ...", or repetitive wording.
@@ -300,23 +327,23 @@ export const getDocPageDisplayName = (pathname: string, entityOverride?: string)
 export const formatDocAskAbout = (topic: string): string => {
   const t = (topic || '').trim();
   if (!t || t.toLowerCase() === 'docs' || t.toLowerCase() === 'documentation') {
-    return 'Ask about Shuffle Documentation';
+    return 'Ask about Documentation';
   }
   const lower = t.toLowerCase();
   if (lower === 'about' || lower === 'about shuffle' || lower === 'about us' || lower === 'shuffle') {
     return 'Ask about Shuffle';
   }
   if (lower === 'automation') {
-    return 'Ask about Shuffle Automation';
+    return 'Ask about Automation';
   }
   if (lower === 'security') {
-    return 'Ask about Shuffle Security';
+    return 'Ask about Security';
   }
   if (lower === 'usability') {
-    return 'Ask about Shuffle Usability';
+    return 'Ask about Usability';
   }
   if (lower === 'infrastructure') {
-    return 'Ask about Shuffle Infrastructure';
+    return 'Ask about Infrastructure';
   }
   if (/^about\s+/i.test(t)) {
     return `Ask about ${t.replace(/^about\s+/i, '').trim()}`;
@@ -327,7 +354,7 @@ export const formatDocAskAbout = (topic: string): string => {
   if (/^shuffle\s+/i.test(t)) {
     return `Ask about ${t}`;
   }
-  return `Ask about Shuffle ${t}`;
+  return `Ask about ${t}`;
 };
 
 /**
@@ -336,23 +363,23 @@ export const formatDocAskAbout = (topic: string): string => {
 export const formatDocHelpTitle = (topic: string): string => {
   const t = (topic || '').trim();
   if (!t || t.toLowerCase() === 'docs' || t.toLowerCase() === 'documentation') {
-    return 'How can we help with Shuffle Documentation?';
+    return 'How can we help with Documentation?';
   }
   const lower = t.toLowerCase();
   if (lower === 'about' || lower === 'about shuffle' || lower === 'about us' || lower === 'shuffle') {
     return 'How can we help with Shuffle?';
   }
   if (lower === 'automation') {
-    return 'How can we help with Shuffle Automation?';
+    return 'How can we help with Automation?';
   }
   if (lower === 'security') {
-    return 'How can we help with Shuffle Security?';
+    return 'How can we help with Security?';
   }
   if (lower === 'usability') {
-    return 'How can we help with Shuffle Usability?';
+    return 'How can we help with Usability?';
   }
   if (lower === 'infrastructure') {
-    return 'How can we help with Shuffle Infrastructure?';
+    return 'How can we help with Infrastructure?';
   }
   if (/^about\s+/i.test(t)) {
     return `How can we help with ${t.replace(/^about\s+/i, '').trim()}?`;
@@ -360,7 +387,7 @@ export const formatDocHelpTitle = (topic: string): string => {
   if (/^shuffle\s+/i.test(t)) {
     return `How can we help with ${t}?`;
   }
-  return `How can we help with Shuffle ${t}?`;
+  return `How can we help with ${t}?`;
 };
 
 /**
@@ -369,7 +396,7 @@ export const formatDocHelpTitle = (topic: string): string => {
 export const formatDocDefaultPrompt = (topic: string): string => {
   const t = (topic || '').trim();
   if (!t || t.toLowerCase() === 'docs' || t.toLowerCase() === 'documentation') {
-    return 'Help me understand Shuffle documentation: ';
+    return 'Help me understand Documentation: ';
   }
   const lower = t.toLowerCase();
   if (lower === 'about' || lower === 'about shuffle' || lower === 'about us' || lower === 'shuffle') {
@@ -392,10 +419,43 @@ export const DEFAULT_AGENT_CONTEXT_RULES: AgentContextRule[] = [
   // ==========================================
   // 1. Incidents, Cases, Tickets, Alerts (Grouped)
   // ==========================================
+  // Incidents List (/incidents, /incidents-simple)
+  {
+    id: 'incidents-list',
+    match: (pathname) => {
+      const norm = pathname.replace(/\/+$/, '') || '/';
+      return norm === '/incidents' || norm === '/incidents-simple';
+    },
+    isBeta: true,
+    buttonLabel: 'Ask about incidents',
+    headerTitle: 'Ask about incidents',
+    defaultApps: [{ name: 'shuffle_incidents' }],
+    defaultPresetId: 'incident-response',
+    sourceCategory: 'incidents',
+    title: 'How can we help handle incidents?',
+    subtitle: () => 'Shuffle Incidents MCP',
+    defaultPrompt: 'Investigate these incidents and recommend next steps: ',
+    placeholder: 'Triage incidents, correlate alerts, or search threat intelligence...',
+    getStorageKey: () => 'incidents_list',
+    description: 'Incidents overview with Shuffle Incidents MCP',
+  },
   // Specific Incident Detail
   {
     id: 'incident-detail',
-    match: '/incidents/:id',
+    match: (pathname) => {
+      const parts = pathname.replace(/\/+$/, '').split('/');
+      if (parts.length === 3 && parts[1] === 'incidents') {
+        const id = parts[2];
+        const reserved = ['custom-fields', 'ioc-types', 'observables', 'response-actions', 'threat-feeds'];
+        if (!reserved.includes(id)) {
+          return { id };
+        }
+      }
+      return null;
+    },
+    isBeta: true,
+    buttonLabel: 'Ask about this incident',
+    headerTitle: 'Ask about this incident',
     defaultApps: [{ name: 'shuffle_incidents' }],
     defaultPresetId: 'incident-response',
     sourceCategory: 'incidents',
@@ -417,6 +477,9 @@ export const DEFAULT_AGENT_CONTEXT_RULES: AgentContextRule[] = [
   {
     id: 'incident-simple-detail',
     match: '/incidents-simple/:id',
+    isBeta: true,
+    buttonLabel: 'Ask about this incident',
+    headerTitle: 'Ask about this incident',
     defaultApps: [{ name: 'shuffle_incidents' }],
     defaultPresetId: 'incident-response',
     sourceCategory: 'incidents',
@@ -818,11 +881,12 @@ export const DEFAULT_AGENT_CONTEXT_RULES: AgentContextRule[] = [
     match: (pathname) => pathname.startsWith('/docs') && /workflow|automation|subflow|trigger/i.test(pathname),
     defaultApps: [{ name: 'shuffle_workflows_builder' }, { name: 'shuffle_apps' }],
     defaultPresetId: 'build-workflows',
-    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    title: (params, pathname, entity) => formatDocHelpTitle(getDocPageDisplayName(pathname, entity)),
+    isBeta: true,
+    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    title: (params, pathname, entity) => formatDocHelpTitle(getDocCategory(pathname, entity)),
     subtitle: () => 'Shuffle Workflows Builder & Apps',
-    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocPageDisplayName(pathname, entity)),
+    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocCategory(pathname, entity)),
     placeholder: 'Ask questions about workflows, nodes, triggers, or building automations...',
     getStorageKey: (params, pathname) => `docs_${pathname.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
     description: 'Documentation for Shuffle Workflows & Automations with Workflows Builder tools',
@@ -835,11 +899,12 @@ export const DEFAULT_AGENT_CONTEXT_RULES: AgentContextRule[] = [
     defaultApps: [{ name: 'shuffle_incidents' }],
     defaultPresetId: 'incident-response',
     sourceCategory: 'incidents',
-    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    title: (params, pathname, entity) => formatDocHelpTitle(getDocPageDisplayName(pathname, entity)),
+    isBeta: true,
+    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    title: (params, pathname, entity) => formatDocHelpTitle(getDocCategory(pathname, entity)),
     subtitle: () => 'Shuffle Incidents MCP',
-    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocPageDisplayName(pathname, entity)),
+    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocCategory(pathname, entity)),
     placeholder: 'Ask questions about incident response, alert feeds, or investigations...',
     getStorageKey: (params, pathname) => `docs_${pathname.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
     description: 'Documentation for Shuffle Incidents with Incident Response tools',
@@ -852,11 +917,12 @@ export const DEFAULT_AGENT_CONTEXT_RULES: AgentContextRule[] = [
     defaultApps: [{ name: 'shuffle_vulnerabilities' }, { name: 'shuffle_assets' }],
     defaultPresetId: 'vulnerability',
     sourceCategory: 'vulnerabilities',
-    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    title: (params, pathname, entity) => formatDocHelpTitle(getDocPageDisplayName(pathname, entity)),
+    isBeta: true,
+    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    title: (params, pathname, entity) => formatDocHelpTitle(getDocCategory(pathname, entity)),
     subtitle: () => 'Shuffle Vulnerabilities & Assets',
-    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocPageDisplayName(pathname, entity)),
+    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocCategory(pathname, entity)),
     placeholder: 'Ask questions about vulnerability management, CVEs, or asset posture...',
     getStorageKey: (params, pathname) => `docs_${pathname.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
     description: 'Documentation for Vulnerabilities & Assets',
@@ -868,11 +934,12 @@ export const DEFAULT_AGENT_CONTEXT_RULES: AgentContextRule[] = [
     match: (pathname) => pathname.startsWith('/docs') && /monitor|terminal|computer-use|host/i.test(pathname),
     defaultApps: [{ name: 'shuffle_host_monitors' }],
     defaultPresetId: 'host-monitor-control',
-    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    title: (params, pathname, entity) => formatDocHelpTitle(getDocPageDisplayName(pathname, entity)),
+    isBeta: true,
+    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    title: (params, pathname, entity) => formatDocHelpTitle(getDocCategory(pathname, entity)),
     subtitle: () => 'Shuffle Host Monitors MCP',
-    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocPageDisplayName(pathname, entity)),
+    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocCategory(pathname, entity)),
     placeholder: 'Ask questions about host monitors, agent execution, or terminal controls...',
     getStorageKey: (params, pathname) => `docs_${pathname.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
     description: 'Documentation for Host Monitors',
@@ -884,11 +951,12 @@ export const DEFAULT_AGENT_CONTEXT_RULES: AgentContextRule[] = [
     match: (pathname) => pathname.startsWith('/docs') && /detection|sigma|rule|pipeline/i.test(pathname),
     defaultApps: [{ name: 'shuffle_detection' }],
     defaultPresetId: 'detection',
-    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    title: (params, pathname, entity) => formatDocHelpTitle(getDocPageDisplayName(pathname, entity)),
+    isBeta: true,
+    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    title: (params, pathname, entity) => formatDocHelpTitle(getDocCategory(pathname, entity)),
     subtitle: () => 'Shuffle Detection MCP',
-    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocPageDisplayName(pathname, entity)),
+    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocCategory(pathname, entity)),
     placeholder: 'Ask questions about detection engineering, Sigma rules, or alerts...',
     getStorageKey: (params, pathname) => `docs_${pathname.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
     description: 'Documentation for Detection & Sigma',
@@ -900,36 +968,53 @@ export const DEFAULT_AGENT_CONTEXT_RULES: AgentContextRule[] = [
     match: (pathname) => pathname.startsWith('/docs') && /app|integration|connector|openapi/i.test(pathname),
     defaultApps: [{ name: 'shuffle_apps' }, { name: 'shuffle_workflows_builder' }],
     defaultPresetId: 'build-workflows',
-    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
-    title: (params, pathname, entity) => formatDocHelpTitle(getDocPageDisplayName(pathname, entity)),
+    isBeta: true,
+    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    title: (params, pathname, entity) => formatDocHelpTitle(getDocCategory(pathname, entity)),
     subtitle: () => 'Shuffle Apps & Integrations',
-    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocPageDisplayName(pathname, entity)),
+    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocCategory(pathname, entity)),
     placeholder: 'Ask questions about building or configuring Shuffle apps...',
     getStorageKey: (params, pathname) => `docs_${pathname.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
     description: 'Documentation for Apps & Integrations',
     sideshift: true,
   },
-  // 7g. General Documentation Fallback (/docs, /docs/*, /legal, /legal/*, /articles, /articles/*)
+  // 7g. General Documentation Fallback (/docs, /docs/*)
   {
     id: 'docs',
+    match: (pathname) => pathname === '/docs' || pathname.startsWith('/docs/'),
+    defaultApps: [],
+    defaultPresetId: null,
+    isBeta: true,
+    buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocCategory(pathname, entity)),
+    title: (params, pathname, entity) => formatDocHelpTitle(getDocCategory(pathname, entity)),
+    subtitle: (params, pathname, entity) => `Shuffle ${getDocCategory(pathname, entity)} Documentation`,
+    defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocCategory(pathname, entity)),
+    placeholder: 'Ask questions about Shuffle features, guides, or API...',
+    getStorageKey: (params, pathname) => `docs_${pathname.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+    description: 'Documentation assistant for Shuffle guides, features, and API references',
+    sideshift: true,
+  },
+  // 7h. Legal & Articles Fallback (/legal, /legal/*, /articles, /articles/*)
+  {
+    id: 'legal-articles',
     match: (pathname) =>
-      pathname === '/docs' ||
-      pathname.startsWith('/docs/') ||
       pathname === '/legal' ||
       pathname.startsWith('/legal/') ||
       pathname === '/articles' ||
       pathname.startsWith('/articles/'),
     defaultApps: [],
     defaultPresetId: null,
+    isBeta: false,
     buttonLabel: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
     headerTitle: (params, pathname, entity) => formatDocAskAbout(getDocPageDisplayName(pathname, entity)),
     title: (params, pathname, entity) => formatDocHelpTitle(getDocPageDisplayName(pathname, entity)),
     subtitle: (params, pathname, entity) => `Shuffle ${getDocPageDisplayName(pathname, entity)} Documentation`,
     defaultPrompt: (params, pathname, entity) => formatDocDefaultPrompt(getDocPageDisplayName(pathname, entity)),
-    placeholder: 'Ask questions about Shuffle features, guides, or API...',
+    placeholder: 'Ask questions about Shuffle policies or articles...',
     getStorageKey: (params, pathname) => `docs_${pathname.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
-    description: 'Documentation assistant for Shuffle guides, features, and API references',
+    description: 'Assistant for Shuffle legal and article references',
     sideshift: true,
   },
 
@@ -1152,6 +1237,10 @@ export const resolveAgentContext = (
 
   const missingConfig = Boolean(matchedRule.missingConfig ?? (matchedRule.id === 'default'));
 
+  const isBeta = typeof matchedRule.isBeta === 'function'
+    ? matchedRule.isBeta(matchedParams, normPath)
+    : Boolean(matchedRule.isBeta);
+
   const composeInput = matchedRule.composeInput
     ? (rawInput: string) => matchedRule!.composeInput!(rawInput, matchedParams, normPath)
     : isDocsRoute(normPath)
@@ -1179,6 +1268,7 @@ export const resolveAgentContext = (
     originalDefaultApps: baseDefaultApps,
     originalDefaultPresetId: matchedRule.defaultPresetId,
     missingConfig,
+    isBeta,
     sideshift: matchedRule.sideshift,
     composeInput,
   };
