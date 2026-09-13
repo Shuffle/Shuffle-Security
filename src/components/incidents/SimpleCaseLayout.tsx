@@ -15,11 +15,13 @@ interface SimpleCaseLayoutProps {
   customFields?: ReactNode;
   observables: ReactNode;
   correlations: ReactNode;
-  /** Configuration controls (share access, actions menu) shown above Contents. */
+  /** Configuration controls (share access, actions menu) shown above Overview. */
   contentsActions?: ReactNode;
   taskItems: IncidentTask[];
   observableCount: number;
   correlationCount: number;
+  /** Incidents merged into this one, shown at the bottom of the Overview rail. */
+  relatedIncidents?: LinkedIncidentSummary[];
 }
 
 const SECTIONS = ['narrative', 'tasks', 'observables', 'correlations'] as const;
