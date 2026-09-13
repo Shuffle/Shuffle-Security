@@ -185,6 +185,11 @@ export const SimpleCaseLayout = ({
       </Box>
 
       <Box component="nav" aria-label="Case contents" sx={{ display: { xs: 'none', lg: 'block' }, order: 3, position: 'sticky', top: 24, minWidth: 0 }}>
+        {contentsActions && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 2.5 }}>
+            {contentsActions}
+          </Box>
+        )}
         <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', mb: 1.25 }}>
           Contents
         </Typography>
