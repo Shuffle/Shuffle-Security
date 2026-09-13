@@ -10640,7 +10640,7 @@ const IncidentDetailPage = () => {
         return (
           <>
             <SimpleCaseLayout
-              narrativeLabel={simpleHasEmail ? 'Email' : 'Description'}
+              narrativeLabel="Description"
               overview={simpleOverview}
               narrative={simpleNarrative}
               timeline={renderTimelinePanel('simple')}
