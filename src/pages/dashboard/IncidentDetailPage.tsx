@@ -7728,6 +7728,7 @@ const IncidentDetailPage = () => {
                     flex: '1 1 100%',
                     order: 2,
                     minWidth: 0,
+                    pl: 1.25,
                   }}
                 >
                   <Checkbox
