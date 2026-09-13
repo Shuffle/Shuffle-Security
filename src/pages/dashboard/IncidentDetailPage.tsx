@@ -294,6 +294,10 @@ const formatCompactTime = (timestamp: number): string => {
  */
 const stepVerbLabel = (label: string, hasActor: boolean): string => {
   if (!hasActor) return label;
+  // Attribute-change steps already read as a verb phrase and carry values
+  // whose casing matters ("Changed severity to Medium") — only lowercase the
+  // leading verb so the sentence reads "<user> changed severity to Medium".
+  if (/^Changed /.test(label)) return `${label.charAt(0).toLowerCase()}${label.slice(1)}`;
   const map: Record<string, string> = {
     'Task created': 'created',
     'Task completed': 'completed',
