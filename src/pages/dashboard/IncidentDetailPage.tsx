@@ -141,7 +141,7 @@ import AgentRunDiagnosisBanner from '@/components/agent/AgentRunDiagnosisBanner'
 import { getRunTitle, getRunIconColor, formatDuration as formatAgentRunDuration, getTimeAgo as getAgentTimeAgo, STATUS_CONFIG as AGENT_STATUS_CONFIG } from '@/components/agent/AgentRunHeader';
 import { getFailureInfo as getAgentFailureInfo, hasOutputWarning as hasAgentOutputWarning, diagnoseOutputWarning as diagnoseAgentOutputWarning } from '@/components/agent/AgentRunResultViewer';
 import AgentRunStatusBadge from '@/components/agent/AgentRunStatusBadge';
-import { AlertTriangle as AlertTriangleIcon, Loader2 as Loader2Icon, ArrowDown as ArrowDownwardIcon, AlertTriangle as WarningAmberIcon, ArrowUp as ArrowUpwardIcon, Fingerprint as FingerprintIcon, ArrowLeft as ArrowBackIcon, CheckCircle2 as CheckCircleIcon, Plus as AddIcon, Send as SendIcon, Reply as ReplyIcon, Paperclip as AttachFileIcon, User as PersonIcon, Pencil as EditIcon, History as HistoryIcon, Clock as AccessTimeIcon, ChevronDown as ExpandMoreIcon, ChevronUp as ExpandLessIcon, Filter as FilterListIcon, Shield as SecurityIcon, Link as LinkIcon, Users as PeopleIcon, Settings as SettingsIcon, FileText as DescriptionIcon, CheckCircle2 as TaskAltIcon, Trash2 as DeleteIcon, GripVertical as DragIndicatorIcon, ListPlus as PlaylistAddIcon, RefreshCw as RefreshIcon, TrendingUp as TrendingUpIcon, Wand2 as AutoFixHighIcon, MoreVertical as MoreVertIcon, Forward as ForwardIcon, GitMerge as CallMergeIcon, X as CloseIcon, Eye as VisibilityIcon, EyeOff as VisibilityOffIcon, ChevronRight as ChevronRightIcon, Globe as LanguageIcon, Search as SearchIcon } from 'lucide-react';
+import { AlertTriangle as AlertTriangleIcon, Loader2 as Loader2Icon, ArrowDown as ArrowDownwardIcon, AlertTriangle as WarningAmberIcon, ArrowUp as ArrowUpwardIcon, Fingerprint as FingerprintIcon, ArrowLeft as ArrowBackIcon, CheckCircle2 as CheckCircleIcon, Plus as AddIcon, Send as SendIcon, Reply as ReplyIcon, Paperclip as AttachFileIcon, User as PersonIcon, Pencil as EditIcon, History as HistoryIcon, Clock as AccessTimeIcon, ChevronDown as ExpandMoreIcon, ChevronUp as ExpandLessIcon, Filter as FilterListIcon, Shield as SecurityIcon, Link as LinkIcon, Users as PeopleIcon, Settings as SettingsIcon, FileText as DescriptionIcon, CheckCircle2 as TaskAltIcon, Trash2 as DeleteIcon, GripVertical as DragIndicatorIcon, ListPlus as PlaylistAddIcon, RefreshCw as RefreshIcon, TrendingUp as TrendingUpIcon, Wand2 as AutoFixHighIcon, MoreVertical as MoreVertIcon, Forward as ForwardIcon, GitMerge as CallMergeIcon, X as CloseIcon, Eye as VisibilityIcon, EyeOff as VisibilityOffIcon, ChevronRight as ChevronRightIcon, Globe as LanguageIcon, Search as SearchIcon, Square as SquareIcon, CheckSquare as CheckSquareIcon } from 'lucide-react';
 import { Zap as ZapIcon } from 'lucide-react';
 import type { AgentRun } from '@/services/agentActivity';
 import { getAgentSkipInfo } from '@/lib/agentParsers';
@@ -7641,23 +7641,69 @@ const IncidentDetailPage = () => {
                 </Typography>
               </>
             ) : item.detail && (
-              <Typography
-                sx={{
-                  fontSize: isSimple ? '0.75rem' : '0.7rem',
-                  color: isIocPill ? 'hsl(var(--destructive))' : (isSimple ? 'hsl(var(--foreground))' : 'text.secondary'),
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: isSimple ? 'normal' : 'nowrap',
-                  lineHeight: 1.4,
-                  minWidth: 0,
-                  ...(isSimple ? { flex: '1 1 100%', order: 2 } : { flex: '1 1 auto' }),
-                }}
-                title={item.detail}
-              >
-                {item.detail}
-              </Typography>
+              isSimple && item.taskId && (item.kind === 'task-created' || item.kind === 'task-completed' || item.kind === 'task-status-changed') ? (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 0.5,
+                    flex: '1 1 100%',
+                    order: 2,
+                    minWidth: 0,
+                  }}
+                >
+                  <Checkbox
+                    size="small"
+                    checked={!!tasks.find((t) => t.id === item.taskId)?.completed}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      if (item.taskId) handleToggleTask(item.taskId);
+                    }}
+                    icon={<SquareIcon size={16} />}
+                    checkedIcon={<CheckSquareIcon size={16} />}
+                    sx={{
+                      p: 0,
+                      mt: -0.1,
+                      color: 'hsl(var(--muted-foreground))',
+                      '&.Mui-checked': { color: 'hsl(var(--muted-foreground))' },
+                    }}
+                  />
+                  <Typography
+                    sx={{
+                      fontSize: '0.75rem',
+                      color: isIocPill ? 'hsl(var(--destructive))' : 'hsl(var(--foreground))',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'normal',
+                      lineHeight: 1.4,
+                      minWidth: 0,
+                      flex: 1,
+                      textDecoration: tasks.find((t) => t.id === item.taskId)?.completed ? 'line-through' : 'none',
+                    }}
+                    title={item.detail}
+                  >
+                    {item.detail}
+                  </Typography>
+                </Box>
+              ) : (
+                <Typography
+                  sx={{
+                    fontSize: isSimple ? '0.75rem' : '0.7rem',
+                    color: isIocPill ? 'hsl(var(--destructive))' : (isSimple ? 'hsl(var(--foreground))' : 'text.secondary'),
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: isSimple ? 'normal' : 'nowrap',
+                    lineHeight: 1.4,
+                    minWidth: 0,
+                    ...(isSimple ? { flex: '1 1 100%', order: 2 } : { flex: '1 1 auto' }),
+                  }}
+                  title={item.detail}
+                >
+                  {item.detail}
+                </Typography>
+              )
             )}
-            {item.taskStatusLabel && (
+            {!(isSimple && item.taskId) && item.taskStatusLabel && (
               <Typography
                 component="span"
                 sx={{
