@@ -81,12 +81,12 @@ export const SimpleCaseLayout = ({
   } as const;
 
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(220px, 260px) minmax(0, 1fr) minmax(180px, 220px)' }, gap: { xs: 3, lg: 3 }, alignItems: 'start' }}>
-      <Box sx={{ order: { xs: 2, lg: 1 }, position: { lg: 'sticky' }, top: { lg: 24 }, minWidth: 0, height: { lg: 'calc(100vh - 48px)' }, display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(180px, 220px) minmax(0, 1fr)', lg: 'minmax(220px, 260px) minmax(0, 1fr) minmax(180px, 220px)' }, gap: { xs: 3, md: 3 }, alignItems: 'start' }}>
+      <Box sx={{ order: { xs: 2, md: 1 }, position: { md: 'sticky' }, top: { md: 24 }, minWidth: 0, height: { md: 'calc(100vh - 48px)' }, display: 'flex', flexDirection: 'column' }}>
         <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', mb: 1.5, flexShrink: 0 }}>
           Timeline
         </Typography>
-        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {timeline}
         </Box>
       </Box>
