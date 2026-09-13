@@ -198,7 +198,7 @@ export const useAgentReadiness = (orgId?: string): AgentReadinessStatus => {
 
       // Step 2: wire up the "Run workflow" automation on the incidents category.
       // Re-fetch latest config so we don't clobber other automations.
-      const latestFetched = await fetchIncidentsCategoryConfig();
+      const latestFetched = await fetchIncidentsCategoryConfig(orgId);
       const latestConfig: CategoryConfig | null =
         latestFetched === CATEGORY_CONFIG_MISSING
           ? null
