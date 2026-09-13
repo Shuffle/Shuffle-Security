@@ -10256,7 +10256,7 @@ const IncidentDetailPage = () => {
               {!!incident?.created && (
                 <Tooltip title={formatTimestamp(incident.created)} placement="top">
                   <Typography sx={{ fontSize: '0.78rem', color: 'hsl(var(--muted-foreground))', cursor: 'default' }}>
-                    {formatRelativeTime(incident.created)}
+                    {formatRelativeTime(normalizeToMs(incident.created))}
                   </Typography>
                 </Tooltip>
               )}
