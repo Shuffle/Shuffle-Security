@@ -120,6 +120,8 @@ import { UserHoverCard, resolveUserAvatar } from '@/components/incidents/UserHov
 import { TaskKanbanBoard } from '@/components/incidents/TaskKanbanBoard';
 import { MentionInput } from '@/components/incidents/MentionInput';
 import { DeferredTextField, DeferredMentionInput } from '@/components/incidents/DeferredTextField';
+import { MarkdownDescriptionEditor } from '@/components/incidents/MarkdownDescriptionEditor';
+import { SafeMarkdown } from '@/components/shared/SafeMarkdown';
 import { TaskDateTimePicker } from '@/components/incidents/TaskDateTimePicker';
 import { FileAttachments } from '@/components/incidents/FileAttachments';
 import { toast } from '@/lib/toast';
