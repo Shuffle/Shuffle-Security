@@ -6896,7 +6896,7 @@ const IncidentDetailPage = () => {
             </Box>
 
             {showAsCreation && (initialTitle || initialDescription) && (
-              <Box sx={{ mt: 0.75, ml: isSimple ? 4 : 4, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              <Box sx={{ mt: 0.75, ml: isSimple ? 3 : 4, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                 {initialTitle && (
                   <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: 'hsl(var(--foreground))', lineHeight: 1.35 }}>
                     {decodeHtmlEntities(String(initialTitle))}
@@ -6920,7 +6920,7 @@ const IncidentDetailPage = () => {
             )}
 
             {diff && totalChanges > 0 && !showAsCreation && (
-              <Box sx={{ mt: 0.75, ml: isSimple ? 4 : 4, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+              <Box sx={{ mt: 0.75, ml: isSimple ? 3 : 4, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
                 {diff.changed.map(({ field, from, to }) => (
                   <Box key={field} sx={{ display: 'flex', flexDirection: 'column', gap: 0.15 }}>
                     <Typography sx={{ fontSize: '0.63rem', fontWeight: 600, color: 'hsl(var(--foreground))', fontFamily: 'JetBrains Mono, monospace' }}>
