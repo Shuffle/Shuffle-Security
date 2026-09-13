@@ -10146,9 +10146,10 @@ const IncidentDetailPage = () => {
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: 2, mt: 2 }}>
         {/* Left content area */}
         <Box sx={{ flex: 1, minWidth: 0, order: { xs: 1, lg: 0 } }}>
-          {/* Modern Pill Tabs */}
-          <Box sx={{ 
-            display: 'flex', 
+          {/* Modern Pill Tabs — hidden in the Simple view */}
+          <Box sx={{
+            display: isSupportUser && activeTab === 7 ? 'none' : 'flex',
+
             alignItems: 'center', 
             justifyContent: 'space-between',
             mb: 2,
