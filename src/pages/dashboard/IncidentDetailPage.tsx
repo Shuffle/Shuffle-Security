@@ -6970,23 +6970,27 @@ const IncidentDetailPage = () => {
 
 
       // Reply button — added to every item so users can start a thread off
-      // any timeline event (revision, agent run, or comment).
-      const replyButton = (
+      // any timeline event (revision, change step, agent run, or comment).
+      const makeReplyButton = (compact = false) => (
         <Tooltip title="Reply to this in a new comment" arrow>
           <IconButton
             size="small"
-            onClick={() => startReplyTo(item)}
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); startReplyTo(item); }}
+            onMouseDown={(e) => { e.stopPropagation(); }}
             sx={{
-              width: 22,
-              height: 22,
-              color: 'text.secondary',
+              width: compact ? 18 : 22,
+              height: compact ? 18 : 22,
+              flexShrink: 0,
+              color: 'text.disabled',
               '&:hover': { color: '#ff6600', bgcolor: 'rgba(255, 102, 0, 0.08)' },
             }}
           >
-            <ReplyIcon size={14} />
+            <ReplyIcon size={compact ? 12 : 14} />
           </IconButton>
         </Tooltip>
       );
+      const replyButton = makeReplyButton(false);
+      const replyButtonCompact = makeReplyButton(true);
 
       if (item.type === 'revision') {
         const rev = item.data;
@@ -7301,6 +7305,7 @@ const IncidentDetailPage = () => {
                 {timeAgo}
               </Typography>
             )}
+            {replyButtonCompact}
             
           </Box>
         );
@@ -7421,6 +7426,7 @@ const IncidentDetailPage = () => {
                 {timeAgo}
               </Typography>
             )}
+            {replyButtonCompact}
           </Box>
           {questionNotif && (
             <InlineAgentQuestion
@@ -7866,6 +7872,7 @@ const IncidentDetailPage = () => {
             <Typography sx={{ fontSize: isSimple ? '0.6rem' : '0.65rem', color: 'text.disabled', ml: 'auto', pl: isSimple ? 0.5 : 1, whiteSpace: 'nowrap', flexShrink: 0 }}>
               {item.timestamp ? (isSimple ? formatCompactTime(item.timestamp) : formatRelativeTime(item.timestamp)) : ''}
             </Typography>
+            {replyButtonCompact}
           </Box>
         );
 
@@ -7953,6 +7960,7 @@ const IncidentDetailPage = () => {
                   <Typography sx={{ fontSize: isSimple ? '0.6rem' : '0.65rem', color: 'text.disabled' }}>
                     {isSimple ? formatCompactTime(actItem.timestamp) : formatRelativeTime(actItem.timestamp)}
                   </Typography>
+                  {replyButtonCompact}
                 </Box>
               </Box>
               <Typography sx={{ fontSize: '0.78rem', color: 'hsl(var(--foreground))', mt: 0.25, whiteSpace: 'pre-wrap' }}>
