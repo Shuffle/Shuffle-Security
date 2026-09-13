@@ -115,27 +115,31 @@ export const SimpleCaseLayout = ({
           Contents
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
-          {sectionData.map(({ key, label, count }) => (
-            <Button
-              key={key}
-              onClick={() => scrollTo(key)}
-              sx={{
-                minHeight: 32,
-                justifyContent: 'space-between',
-                px: 1,
-                textTransform: 'none',
-                fontSize: '0.78rem',
-                fontWeight: activeSection === key ? 700 : 500,
-                color: activeSection === key ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
-                borderLeft: '2px solid',
-                borderColor: activeSection === key ? 'hsl(var(--primary))' : 'transparent',
-                borderRadius: 0,
-              }}
-            >
-              <span>{label}</span>
-              {count !== undefined && <span>{count}</span>}
-            </Button>
-          ))}
+          {sectionData.map(({ key, label, count, icon: Icon }) => {
+            const isActive = activeSection === key;
+            return (
+              <Button
+                key={key}
+                onClick={() => scrollTo(key)}
+                sx={{
+                  minHeight: 32,
+                  justifyContent: 'flex-start',
+                  gap: 1,
+                  px: 1,
+                  textTransform: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
+                  borderRadius: 1,
+                  '&:hover': { bgcolor: 'hsl(var(--muted) / 0.35)' },
+                }}
+              >
+                <Icon size={14} style={{ color: isActive ? 'hsl(var(--primary))' : 'inherit', flexShrink: 0 }} />
+                <Box component="span" sx={{ flex: 1, textAlign: 'left' }}>{label}</Box>
+                {count !== undefined && <span>{count}</span>}
+              </Button>
+            );
+          })}
         </Box>
         {openTasks.length > 0 && (
           <Box sx={{ mt: 3 }}>
