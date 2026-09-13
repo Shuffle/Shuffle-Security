@@ -6317,7 +6317,7 @@ const IncidentDetailPage = () => {
             // Stagger so multiple attributes changed in one save keep order.
             timestamp: ts + fieldIdx,
             id: `step-attr-${idx}-${field}`,
-            label: `changed ${ATTRIBUTE_LABELS[field]} to ${after}`,
+            label: `Changed ${ATTRIBUTE_LABELS[field]} to ${after}`,
             detail: `from ${before}`,
             actor: revisions[idx]?.updated_by ? String(revisions[idx].updated_by) : undefined,
           });
