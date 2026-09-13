@@ -58,10 +58,22 @@ export const SimpleCaseLayout = ({
     correlations: null,
   });
 
+  // A short case fits entirely on one screen, so scroll position alone cannot
+  // tell which section the user cares about — clicking "Tasks" would instantly
+  // snap the highlight back to the last visible section. Any deliberate action
+  // (clicking a rail entry, or typing/clicking inside a section) therefore
+  // takes over the highlight and locks out scroll tracking for a moment.
+  const lockUntil = useRef(0);
+  const focusSection = (key: SectionKey, lockMs = 1200) => {
+    lockUntil.current = Date.now() + lockMs;
+    setActiveSection((prev) => (prev === key ? prev : key));
+  };
+
   useEffect(() => {
     const elements = SECTIONS.map((key) => refs.current[key]).filter((el): el is HTMLElement => Boolean(el));
     if (elements.length === 0) return;
     const observer = new IntersectionObserver((entries) => {
+      if (Date.now() < lockUntil.current) return;
       const visible = entries
         .filter((entry) => entry.isIntersecting)
         .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
@@ -76,10 +88,17 @@ export const SimpleCaseLayout = ({
     const target = taskId
       ? document.querySelector(`[data-simple-task-id="${CSS.escape(taskId)}"]`)
       : refs.current[key];
+    focusSection(key, 1500);
     if (!(target instanceof HTMLElement)) return;
-    setActiveSection(key);
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  /** Shared props so interacting anywhere inside a section highlights it. */
+  const sectionActivation = (key: SectionKey) => ({
+    onPointerDown: () => focusSection(key),
+    onFocusCapture: () => focusSection(key),
+    onInputCapture: () => focusSection(key),
+  });
 
   // The timeline column is sticky, but before the page is scrolled its top
   // starts below the incident header, so a flat 100vh height overflows the
@@ -166,11 +185,11 @@ export const SimpleCaseLayout = ({
             {overview}
           </Box>
         )}
-        <Box id="simple-case-narrative" ref={(node: HTMLElement | null) => { refs.current.narrative = node; }} data-simple-section="narrative" sx={sectionSx}>
+        <Box id="simple-case-narrative" ref={(node: HTMLElement | null) => { refs.current.narrative = node; }} data-simple-section="narrative" sx={sectionSx} {...sectionActivation('narrative')}>
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>{narrativeLabel}</Typography>
           {narrative}
         </Box>
-        <Box id="simple-case-tasks" ref={(node: HTMLElement | null) => { refs.current.tasks = node; }} data-simple-section="tasks" sx={sectionSx}>
+        <Box id="simple-case-tasks" ref={(node: HTMLElement | null) => { refs.current.tasks = node; }} data-simple-section="tasks" sx={sectionSx} {...sectionActivation('tasks')}>
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Tasks</Typography>
           {tasks}
         </Box>
@@ -180,11 +199,11 @@ export const SimpleCaseLayout = ({
             {customFields}
           </Box>
         )}
-        <Box id="simple-case-observables" ref={(node: HTMLElement | null) => { refs.current.observables = node; }} data-simple-section="observables" sx={sectionSx}>
+        <Box id="simple-case-observables" ref={(node: HTMLElement | null) => { refs.current.observables = node; }} data-simple-section="observables" sx={sectionSx} {...sectionActivation('observables')}>
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Observables</Typography>
           {observables}
         </Box>
-        <Box id="simple-case-correlations" ref={(node: HTMLElement | null) => { refs.current.correlations = node; }} data-simple-section="correlations" sx={{ ...sectionSx, pb: 2 }}>
+        <Box id="simple-case-correlations" ref={(node: HTMLElement | null) => { refs.current.correlations = node; }} data-simple-section="correlations" sx={{ ...sectionSx, pb: 2 }} {...sectionActivation('correlations')}>
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Correlations</Typography>
           {correlations}
         </Box>
