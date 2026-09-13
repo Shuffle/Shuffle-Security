@@ -1265,6 +1265,15 @@ const IncidentDetailPage = () => {
   // Anchor for the unified Timeline filters dropdown.
   const [timelineFilterAnchor, setTimelineFilterAnchor] = useState<HTMLElement | null>(null);
   const [revisionDialogData, setRevisionDialogData] = useState<{ json: string; changedKeys: Set<string> } | null>(null);
+  // Remember whether the user prefers the Simple or Detailed incident view so
+  // opening any incident lands on the same experience as last time.
+  const VIEW_MODE_STORAGE_KEY = 'shuffle-incident-view-mode';
+  const readPreferredViewMode = (): 'simple' | 'detailed' | null => {
+    try {
+      const v = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+      return v === 'simple' || v === 'detailed' ? v : null;
+    } catch { return null; }
+  };
   const initialTab = (() => {
     const t = searchParams.get('tab');
     if (t) {
@@ -1272,7 +1281,8 @@ const IncidentDetailPage = () => {
       if (idx === 7 && !isSupportUser) return 0;
       return idx >= 0 ? idx : 0;
     }
-    return isSupportUser ? 7 : 0;
+    if (!isSupportUser) return 0;
+    return readPreferredViewMode() === 'detailed' ? 0 : 7;
   })();
    const [activeTab, setActiveTabState] = useState(initialTab);
    useEffect(() => {
@@ -1285,9 +1295,10 @@ const IncidentDetailPage = () => {
        window.history.replaceState(null, '', `${window.location.pathname}${paramStr ? '?' + paramStr : ''}`);
        return;
      }
-     if (!requestedTab && isSupportUser && activeTab === 0) {
+     if (!requestedTab && isSupportUser && activeTab === 0 && readPreferredViewMode() !== 'detailed') {
        setActiveTabState(7);
      }
+     // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [activeTab, isSupportUser, searchParams]);
    const setActiveTab = (tab: number) => {
      if (tab === 7 && !isSupportUser) return;
@@ -1301,6 +1312,9 @@ const IncidentDetailPage = () => {
        }
        return tab;
      });
+     if (isSupportUser) {
+       try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, tab === 7 ? 'simple' : 'detailed'); } catch { /* ignore */ }
+     }
      const newParams = new URLSearchParams(searchParams);
       if (tab === 7) { newParams.delete('tab'); } else { newParams.set('tab', TAB_NAMES[tab] || ''); }
      const paramStr = newParams.toString();
