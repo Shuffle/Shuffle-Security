@@ -6886,21 +6886,25 @@ const IncidentDetailPage = () => {
       const targetKey = replyTargetKey(it);
       const target = items.find((candidate) => getItemKey(candidate) === targetKey) || it;
       setReplyingTo({ id: targetKey, label: getItemLabel(target), preview: getItemPreview(target) });
-      // Scroll the input into view + focus it so the user can immediately type.
-      // The reply banner re-renders the input, so retry for a few frames until
-      // the textarea actually exists and takes focus.
+      // Focus the comment box so the user can immediately type. The reply
+      // banner re-renders the input, so retry for a few frames until the
+      // textarea actually exists and takes focus.
       let attempts = 0;
       const tryFocus = () => {
         attempts += 1;
-        commentInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        const ta = commentInputRef.current?.querySelector('textarea') as HTMLTextAreaElement | null;
+        const container = commentInputRef.current;
+        const ta = (container?.querySelector('textarea:not([readonly])')
+          || container?.querySelector('textarea')) as HTMLTextAreaElement | null;
         if (ta) {
-          ta.focus();
+          ta.focus({ preventScroll: true });
           const len = ta.value.length;
           try { ta.setSelectionRange(len, len); } catch { /* ignore */ }
-          if (document.activeElement === ta) return;
+          if (document.activeElement === ta) {
+            container?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            return;
+          }
         }
-        if (attempts < 12) setTimeout(tryFocus, 50);
+        if (attempts < 20) setTimeout(tryFocus, 50);
       };
       setTimeout(tryFocus, 0);
     };
