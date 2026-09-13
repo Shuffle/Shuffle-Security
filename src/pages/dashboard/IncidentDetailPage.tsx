@@ -119,6 +119,7 @@ import CollapsibleContent from '@/components/incidents/CollapsibleContent';
 import { UserHoverCard, resolveUserAvatar } from '@/components/incidents/UserHoverCard';
 import { TaskKanbanBoard } from '@/components/incidents/TaskKanbanBoard';
 import { MentionInput } from '@/components/incidents/MentionInput';
+import { DeferredTextField, DeferredMentionInput } from '@/components/incidents/DeferredTextField';
 import { TaskDateTimePicker } from '@/components/incidents/TaskDateTimePicker';
 import { FileAttachments } from '@/components/incidents/FileAttachments';
 import { toast } from '@/lib/toast';
@@ -10247,9 +10248,9 @@ const IncidentDetailPage = () => {
             sx={{ minHeight: 120, cursor: isPublicView ? 'default' : 'text', color: 'hsl(var(--foreground))' }}
           >
             {isEditingDescription ? (
-              <MentionInput
+              <DeferredMentionInput
                 value={editedMessage}
-                onChange={setEditedMessage}
+                onCommit={setEditedMessage}
                 fullWidth
                 multiline
                 minRows={5}
@@ -10258,6 +10259,7 @@ const IncidentDetailPage = () => {
                 autoFocus
                 sx={{ '& .MuiInput-root:before, & .MuiInput-root:after': { display: 'none' }, '& textarea': { fontSize: '0.95rem', lineHeight: 1.8 } }}
               />
+
             ) : (
               <Typography sx={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem', lineHeight: 1.8, color: editedMessage ? 'inherit' : 'hsl(var(--muted-foreground))' }}>
                 {editedMessage || 'Click to add a description.'}
@@ -10279,9 +10281,9 @@ const IncidentDetailPage = () => {
                   <TaskAltIcon size={24} style={{ color: severityColors[editedSeverity] }} />
                 )}
               </Box>
-              <TextField
+              <DeferredTextField
                 value={editedTitle}
-                onChange={(e) => !isPublicView && setEditedTitle(e.target.value)}
+                onCommit={(next) => { if (!isPublicView) setEditedTitle(next); }}
                 variant="standard"
                 placeholder="Untitled incident"
                 multiline
@@ -10290,6 +10292,7 @@ const IncidentDetailPage = () => {
                 slotProps={{ input: { disableUnderline: true } }}
                 sx={{ '& textarea, & input': { fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.25, color: 'hsl(var(--foreground))' } }}
               />
+
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, flexWrap: 'wrap', ...(isPublicView && { pointerEvents: 'none' }) }}>
               <FormControl size="small" variant="standard">
@@ -10392,15 +10395,16 @@ const IncidentDetailPage = () => {
                 <Box key={task.id} data-simple-task-id={task.id} sx={{ py: 0.7, scrollMarginTop: 100 }}>
                   <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
                     <Checkbox checked={task.completed} onChange={() => handleToggleTask(task.id)} size="small" sx={{ p: 0.25, mt: 0.1 }} />
-                    <TextField
+                    <DeferredTextField
                       value={task.title}
-                      onChange={(event) => handleUpdateTaskTitle(task.id, event.target.value)}
+                      onCommit={(next) => handleUpdateTaskTitle(task.id, next)}
                       variant="standard"
                       fullWidth
                       multiline
                       slotProps={{ input: { disableUnderline: true } }}
                       sx={{ '& textarea, & input': { fontSize: '0.88rem', lineHeight: 1.55, textDecoration: task.completed ? 'line-through' : 'none', color: task.completed ? 'hsl(var(--muted-foreground))' : 'hsl(var(--foreground))' } }}
                     />
+
                     <IconButton
                       size="small"
                       onClick={() => toggleSimpleTaskExpanded(task.id)}
@@ -10412,9 +10416,9 @@ const IncidentDetailPage = () => {
                   </Box>
                   {expanded && (
                     <Box sx={{ pl: 4, pr: 4.5, pt: 0.3 }}>
-                      <TextField
+                      <DeferredTextField
                         value={task.description || ''}
-                        onChange={(event) => handleUpdateTaskDescription(task.id, event.target.value)}
+                        onCommit={(next) => handleUpdateTaskDescription(task.id, next)}
                         variant="standard"
                         fullWidth
                         multiline
@@ -10422,6 +10426,7 @@ const IncidentDetailPage = () => {
                         slotProps={{ input: { disableUnderline: true } }}
                         sx={{ '& textarea': { fontSize: '0.82rem', lineHeight: 1.6, color: 'hsl(var(--muted-foreground))' } }}
                       />
+
                     </Box>
                   )}
                 </Box>
