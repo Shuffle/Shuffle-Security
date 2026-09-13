@@ -6378,11 +6378,19 @@ const IncidentDetailPage = () => {
         assignee: 'assignee',
         title: 'title',
         tlp: 'TLP',
+        description: 'description',
       };
       const attributeText = (value: any): string => {
         const str = typeof value === 'string' ? value.trim() : (value == null ? '' : String(value));
         if (!str) return 'none';
         return str.length > 60 ? `${str.slice(0, 60)}…` : str;
+      };
+      // The description is stored as message/desc on the raw record, so it
+      // needs its own accessor rather than a plain field lookup.
+      const attributeValue = (rev: any, field: string): any => {
+        if (!rev) return undefined;
+        if (field === 'description') return rev.message ?? rev.desc ?? rev.description;
+        return rev[field];
       };
       for (let idx = 0; idx < revisions.length - 1; idx++) {
         const current = parsedRevisions[idx];
@@ -6391,18 +6399,23 @@ const IncidentDetailPage = () => {
         const ts = normalizeToMs(revisions[idx]?.edited ?? revisions[idx]?.created);
         if (!(ts > 0)) continue;
         Object.keys(ATTRIBUTE_LABELS).forEach((field, fieldIdx) => {
-          if (previous[field] === undefined && current[field] === undefined) return;
-          const before = attributeText(previous[field]);
-          const after = attributeText(current[field]);
+          const prevRaw = attributeValue(previous, field);
+          const currRaw = attributeValue(current, field);
+          if (prevRaw === undefined && currRaw === undefined) return;
+          const before = attributeText(prevRaw);
+          const after = attributeText(currRaw);
           if (before === after) return;
+          // Long free text (description) reads better as "updated" + preview
+          // than as a "to <wall of text>" sentence.
+          const isLongText = field === 'description';
           items.push({
             type: 'step',
             kind: 'attribute-changed',
             // Stagger so multiple attributes changed in one save keep order.
             timestamp: ts + fieldIdx,
             id: `step-attr-${idx}-${field}`,
-            label: `Changed ${ATTRIBUTE_LABELS[field]} to ${after}`,
-            detail: `from ${before}`,
+            label: isLongText ? 'Updated the description' : `Changed ${ATTRIBUTE_LABELS[field]} to ${after}`,
+            detail: isLongText ? after : `from ${before}`,
             actor: revisions[idx]?.updated_by ? String(revisions[idx].updated_by) : undefined,
           });
         });
