@@ -7778,7 +7778,7 @@ const IncidentDetailPage = () => {
                     whiteSpace: isSimple ? 'normal' : 'nowrap',
                     lineHeight: 1.4,
                     minWidth: 0,
-                    ...(isSimple ? { flex: '1 1 100%', order: 2 } : { flex: '1 1 auto' }),
+                    ...(isSimple ? { flex: '1 1 100%', order: 2, pl: 1.25 } : { flex: '1 1 auto' }),
                   }}
                   title={item.detail}
                 >
