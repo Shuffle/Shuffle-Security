@@ -40,10 +40,11 @@ export const DeferredTextField = ({ value, onCommit, onFocus, onBlur, ...props }
   );
 };
 
-type DeferredMentionInputProps = Omit<TextFieldProps, 'value' | 'onChange'> & {
+type DeferredMentionInputProps = Omit<TextFieldProps, 'value' | 'onChange' | 'onSubmit'> & {
   value: string;
   onCommit: (value: string) => void;
 };
+
 
 export const DeferredMentionInput = ({ value, onCommit, onBlur, ...props }: DeferredMentionInputProps) => {
   const [draft, setDraft] = useState(value);
