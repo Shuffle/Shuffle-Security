@@ -1305,7 +1305,14 @@ const IncidentDetailPage = () => {
          setRawJsonText(JSON.stringify((incident as any)?.rawOCSF || {}, null, 2));
          setSelectedRevisionIdx(null);
        }
-       return tab;
+      // Switching tabs while scrolled to the bottom of a long tab (e.g. the
+      // simple timeline) would otherwise leave the new tab scrolled past its
+      // content. Always start the new tab at the top; any focus helper that
+      // runs after this scrolls its own target into view.
+      if (prev !== tab) {
+        try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch { /* ignore */ }
+      }
+      return tab;
      });
      try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, tab === 7 ? 'simple' : 'detailed'); } catch { /* ignore */ }
      const newParams = new URLSearchParams(searchParams);
