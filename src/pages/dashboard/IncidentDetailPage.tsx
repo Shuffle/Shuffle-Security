@@ -1280,30 +1280,23 @@ const IncidentDetailPage = () => {
     const t = searchParams.get('tab');
     if (t) {
       const idx = TAB_NAMES.indexOf(t as any);
-      if (idx === 7 && !isSupportUser) return 0;
       return idx >= 0 ? idx : 0;
     }
-    if (!isSupportUser) return 0;
-    return readPreferredViewMode() === 'detailed' ? 0 : 7;
+    const preferred = readPreferredViewMode();
+    if (preferred === 'simple') return 7;
+    if (preferred === 'detailed') return 0;
+    // No stored choice yet: support users start in Simple, everyone else Detailed.
+    return isSupportUser ? 7 : 0;
   })();
    const [activeTab, setActiveTabState] = useState(initialTab);
    useEffect(() => {
      const requestedTab = searchParams.get('tab');
-     if (activeTab === 7 && !isSupportUser) {
-       setActiveTabState(0);
-       const newParams = new URLSearchParams(searchParams);
-       newParams.set('tab', 'details');
-       const paramStr = newParams.toString();
-       window.history.replaceState(null, '', `${window.location.pathname}${paramStr ? '?' + paramStr : ''}`);
-       return;
-     }
-     if (!requestedTab && isSupportUser && activeTab === 0 && readPreferredViewMode() !== 'detailed') {
+     if (!requestedTab && activeTab === 0 && readPreferredViewMode() === 'simple') {
        setActiveTabState(7);
      }
      // eslint-disable-next-line react-hooks/exhaustive-deps
    }, [activeTab, isSupportUser, searchParams]);
    const setActiveTab = (tab: number) => {
-     if (tab === 7 && !isSupportUser) return;
      // Leaving the Raw OCSF tab (index 4) while previewing an older revision:
      // revert the editor back to the live incident OCSF so unsaved revision
      // previews do not persist across tab switches.
