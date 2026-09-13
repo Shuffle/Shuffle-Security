@@ -5590,9 +5590,9 @@ const IncidentDetailPage = () => {
     switch (field.type) {
       case 'text':
         return wrap(
-          <TextField
-            value={value || ''}
-            onChange={(e) => handleCustomFieldChange(field, e.target.value)}
+          <DeferredTextField
+            value={typeof value === 'string' ? value : value == null ? '' : String(value)}
+            onCommit={(next) => handleCustomFieldChange(field, next)}
             placeholder={placeholder}
             fullWidth
             size="small"
@@ -5601,10 +5601,10 @@ const IncidentDetailPage = () => {
         );
       case 'number':
         return wrap(
-          <TextField
+          <DeferredTextField
             type="number"
-            value={value ?? ''}
-            onChange={(e) => handleCustomFieldChange(field, Number(e.target.value))}
+            value={value == null ? '' : String(value)}
+            onCommit={(next) => handleCustomFieldChange(field, next === '' ? '' : Number(next))}
             placeholder={placeholder}
             fullWidth
             size="small"
