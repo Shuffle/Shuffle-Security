@@ -7597,7 +7597,7 @@ const IncidentDetailPage = () => {
               borderRadius: isSimple ? 1 : 999,
               bgcolor: pillBg,
               border: isSimple ? 'none' : `1px solid ${pillBorder}`,
-              mb: isSimple ? 1 : 0,
+              mb: isSimple ? 1.375 : 0,
               maxWidth: '100%',
               minWidth: 0,
               overflow: 'hidden',
