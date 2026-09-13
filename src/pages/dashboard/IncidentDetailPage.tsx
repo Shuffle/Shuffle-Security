@@ -4240,7 +4240,7 @@ const IncidentDetailPage = () => {
         }
 
         // ─ Activity feed: only adopt if not dirty ──────────────────────
-        const newActivity = reParsed.activity || [];
+        const newActivity = mergePendingActivity(reParsed.activity || []);
         setActivity(prev => {
           // Only replace if the server has more / different items, otherwise
           // we'd risk wiping an optimistic local addition (e.g. a comment
