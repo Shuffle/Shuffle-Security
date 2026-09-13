@@ -9101,7 +9101,7 @@ const IncidentDetailPage = () => {
 
       {/* Compact Header — hidden in the Simple view, where the overview column
           already carries the title, severity, status, assignee and timestamp. */}
-      <Box sx={{ mb: 2, display: isSupportUser && activeTab === 7 ? 'none' : 'block' }}>
+      <Box sx={{ mb: 2, display: activeTab === 7 ? 'none' : 'block' }}>
         <Box
           sx={{
             display: 'flex',
@@ -10268,7 +10268,7 @@ const IncidentDetailPage = () => {
         <Box sx={{ flex: 1, minWidth: 0, order: { xs: 1, lg: 0 } }}>
           {/* Modern Pill Tabs — hidden in the Simple view */}
           <Box sx={{
-            display: isSupportUser && activeTab === 7 ? 'none' : 'flex',
+            display: activeTab === 7 ? 'none' : 'flex',
 
             alignItems: 'center', 
             justifyContent: 'space-between',
@@ -10284,7 +10284,7 @@ const IncidentDetailPage = () => {
               value={String(activeTab)}
               onChange={(v) => setActiveTab(Number(v))}
               options={[
-                ...(isSupportUser ? [{ value: '7', label: 'Simple', dataTour: 'incident-tab-simple' }] : []),
+                { value: '7', label: 'Simple', dataTour: 'incident-tab-simple' },
                 { value: '0', label: 'Detailed', dataTour: 'incident-tab-details' },
                 { value: '1', label: 'Tasks', dataTour: 'incident-tab-tasks', count: visibleTasks.length > 0 ? visibleTasks.length : undefined, title: visibleTasks.length > 0 ? `${visibleTasks.filter(t => t.completed).length}/${visibleTasks.length} completed` : undefined },
                 { value: '2', label: 'Observables', dataTour: 'incident-tab-observables', count: visibleObservablesCount > 0 ? visibleObservablesCount : undefined },
@@ -10353,7 +10353,7 @@ const IncidentDetailPage = () => {
 
           {/* Tab Content */}
       <Box sx={isPublicView ? { pointerEvents: 'none', '& input, & textarea, & select, & button:not([data-public-ok])': { opacity: 0.7 } } : {}}>
-      {isSupportUser && activeTab === 7 && (() => {
+      {activeTab === 7 && (() => {
         const simpleHasEmail = !!incident && isEmailContent(editedMessage || '', rawDescriptionHtml || '', incident.rawOCSF);
         // When the case came in as an email we show the email renderer above the
         // description, collapsed by default, so the description stays available
