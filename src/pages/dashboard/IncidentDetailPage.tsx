@@ -1043,6 +1043,12 @@ const IncidentDetailPage = () => {
   const commentInputRef = useRef<HTMLDivElement>(null);
   // Simple-view timeline feed: always parked at the newest (bottom) entry.
   const simpleFeedRef = useRef<HTMLDivElement | null>(null);
+  const [simpleExpandedTaskIds, setSimpleExpandedTaskIds] = useState<string[]>([]);
+  const toggleSimpleTaskExpanded = (taskId: string) => {
+    setSimpleExpandedTaskIds((previous) => (
+      previous.includes(taskId) ? previous.filter((id) => id !== taskId) : [...previous, taskId]
+    ));
+  };
   const [commentUploading, setCommentUploading] = useState(false);
   const handleCommentAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
