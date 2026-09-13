@@ -7960,6 +7960,7 @@ const IncidentDetailPage = () => {
                   <Typography sx={{ fontSize: isSimple ? '0.6rem' : '0.65rem', color: 'text.disabled' }}>
                     {isSimple ? formatCompactTime(actItem.timestamp) : formatRelativeTime(actItem.timestamp)}
                   </Typography>
+                  {replyButtonCompact}
                 </Box>
               </Box>
               <Typography sx={{ fontSize: '0.78rem', color: 'hsl(var(--foreground))', mt: 0.25, whiteSpace: 'pre-wrap' }}>
