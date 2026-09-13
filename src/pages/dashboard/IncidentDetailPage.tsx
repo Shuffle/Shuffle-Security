@@ -4935,7 +4935,12 @@ const IncidentDetailPage = () => {
         },
       },
     };
-    await writeIncidentSafe(incident.id, updatedOCSF, crossOrgId || undefined);
+    const commentWrite = await writeIncidentSafe(incident.id, updatedOCSF, crossOrgId || undefined);
+    if (!commentWrite?.success) {
+      // The backend rejected the comment — stop protecting the local entry so
+      // the next refresh reflects what actually got stored.
+      dropPendingActivity(commentActivity.id);
+    }
     // No success toast — the new comment renders immediately in the timeline.
     // Demo Mode signal — lets the tour mark "ask the agent" as complete.
     try { window.dispatchEvent(new CustomEvent('demo:incident-comment-sent')); } catch { /* no-op */ }
