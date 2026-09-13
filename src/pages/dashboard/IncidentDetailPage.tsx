@@ -4899,6 +4899,9 @@ const IncidentDetailPage = () => {
     };
     
     const updatedActivity = [...activity, commentActivity];
+    // Hold the local entry so a background poll that raced our write cannot
+    // remove it before the backend echoes it back.
+    trackPendingActivity(commentActivity);
     setActivity(updatedActivity);
     setNewComment('');
     setCommentAttachments([]);
