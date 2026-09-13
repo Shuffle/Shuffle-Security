@@ -7641,23 +7641,69 @@ const IncidentDetailPage = () => {
                 </Typography>
               </>
             ) : item.detail && (
-              <Typography
-                sx={{
-                  fontSize: isSimple ? '0.75rem' : '0.7rem',
-                  color: isIocPill ? 'hsl(var(--destructive))' : (isSimple ? 'hsl(var(--foreground))' : 'text.secondary'),
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: isSimple ? 'normal' : 'nowrap',
-                  lineHeight: 1.4,
-                  minWidth: 0,
-                  ...(isSimple ? { flex: '1 1 100%', order: 2 } : { flex: '1 1 auto' }),
-                }}
-                title={item.detail}
-              >
-                {item.detail}
-              </Typography>
+              isSimple && item.taskId && (item.kind === 'task-created' || item.kind === 'task-completed' || item.kind === 'task-status-changed') ? (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 0.5,
+                    flex: '1 1 100%',
+                    order: 2,
+                    minWidth: 0,
+                  }}
+                >
+                  <Checkbox
+                    size="small"
+                    checked={!!tasks.find((t) => t.id === item.taskId)?.completed}
+                    onChange={(e) => {
+                      e.stopPropagation();
+                      if (item.taskId) handleToggleTask(item.taskId);
+                    }}
+                    icon={<SquareIcon size={16} />}
+                    checkedIcon={<CheckSquareIcon size={16} />}
+                    sx={{
+                      p: 0,
+                      mt: -0.1,
+                      color: 'hsl(var(--muted-foreground))',
+                      '&.Mui-checked': { color: 'hsl(var(--muted-foreground))' },
+                    }}
+                  />
+                  <Typography
+                    sx={{
+                      fontSize: '0.75rem',
+                      color: isIocPill ? 'hsl(var(--destructive))' : 'hsl(var(--foreground))',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'normal',
+                      lineHeight: 1.4,
+                      minWidth: 0,
+                      flex: 1,
+                      textDecoration: tasks.find((t) => t.id === item.taskId)?.completed ? 'line-through' : 'none',
+                    }}
+                    title={item.detail}
+                  >
+                    {item.detail}
+                  </Typography>
+                </Box>
+              ) : (
+                <Typography
+                  sx={{
+                    fontSize: isSimple ? '0.75rem' : '0.7rem',
+                    color: isIocPill ? 'hsl(var(--destructive))' : (isSimple ? 'hsl(var(--foreground))' : 'text.secondary'),
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: isSimple ? 'normal' : 'nowrap',
+                    lineHeight: 1.4,
+                    minWidth: 0,
+                    ...(isSimple ? { flex: '1 1 100%', order: 2 } : { flex: '1 1 auto' }),
+                  }}
+                  title={item.detail}
+                >
+                  {item.detail}
+                </Typography>
+              )
             )}
-            {item.taskStatusLabel && (
+            {!(isSimple && item.taskId) && item.taskStatusLabel && (
               <Typography
                 component="span"
                 sx={{
