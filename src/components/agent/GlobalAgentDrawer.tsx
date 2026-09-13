@@ -32,24 +32,27 @@ export interface GlobalAgentDrawerProps {
 }
 
 const GlobalAgentDrawer = ({ sideshift }: GlobalAgentDrawerProps = {}) => {
-  const [open, setOpen] = useState(() => {
-    try {
-      if (typeof window === 'undefined') return false;
-      if (isAgentRoute(window.location.pathname)) return false;
-      return localStorage.getItem('shuffle_agent_drawer_open') === 'true';
-    } catch {
-      return false;
-    }
-  });
-  const [initialTab, setInitialTab] = useState<AgentRunDrawerTab>(() => {
-    try {
-      if (typeof window === 'undefined') return 'run';
-      const saved = localStorage.getItem('shuffle_agent_drawer_tab');
-      if (saved === 'run' || saved === 'permissions' || saved === 'localLLM') return saved;
-    } catch { /* ignore */ }
-    return 'run';
-  });
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const [open, setOpen] = useState(false);
+  const [initialTab, setInitialTab] = useState<AgentRunDrawerTab>('run');
   const [defaultInput, setDefaultInput] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      if (isAgentRoute(window.location.pathname)) return;
+      if (localStorage.getItem('shuffle_agent_drawer_open') === 'true') {
+        setOpen(true);
+      }
+      const savedTab = localStorage.getItem('shuffle_agent_drawer_tab');
+      if (savedTab === 'run' || savedTab === 'permissions' || savedTab === 'localLLM') {
+        setInitialTab(savedTab);
+      }
+    } catch { /* ignore */ }
+  }, []);
   const location = useLocation();
   const navigate = useNavigate();
   const scheduleAgentRun = useScheduleAgentRun();
@@ -117,6 +120,10 @@ const GlobalAgentDrawer = ({ sideshift }: GlobalAgentDrawerProps = {}) => {
       );
     }
   }, [isAgentDisabled, location.search, location.pathname, navigate]);
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <AskAiWidget

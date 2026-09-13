@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Box, Button, Typography } from '@mui/material';
+import { FileText, ListChecks, ScanEye, GitBranch } from 'lucide-react';
 import type { IncidentTask } from '@/config/ocsfIncidentSchema';
 
 interface SimpleCaseLayoutProps {
@@ -16,6 +17,13 @@ interface SimpleCaseLayoutProps {
 
 const SECTIONS = ['narrative', 'tasks', 'observables', 'correlations'] as const;
 type SectionKey = typeof SECTIONS[number];
+
+const SECTION_ICONS: Record<SectionKey, typeof FileText> = {
+  narrative: FileText,
+  tasks: ListChecks,
+  observables: ScanEye,
+  correlations: GitBranch,
+};
 
 export const SimpleCaseLayout = ({
   narrativeLabel,
@@ -60,11 +68,11 @@ export const SimpleCaseLayout = ({
   };
 
   const openTasks = taskItems.filter((task) => !task.completed && !task.disabled);
-  const sectionData: Array<{ key: SectionKey; label: string; count?: number }> = [
-    { key: 'narrative', label: narrativeLabel },
-    { key: 'tasks', label: 'Tasks', count: openTasks.length },
-    { key: 'observables', label: 'Observables', count: observableCount },
-    { key: 'correlations', label: 'Correlations', count: correlationCount },
+  const sectionData: Array<{ key: SectionKey; label: string; count?: number; icon: typeof FileText }> = [
+    { key: 'narrative', label: narrativeLabel, icon: SECTION_ICONS.narrative },
+    { key: 'tasks', label: 'Tasks', count: openTasks.length, icon: SECTION_ICONS.tasks },
+    { key: 'observables', label: 'Observables', count: observableCount, icon: SECTION_ICONS.observables },
+    { key: 'correlations', label: 'Correlations', count: correlationCount, icon: SECTION_ICONS.correlations },
   ];
 
   const sectionSx = {
@@ -73,17 +81,17 @@ export const SimpleCaseLayout = ({
   } as const;
 
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(220px, 260px) minmax(0, 1fr) minmax(180px, 220px)' }, gap: { xs: 3, lg: 3 }, alignItems: 'start' }}>
-      <Box sx={{ order: { xs: 2, lg: 1 }, position: { lg: 'sticky' }, top: { lg: 24 }, minWidth: 0, height: { lg: 'calc(100vh - 48px)' }, display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(180px, 220px) minmax(0, 1fr)', lg: 'minmax(220px, 260px) minmax(0, 1fr) minmax(180px, 220px)' }, gap: { xs: 3, md: 3 }, alignItems: 'start' }}>
+      <Box sx={{ order: { xs: 2, md: 1 }, position: { md: 'sticky' }, top: { md: 24 }, minWidth: 0, height: { md: 'calc(100vh - 48px)' }, display: 'flex', flexDirection: 'column' }}>
         <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', mb: 1.5, flexShrink: 0 }}>
           Timeline
         </Typography>
-        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {timeline}
         </Box>
       </Box>
 
-      <Box sx={{ order: { xs: 1, lg: 2 }, minWidth: 0, maxWidth: 820, width: '100%', mx: 'auto' }}>
+      <Box sx={{ order: { xs: 1, md: 2 }, minWidth: 0, maxWidth: 820, width: '100%', mx: 'auto' }}>
         <Box id="simple-case-narrative" ref={(node: HTMLElement | null) => { refs.current.narrative = node; }} data-simple-section="narrative" sx={sectionSx}>
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>{narrativeLabel}</Typography>
           {narrative}
@@ -107,27 +115,31 @@ export const SimpleCaseLayout = ({
           Contents
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
-          {sectionData.map(({ key, label, count }) => (
-            <Button
-              key={key}
-              onClick={() => scrollTo(key)}
-              sx={{
-                minHeight: 32,
-                justifyContent: 'space-between',
-                px: 1,
-                textTransform: 'none',
-                fontSize: '0.78rem',
-                fontWeight: activeSection === key ? 700 : 500,
-                color: activeSection === key ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
-                borderLeft: '2px solid',
-                borderColor: activeSection === key ? 'hsl(var(--primary))' : 'transparent',
-                borderRadius: 0,
-              }}
-            >
-              <span>{label}</span>
-              {count !== undefined && <span>{count}</span>}
-            </Button>
-          ))}
+          {sectionData.map(({ key, label, count, icon: Icon }) => {
+            const isActive = activeSection === key;
+            return (
+              <Button
+                key={key}
+                onClick={() => scrollTo(key)}
+                sx={{
+                  minHeight: 32,
+                  justifyContent: 'flex-start',
+                  gap: 1,
+                  px: 1,
+                  textTransform: 'none',
+                  fontSize: '0.78rem',
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
+                  borderRadius: 1,
+                  '&:hover': { bgcolor: 'hsl(var(--muted) / 0.35)' },
+                }}
+              >
+                <Icon size={14} style={{ color: isActive ? 'hsl(var(--primary))' : 'inherit', flexShrink: 0 }} />
+                <Box component="span" sx={{ flex: 1, textAlign: 'left' }}>{label}</Box>
+                {count !== undefined && <span>{count}</span>}
+              </Button>
+            );
+          })}
         </Box>
         {openTasks.length > 0 && (
           <Box sx={{ mt: 3 }}>
