@@ -43,6 +43,10 @@ export interface AgentRunRequest {
    * preset's prompt and tool selection instead of the frontend doing it locally.
    */
   presetId?: string;
+  /** Optional target incident ID for the incident-handler skill */
+  incidentId?: string;
+  /** Optional target workflow ID for the edit-workflow skill */
+  workflowId?: string;
   /**
    * If true, return the initial response immediately without polling for the
    * final execution result. The caller is then responsible for polling
@@ -283,6 +287,13 @@ const isExecutionStub = (data: unknown): data is { execution_id: string } => {
  */
 export const runAgent = async (request: AgentRunRequest): Promise<AgentRunResponse> => {
   const input: Record<string, unknown> = { text: request.input };
+
+  if (request.workflowId) {
+    input.workflow_id = request.workflowId;
+  }
+  if (request.incidentId) {
+    input.incident_id = request.incidentId;
+  }
 
   // Collect images: prefer explicit `images` array, fall back to legacy `image` data URL.
   const images: AgentImageInput[] = [];

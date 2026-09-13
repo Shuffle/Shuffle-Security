@@ -175,6 +175,7 @@ export const AskAiDrawer: React.FC<AskAiDrawerProps> = ({
         placeholder: agentUIProps?.placeholder ?? resolvedContext.placeholder,
         contextCategory: resolvedContext.sourceCategory,
         contextStorageKey: resolvedContext.storageKey,
+        contextParams: resolvedContext.params,
         composeSubmitInput: resolvedContext.composeInput,
         onAppsChange: (apps) => {
           handleAppsChange(apps);

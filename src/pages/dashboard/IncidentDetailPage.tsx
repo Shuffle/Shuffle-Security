@@ -841,13 +841,15 @@ const IncidentDetailPage = () => {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       (window as any).__shuffleActiveEntityTitle = currentIncidentTitle || undefined;
+      (window as any).__shuffleActiveIncidentId = rawId || undefined;
     }
     return () => {
       if (typeof window !== 'undefined') {
         (window as any).__shuffleActiveEntityTitle = undefined;
+        (window as any).__shuffleActiveIncidentId = undefined;
       }
     };
-  }, [currentIncidentTitle]);
+  }, [currentIncidentTitle, rawId]);
   const [editedMessage, setEditedMessage] = useState('');
   const [editedSeverity, setEditedSeverity] = useState('');
   const [editedAssignee, setEditedAssignee] = useState('');

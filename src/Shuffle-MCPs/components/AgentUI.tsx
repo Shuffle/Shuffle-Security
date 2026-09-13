@@ -870,6 +870,12 @@ export interface AgentUIProps {
    * (e.g. pre-injecting dynamic documentation markdown).
    */
   composeSubmitInput?: (raw: string) => string;
+  /** Context parameters (e.g. { id: 'hello' } when on /incidents/:id) */
+  contextParams?: Record<string, string>;
+  /** Optional target incident ID for incident-handler skill */
+  incidentId?: string;
+  /** Optional target workflow ID for edit-workflow skill */
+  workflowId?: string;
 }
 
 /** Set of confirmed live built-in Shuffle services that are always available in the platform */
@@ -2161,6 +2167,9 @@ const AgentUI: React.FC<AgentUIProps> = ({
   presetCtas,
   sidebarLayout = false,
   composeSubmitInput: propComposeSubmitInput,
+  contextParams,
+  incidentId: propIncidentId,
+  workflowId: propWorkflowId,
 }) => {
   const isEffectiveSupport = isSupport !== undefined ? isSupport : isSupportUser();
 
@@ -3801,6 +3810,14 @@ const AgentUI: React.FC<AgentUIProps> = ({
       }, { replace: true });
     }
 
+    const resolvedIncidentId = propIncidentId || contextParams?.id || (
+      typeof window !== 'undefined' ? (window as any).__shuffleActiveIncidentId : undefined
+    );
+
+    const resolvedWorkflowId = propWorkflowId || (
+      typeof window !== 'undefined' ? (window as any).__shuffleActiveWorkflowId : undefined
+    );
+
     const result = await runAgent({
       input: composed.trim(),
       skipPolling: true,
@@ -3808,6 +3825,8 @@ const AgentUI: React.FC<AgentUIProps> = ({
       ...(apiKey ? { apiKey } : {}),
       ...(apiBaseUrl ? { apiBaseUrl } : {}),
       ...(orgId ? { orgId } : {}),
+      ...(resolvedIncidentId ? { incidentId: resolvedIncidentId } : {}),
+      ...(resolvedWorkflowId ? { workflowId: resolvedWorkflowId } : {}),
       // Send a single comma-separated `tool_name` in the format
       // `app:<objectID>:<slug>,app:<objectID>:<slug>` so the backend resolves
       // the exact app versions instead of guessing by slug. When the current

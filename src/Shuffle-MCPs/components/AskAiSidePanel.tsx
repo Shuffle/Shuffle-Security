@@ -933,6 +933,7 @@ export const AskAiSidePanel: React.FC<AskAiSidePanelProps> = ({
                 placeholder={context.placeholder}
                 contextCategory={context.sourceCategory}
                 contextStorageKey={context.storageKey}
+                contextParams={context.params}
                 composeSubmitInput={context.composeInput}
                 defaultInput={effectiveDefaultInput}
                 onAppsChange={handleAppsChange}
