@@ -40,6 +40,19 @@ const GlobalAgentDrawer = ({ sideshift }: GlobalAgentDrawerProps = {}) => {
   const [open, setOpen] = useState(false);
   const [initialTab, setInitialTab] = useState<AgentRunDrawerTab>('run');
   const [defaultInput, setDefaultInput] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      if (isAgentRoute(window.location.pathname)) return;
+      if (localStorage.getItem('shuffle_agent_drawer_open') === 'true') {
+        setOpen(true);
+      }
+      const savedTab = localStorage.getItem('shuffle_agent_drawer_tab');
+      if (savedTab === 'run' || savedTab === 'permissions' || savedTab === 'localLLM') {
+        setInitialTab(savedTab);
+      }
+    } catch { /* ignore */ }
+  }, []);
   const location = useLocation();
   const navigate = useNavigate();
   const scheduleAgentRun = useScheduleAgentRun();
