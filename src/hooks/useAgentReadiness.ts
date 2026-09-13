@@ -60,17 +60,19 @@ const getOrgId = (): string | null => {
 const CATEGORY_CONFIG_MISSING = Symbol('category_config_missing');
 type FetchedCategoryConfig = CategoryConfig | typeof CATEGORY_CONFIG_MISSING | null;
 
-const fetchIncidentsCategoryConfig = async (): Promise<FetchedCategoryConfig> => {
-  const orgId = getOrgId();
+const fetchIncidentsCategoryConfig = async (orgIdArg?: string): Promise<FetchedCategoryConfig> => {
+  const orgId = orgIdArg || getOrgId();
   if (!orgId) return null;
   const url = getApiUrl(
     `/api/v1/orgs/${orgId}/list_cache?category=${encodeURIComponent(
       DATASTORE_CATEGORIES.INCIDENTS,
     )}&top=1`,
   );
+  const headers: Record<string, string> = { ...getAuthHeader() };
+  if (orgIdArg) headers['Org-Id'] = orgIdArg;
   const res = await fetch(url, {
     credentials: 'include',
-    headers: { ...getAuthHeader() },
+    headers,
   });
   if (!res.ok) throw new Error(`list_cache responded with ${res.status}`);
   const data = await res.json();
@@ -78,8 +80,14 @@ const fetchIncidentsCategoryConfig = async (): Promise<FetchedCategoryConfig> =>
   return cfg ?? CATEGORY_CONFIG_MISSING;
 };
 
-export const useAgentReadiness = (): AgentReadinessStatus => {
-  const { data: workflows, isLoading: wfLoading, refetch: refetchWorkflows } = useWorkflows();
+/**
+ * @param orgId - Validate the agent wiring inside THIS tenant instead of the
+ *   active org. Incidents that live in a sub-org (route id "orgId::incidentId")
+ *   must pass their own org id, otherwise readiness reports the parent org's
+ *   configuration while the incident's workflows live somewhere else.
+ */
+export const useAgentReadiness = (orgId?: string): AgentReadinessStatus => {
+  const { data: workflows, isLoading: wfLoading, refetch: refetchWorkflows } = useWorkflows(orgId);
   const queryClient = useQueryClient();
   const [isEnabling, setIsEnabling] = useState(false);
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
@@ -87,8 +95,8 @@ export const useAgentReadiness = (): AgentReadinessStatus => {
   const labels = useMemo(() => getAutomationLabels('assign_escalate'), []);
 
   const { data: fetched, isLoading: cfgLoading } = useQuery<FetchedCategoryConfig>({
-    queryKey: ['agent-readiness-category-config'],
-    queryFn: fetchIncidentsCategoryConfig,
+    queryKey: ['agent-readiness-category-config', orgId || 'active'],
+    queryFn: () => fetchIncidentsCategoryConfig(orgId),
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 2,
@@ -134,7 +142,8 @@ export const useAgentReadiness = (): AgentReadinessStatus => {
   // Automation Readiness banner. Any consumer that reads agentReadiness.active
   // now agrees with that banner by construction (no more "AI Agent is on but
   // Assign & Escalate is off" mismatches).
-  const assign = useAssignEscalateStatus();
+  const assignOptions = useMemo(() => (orgId ? { orgIds: [orgId] } : undefined), [orgId]);
+  const assign = useAssignEscalateStatus(assignOptions);
   const serverActive = assign.active;
   const active = optimistic !== null ? optimistic : serverActive;
 
@@ -142,14 +151,15 @@ export const useAgentReadiness = (): AgentReadinessStatus => {
   const refetchAll = useCallback(async () => {
     await Promise.allSettled([
       refetchWorkflows(),
-      queryClient.invalidateQueries({ queryKey: ['agent-readiness-category-config'] }),
+      queryClient.invalidateQueries({ queryKey: ['agent-readiness-category-config', orgId || 'active'] }),
     ]);
-  }, [refetchWorkflows, queryClient]);
+  }, [refetchWorkflows, queryClient, orgId]);
 
   const enable = useCallback(async () => {
     setOptimistic(true);
     setIsEnabling(true);
     try {
+      const orgHeaders: Record<string, string> = orgId ? { 'Org-Id': orgId } : {};
       // Step 1: ensure the Assign & Escalate workflow exists.
       let workflowId = matchingWorkflow?.id || null;
       if (!workflowId) {
@@ -159,7 +169,7 @@ export const useAgentReadiness = (): AgentReadinessStatus => {
             fetch(getApiUrl('/api/v2/workflows/generate'), {
               method: 'POST',
               credentials: 'include',
-              headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+              headers: { ...getAuthHeader(), ...orgHeaders, 'Content-Type': 'application/json' },
               // schedule-based — no apps required
               body: JSON.stringify({ label, category: 'cases' }),
             }).then(async (r) => {
@@ -167,6 +177,7 @@ export const useAgentReadiness = (): AgentReadinessStatus => {
             }),
           ),
         );
+
         for (const r of results) {
           if (r.status !== 'fulfilled' || !r.value) continue;
           const body: any = r.value;
@@ -187,7 +198,7 @@ export const useAgentReadiness = (): AgentReadinessStatus => {
 
       // Step 2: wire up the "Run workflow" automation on the incidents category.
       // Re-fetch latest config so we don't clobber other automations.
-      const latestFetched = await fetchIncidentsCategoryConfig();
+      const latestFetched = await fetchIncidentsCategoryConfig(orgId);
       const latestConfig: CategoryConfig | null =
         latestFetched === CATEGORY_CONFIG_MISSING
           ? null
@@ -238,7 +249,7 @@ export const useAgentReadiness = (): AgentReadinessStatus => {
       await fetch(getApiUrl('/api/v2/datastore/automate'), {
         method: 'POST',
         credentials: 'include',
-        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+        headers: { ...getAuthHeader(), ...orgHeaders, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -249,7 +260,7 @@ export const useAgentReadiness = (): AgentReadinessStatus => {
       // past any timeout, and the generate API already confirmed success.
       // Only clear once the server-side state catches up (handled below).
     }
-  }, [labels, matchingWorkflow, refetchWorkflows, refetchAll]);
+  }, [labels, matchingWorkflow, refetchWorkflows, refetchAll, orgId]);
 
   // Clear optimistic flag once the server agrees we're active, so we never
   // flicker back to "not enabled" after a successful enable().

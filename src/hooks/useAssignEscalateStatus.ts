@@ -75,7 +75,11 @@ const isOrgActive = (
     (w) => labels.includes(w.name) && w.background_processing === true,
   );
   if (!matchingWorkflow) return false;
-  if (cfg === CATEGORY_CONFIG_MISSING) return true;
+  // No category_config at all means no "Run workflow" automation exists on the
+  // incidents category, so nothing ever fires. Reporting "ready" here is what
+  // produced the "readiness says enabled but zero runs" mismatch, so a missing
+  // config is now treated as NOT ready.
+  if (cfg === CATEGORY_CONFIG_MISSING) return false;
   const categoryConfig = (cfg as CategoryConfig | null | undefined) ?? null;
   const wfAutomation = categoryConfig?.automations?.find((a) => a.name === 'Run workflow');
   if (!wfAutomation || !wfAutomation.enabled) return false;
@@ -102,8 +106,8 @@ const computeOrgChecks = (
   const wfOption = wfAutomation?.options?.find((o) => o.key === 'workflow_id');
   const mappedIds = (wfOption?.value || '').split(',').map((s) => s.trim()).filter(Boolean);
 
-  const automationEnabled = cfgMissing ? true : !!wfAutomation?.enabled;
-  const mapped = cfgMissing ? true : (!!named && mappedIds.includes(named.id));
+  const automationEnabled = cfgMissing ? false : !!wfAutomation?.enabled;
+  const mapped = cfgMissing ? false : (!!named && mappedIds.includes(named.id));
 
   return [
     {
@@ -128,7 +132,7 @@ const computeOrgChecks = (
       label: '"Run workflow" incident automation enabled',
       active: automationEnabled,
       detail: cfgMissing
-        ? 'No category_config returned yet (tenant has no incidents), assumed enabled.'
+        ? 'No category_config returned for the incidents category, so no "Run workflow" automation exists and nothing fires.'
         : automationEnabled
           ? 'The "Run workflow" automation is enabled on the incidents category.'
           : 'The "Run workflow" automation is missing or disabled on the incidents category, so no workflow fires.',
@@ -138,7 +142,7 @@ const computeOrgChecks = (
       label: 'Workflow mapped to the incident automation',
       active: mapped,
       detail: cfgMissing
-        ? 'No category_config returned yet (tenant has no incidents), assumed mapped.'
+        ? 'No category_config returned for the incidents category, so the workflow is not mapped to any automation.'
         : mapped
           ? 'The workflow id is listed in the automation\'s workflow_id option.'
           : exists
