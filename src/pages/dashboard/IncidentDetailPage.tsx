@@ -6207,7 +6207,7 @@ const IncidentDetailPage = () => {
       | { type: 'agent'; timestamp: number; data: typeof agentRuns[number] }
       | { type: 'workflow-exec'; timestamp: number; data: typeof agentRuns[number] }
       | { type: 'manual'; timestamp: number; data: ActivityItem }
-      | { type: 'step'; timestamp: number; kind: StepKind; id: string; label: string; detail?: string; count?: number; corrCount?: number; corrObsKeys?: string[]; obsKeys?: string[]; obsType?: string; obsValue?: string; taskId?: string; taskStatusLabel?: string };
+      | { type: 'step'; timestamp: number; kind: StepKind; id: string; label: string; detail?: string; actor?: string; count?: number; corrCount?: number; corrObsKeys?: string[]; obsKeys?: string[]; obsType?: string; obsValue?: string; taskId?: string; taskStatusLabel?: string };
 
     const items: TimelineItem[] = [];
 
@@ -6371,6 +6371,7 @@ const IncidentDetailPage = () => {
             id: `step-task-created-${t.id}`,
             label: 'Task created',
             detail: t.title,
+            actor: t.createdBy || undefined,
             taskId: String(t.id),
             taskStatusLabel: currentStatusLabel,
           });
@@ -6389,7 +6390,8 @@ const IncidentDetailPage = () => {
             timestamp: ts,
             id: `step-task-status-${t.id}-${hIdx}`,
             label: 'Task moved',
-            detail: `${t.title} · ${laneLabel(entry.from)} → ${laneLabel(entry.to)}${entry.by ? ` by ${entry.by}` : ''}`,
+            detail: `${t.title} · ${laneLabel(entry.from)} → ${laneLabel(entry.to)}`,
+            actor: entry.by || undefined,
             taskId: String(t.id),
             taskStatusLabel: currentStatusLabel,
           });
@@ -6404,6 +6406,9 @@ const IncidentDetailPage = () => {
               id: `step-task-completed-${t.id}`,
               label: 'Task completed',
               detail: t.title,
+              actor: (t.statusHistory || []).slice().reverse().find((h) => h?.to === 'done')?.by
+                || t.assignee
+                || undefined,
               taskId: String(t.id),
               taskStatusLabel: currentStatusLabel,
             });
