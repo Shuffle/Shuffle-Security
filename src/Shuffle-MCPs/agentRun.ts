@@ -45,6 +45,8 @@ export interface AgentRunRequest {
   presetId?: string;
   /** Optional target incident ID for the incident-handler skill */
   incidentId?: string;
+  /** Optional target vulnerability ID for the vulnerability skill */
+  vulnerabilityId?: string;
   /** Optional target workflow ID for the edit-workflow skill */
   workflowId?: string;
   /**
@@ -293,6 +295,9 @@ export const runAgent = async (request: AgentRunRequest): Promise<AgentRunRespon
   }
   if (request.incidentId) {
     input.incident_id = request.incidentId;
+  }
+  if (request.vulnerabilityId) {
+    input.vulnerability_id = request.vulnerabilityId;
   }
 
   // Collect images: prefer explicit `images` array, fall back to legacy `image` data URL.

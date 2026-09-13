@@ -874,6 +874,8 @@ export interface AgentUIProps {
   contextParams?: Record<string, string>;
   /** Optional target incident ID for incident-handler skill */
   incidentId?: string;
+  /** Optional target vulnerability ID for vulnerability skill */
+  vulnerabilityId?: string;
   /** Optional target workflow ID for edit-workflow skill */
   workflowId?: string;
 }
@@ -2169,6 +2171,7 @@ const AgentUI: React.FC<AgentUIProps> = ({
   composeSubmitInput: propComposeSubmitInput,
   contextParams,
   incidentId: propIncidentId,
+  vulnerabilityId: propVulnerabilityId,
   workflowId: propWorkflowId,
 }) => {
   const isEffectiveSupport = isSupport !== undefined ? isSupport : isSupportUser();
@@ -3810,11 +3813,21 @@ const AgentUI: React.FC<AgentUIProps> = ({
       }, { replace: true });
     }
 
-    const resolvedIncidentId = propIncidentId || contextParams?.id || (
+    const resolvedIncidentId = propIncidentId || (
+      contextCategory === 'incidents' ? contextParams?.id : undefined
+    ) || (
       typeof window !== 'undefined' ? (window as any).__shuffleActiveIncidentId : undefined
     );
 
+    const resolvedVulnerabilityId = propVulnerabilityId || (
+      contextCategory === 'vulnerabilities' ? contextParams?.id : undefined
+    ) || (
+      typeof window !== 'undefined' ? (window as any).__shuffleActiveVulnerabilityId : undefined
+    );
+
     const resolvedWorkflowId = propWorkflowId || (
+      contextCategory === 'workflows' ? contextParams?.id : undefined
+    ) || (
       typeof window !== 'undefined' ? (window as any).__shuffleActiveWorkflowId : undefined
     );
 
@@ -3826,6 +3839,7 @@ const AgentUI: React.FC<AgentUIProps> = ({
       ...(apiBaseUrl ? { apiBaseUrl } : {}),
       ...(orgId ? { orgId } : {}),
       ...(resolvedIncidentId ? { incidentId: resolvedIncidentId } : {}),
+      ...(resolvedVulnerabilityId ? { vulnerabilityId: resolvedVulnerabilityId } : {}),
       ...(resolvedWorkflowId ? { workflowId: resolvedWorkflowId } : {}),
       // Send a single comma-separated `tool_name` in the format
       // `app:<objectID>:<slug>,app:<objectID>:<slug>` so the backend resolves
@@ -4691,8 +4705,10 @@ const AgentUI: React.FC<AgentUIProps> = ({
   }, [onChooseLLM]);
 
   const isAiAuthIssue = useMemo(() => {
+    // If the agent completed with a valid final answer, it did not fail AI authentication.
+    if (finishAnswer && finishAnswer.trim().length > 0) return false;
     const diagnosable = execution?.results?.length ? execution : (agentData as any);
-    return isAiAuthFailure(diagnosable, finishAnswer || error || '');
+    return isAiAuthFailure(diagnosable, error || '');
   }, [execution, agentData, finishAnswer, error]);
 
   const aiAuthSuggestionNode = isAiAuthIssue ? (

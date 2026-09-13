@@ -22,10 +22,9 @@ export const AiAuthSuggestion: React.FC<AiAuthSuggestionProps> = ({
     <Box
       sx={{
         display: 'flex',
-        flexDirection: { xs: 'column', sm: 'row' },
-        alignItems: { xs: 'stretch', sm: 'center' },
-        justifyContent: 'space-between',
-        gap: 1.5,
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 1.25,
         p: 1.5,
         borderRadius: 1.5,
         border: '1px solid hsla(var(--severity-critical) / 0.35)',
@@ -33,7 +32,7 @@ export const AiAuthSuggestion: React.FC<AiAuthSuggestionProps> = ({
         ...(sx || {}),
       }}
     >
-      <Box sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ width: '100%' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
           <Box
             component="span"
@@ -82,9 +81,8 @@ export const AiAuthSuggestion: React.FC<AiAuthSuggestionProps> = ({
           onOpenLocalLlm();
         }}
         sx={{
-          flexShrink: 0,
-          height: 32,
-          px: 1.75,
+          height: 30,
+          px: 1.5,
           textTransform: 'none',
           fontSize: '0.78rem',
           fontWeight: 600,

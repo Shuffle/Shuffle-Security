@@ -206,14 +206,14 @@ export const isAiAuthText = (text: string | null | undefined): boolean => {
   const lower = text.toLowerCase();
 
   const hasAuthSignal =
-    /\b(401|unauthori[sz]ed|invalid[_\s-]*(api[_\s-]*key|token|credentials?)|incorrect\s+api\s+key|missing[_\s-]*(api[_\s-]*key|token|authorization)|authentication[_\s-]*(failed|required|error)|bearer[_\s-]*token|expired[_\s-]*token)\b/.test(
+    /\b(401|unauthori[sz]ed|invalid[_\s-]*(api[_\s-]*key|credentials?)|incorrect\s+api\s+key|missing[_\s-]*(api[_\s-]*key|authorization)|authentication[_\s-]*(failed|required|error))\b/.test(
       lower
     );
 
   if (!hasAuthSignal) return false;
 
   const hasAiSignal =
-    /\b(failed\s+to\s+start\s+ai\s+agent|ai\s+agent|runactionai|llm\s+request|failed\s+to\s+run\s+llm|no\s+llm|openai|anthropic|mistral|groq|deepseek|together\.ai|together\.xyz|openrouter|gemini|googleapis\.com|ollama|lm\s*studio|platform\.openai\.com|api\.openai\.com|local\s*llm)\b/.test(
+    /\b(failed\s+to\s+start\s+ai\s+agent|failed\s+to\s+run\s+ai\s+agent|ai\s+agent\s+(failed|error|crash)|runactionai|llm\s+request|failed\s+to\s+run\s+llm|no\s+llm|openai|anthropic|mistral|groq|deepseek|together\.ai|together\.xyz|openrouter|gemini|googleapis\.com|ollama|lm\s*studio|platform\.openai\.com|api\.openai\.com|local\s*llm)\b/.test(
       lower
     ) ||
     /error\s+from\s+['"][^'"]*(openai|anthropic|mistral|groq|deepseek|together|openrouter|googleapis|ollama|lmstudio)/.test(
@@ -333,17 +333,48 @@ export const diagnoseOutputWarning = (run: DiagnosableRun): OutputDiagnosis | nu
     };
   }
 
-  // AI Authentication failure detection runs against the FULL payload (raw +
-  // parsed) just like token limits, because model credentials failures can happen
-  // during agent initialization before any decisions execute.
-  const aiAuthMatch = (() => {
-    const candidates: string[] = [];
-    if (parsed && typeof parsed === 'object') {
-      for (const e of collectEntries(parsed)) {
-        if (isSentenceLike(e.value)) candidates.push(e.value);
+  // AI Authentication failure detection.
+  // Model credential failures prevent the agent from producing decisions or finishing.
+  // If the run has finished and completed a finish/finalise step, it is NOT an AI auth failure.
+  const isFinished = (run.status || '').toUpperCase() === 'FINISHED';
+  const hasSuccessfulFinish = (() => {
+    if (!parsed || typeof parsed !== 'object') return false;
+    if (Array.isArray(parsed.decisions) && parsed.decisions.length > 0) {
+      const last = parsed.decisions[parsed.decisions.length - 1];
+      if (last && typeof last === 'object') {
+        const action = String(last.action || last.details?.action || '').toLowerCase();
+        const category = String(last.category || '').toLowerCase();
+        if (['finish', 'finalise'].includes(action) || ['finish', 'finalise'].includes(category)) {
+          return last.success !== false;
+        }
       }
     }
-    if (raw) {
+    return false;
+  })();
+
+  const aiAuthMatch = (() => {
+    if (isFinished && hasSuccessfulFinish) return null;
+
+    const candidates: string[] = [];
+    if (parsed && typeof parsed === 'object') {
+      // Check explicit error/failure fields rather than walking the whole payload
+      // (which contains system prompts, injected incident datastore context, and output reports).
+      if (typeof parsed.error === 'string') candidates.push(parsed.error);
+      if (typeof parsed.reason === 'string') candidates.push(parsed.reason);
+      if (typeof parsed.message === 'string') candidates.push(parsed.message);
+
+      if (Array.isArray(parsed.decisions)) {
+        for (const d of parsed.decisions) {
+          if (typeof d?.run_details?.error === 'string') candidates.push(d.run_details.error);
+          if (d?.success === false || d?.status === 'FAILED') {
+            if (typeof d?.reason === 'string') candidates.push(d.reason);
+            if (typeof d?.run_details?.result === 'string') candidates.push(d.run_details.result);
+          }
+        }
+      }
+    }
+    // If no decisions were produced at all, check raw error output
+    if (raw && (!parsed || !Array.isArray(parsed.decisions) || parsed.decisions.length === 0)) {
       candidates.push(raw);
     }
     return candidates.find((v) => isAiAuthText(v)) || null;
@@ -679,35 +710,28 @@ export const isAiAuthFailure = (
   if (isAiAuthText(extraText)) return true;
   if (!run) return false;
 
-  // 1. Direct diagnosis
-  const diagnosis = diagnoseOutputWarning(run);
-  if (diagnosis?.kind === 'ai_auth' || diagnosis?.isAiAuth) return true;
+  const status = (run.status || '').toUpperCase();
+  const isFinished = status === 'FINISHED';
 
-  // 2. Failure info for FAILED/ABORTED runs
+  // 1. Failure info for FAILED/ABORTED runs
   const fail = getFailureInfo(run);
   if (fail && isAiAuthText(fail.reason)) return true;
 
-  // 3. Raw result payload
-  if (typeof run.result === 'string' && isAiAuthText(run.result)) return true;
+  // 2. Direct diagnosis (which checks token limits, auth failures, etc.)
+  const diagnosis = diagnoseOutputWarning(run);
+  if (diagnosis?.kind === 'ai_auth' || diagnosis?.isAiAuth) return true;
 
-  // 4. Results array
-  if (Array.isArray(run.results)) {
-    for (const r of run.results) {
-      if (typeof r?.result === 'string' && isAiAuthText(r.result)) return true;
-    }
-  }
+  // If the run has finished and produced no diagnosis/failure info, it succeeded.
+  if (isFinished) return false;
 
-  // 5. Decisions list (e.g. finalise reason or failed AI agent action)
+  // 3. Decisions list: inspect only actions that explicitly errored or failed
   const decisions = (run as any)?.decisions;
   if (Array.isArray(decisions)) {
     for (const d of decisions) {
-      if (isAiAuthText(d?.reason)) return true;
       if (typeof d?.run_details?.error === 'string' && isAiAuthText(d.run_details.error)) return true;
-      if (typeof d?.run_details?.result === 'string' && isAiAuthText(d.run_details.result)) return true;
-      if (Array.isArray(d?.fields)) {
-        for (const f of d.fields) {
-          if (isAiAuthText(f?.value)) return true;
-        }
+      if (d?.success === false || d?.status === 'FAILED') {
+        if (isAiAuthText(d?.reason)) return true;
+        if (typeof d?.run_details?.result === 'string' && isAiAuthText(d.run_details.result)) return true;
       }
     }
   }

@@ -85,6 +85,12 @@ const AgentRunDiagnosisBanner = ({ run, sx, onJumpToEvidence, onFocusContinue, e
 
   if (!failureInfo && !diagnosis) return null;
 
+  // When the run is finished, any AI auth warning is handled by the bottom suggestion
+  // card in the timeline. Suppress it from the top banner to avoid redundant stacked warnings.
+  if (status === 'FINISHED' && (diagnosis?.kind === 'ai_auth' || diagnosis?.isAiAuth)) {
+    return null;
+  }
+
   const isCritical = !!failureInfo || diagnosis?.kind === 'token_limit' || diagnosis?.kind === 'ai_auth' || Boolean(diagnosis?.isAiAuth);
   const tone = isCritical ? 'critical' : 'medium';
   const Icon = isCritical ? AlertTriangle : HelpCircle;
