@@ -10556,6 +10556,7 @@ const IncidentDetailPage = () => {
               taskItems={visibleTasks}
               observableCount={visibleObservablesCount}
               correlationCount={visibleCorrelations.length}
+              relatedIncidents={relatedIncidents.linked}
             />
             {simpleShareItem && (
               <ShareAccessModal

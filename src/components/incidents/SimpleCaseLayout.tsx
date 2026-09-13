@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import { FileText, ListChecks, ScanEye, GitBranch } from 'lucide-react';
+import { useNavigate } from '@/lib/router-compat';
 import type { IncidentTask } from '@/config/ocsfIncidentSchema';
+import type { LinkedIncidentSummary } from '@/hooks/useRelatedIncidents';
 
 interface SimpleCaseLayoutProps {
   narrativeLabel: string;
@@ -13,11 +15,13 @@ interface SimpleCaseLayoutProps {
   customFields?: ReactNode;
   observables: ReactNode;
   correlations: ReactNode;
-  /** Configuration controls (share access, actions menu) shown above Contents. */
+  /** Configuration controls (share access, actions menu) shown above Overview. */
   contentsActions?: ReactNode;
   taskItems: IncidentTask[];
   observableCount: number;
   correlationCount: number;
+  /** Incidents merged into this one, shown at the bottom of the Overview rail. */
+  relatedIncidents?: LinkedIncidentSummary[];
 }
 
 const SECTIONS = ['narrative', 'tasks', 'observables', 'correlations'] as const;
@@ -43,7 +47,9 @@ export const SimpleCaseLayout = ({
   taskItems,
   observableCount,
   correlationCount,
+  relatedIncidents,
 }: SimpleCaseLayoutProps) => {
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<SectionKey>('narrative');
   const refs = useRef<Record<SectionKey, HTMLElement | null>>({
     narrative: null,
@@ -184,14 +190,14 @@ export const SimpleCaseLayout = ({
         </Box>
       </Box>
 
-      <Box component="nav" aria-label="Case contents" sx={{ display: { xs: 'none', lg: 'block' }, order: 3, position: 'sticky', top: 24, minWidth: 0 }}>
+      <Box component="nav" aria-label="Case overview" sx={{ display: { xs: 'none', lg: 'block' }, order: 3, position: 'sticky', top: 24, minWidth: 0 }}>
         {contentsActions && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 2.5 }}>
             {contentsActions}
           </Box>
         )}
         <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', mb: 1.25 }}>
-          Contents
+          Overview
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}>
           {sectionData.map(({ key, label, count, icon: Icon }) => {
@@ -233,6 +239,23 @@ export const SimpleCaseLayout = ({
                 sx={{ display: 'block', width: '100%', minHeight: 30, px: 1, textAlign: 'left', textTransform: 'none', color: 'hsl(var(--muted-foreground))', fontSize: '0.74rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
               >
                 {task.title}
+              </Button>
+            ))}
+          </Box>
+        )}
+        {(relatedIncidents ?? []).length > 0 && (
+          <Box sx={{ mt: 3 }}>
+            <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', mb: 0.75 }}>
+              Related incidents
+            </Typography>
+            {(relatedIncidents ?? []).slice(0, 8).map((ri) => (
+              <Button
+                key={ri.id}
+                onClick={() => navigate(`/incidents/${encodeURIComponent(ri.id)}`)}
+                title={ri.title}
+                sx={{ display: 'block', width: '100%', minHeight: 30, px: 1, textAlign: 'left', textTransform: 'none', color: 'hsl(var(--muted-foreground))', fontSize: '0.74rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {ri.title}
               </Button>
             ))}
           </Box>
