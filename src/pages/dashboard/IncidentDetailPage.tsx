@@ -3285,7 +3285,7 @@ const IncidentDetailPage = () => {
         
         setEditedCustomFields(flattenedCustomFields);
         setEditedLabels(parsed.labels || []);
-        setActivity(parsed.activity || []);
+        setActivity(mergePendingActivity(parsed.activity || []));
         const loadedTasks = parsed.tasks || customAttrs?.tasks || (parsed.rawOCSF as any)?.tasks || [];
         // Ensure all tasks have unique IDs (but don't filter duplicates - just normalize IDs)
         const normalizedTasks = loadedTasks.map((task: IncidentTask, index: number) => ({
