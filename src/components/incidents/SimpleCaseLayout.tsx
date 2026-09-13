@@ -41,6 +41,7 @@ export const SimpleCaseLayout = ({
   overview,
   narrative,
   timeline,
+  timelineActions,
   tasks,
   customFields,
   observables,
