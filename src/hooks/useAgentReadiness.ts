@@ -60,17 +60,19 @@ const getOrgId = (): string | null => {
 const CATEGORY_CONFIG_MISSING = Symbol('category_config_missing');
 type FetchedCategoryConfig = CategoryConfig | typeof CATEGORY_CONFIG_MISSING | null;
 
-const fetchIncidentsCategoryConfig = async (): Promise<FetchedCategoryConfig> => {
-  const orgId = getOrgId();
+const fetchIncidentsCategoryConfig = async (orgIdArg?: string): Promise<FetchedCategoryConfig> => {
+  const orgId = orgIdArg || getOrgId();
   if (!orgId) return null;
   const url = getApiUrl(
     `/api/v1/orgs/${orgId}/list_cache?category=${encodeURIComponent(
       DATASTORE_CATEGORIES.INCIDENTS,
     )}&top=1`,
   );
+  const headers: Record<string, string> = { ...getAuthHeader() };
+  if (orgIdArg) headers['Org-Id'] = orgIdArg;
   const res = await fetch(url, {
     credentials: 'include',
-    headers: { ...getAuthHeader() },
+    headers,
   });
   if (!res.ok) throw new Error(`list_cache responded with ${res.status}`);
   const data = await res.json();
@@ -78,8 +80,14 @@ const fetchIncidentsCategoryConfig = async (): Promise<FetchedCategoryConfig> =>
   return cfg ?? CATEGORY_CONFIG_MISSING;
 };
 
-export const useAgentReadiness = (): AgentReadinessStatus => {
-  const { data: workflows, isLoading: wfLoading, refetch: refetchWorkflows } = useWorkflows();
+/**
+ * @param orgId - Validate the agent wiring inside THIS tenant instead of the
+ *   active org. Incidents that live in a sub-org (route id "orgId::incidentId")
+ *   must pass their own org id, otherwise readiness reports the parent org's
+ *   configuration while the incident's workflows live somewhere else.
+ */
+export const useAgentReadiness = (orgId?: string): AgentReadinessStatus => {
+  const { data: workflows, isLoading: wfLoading, refetch: refetchWorkflows } = useWorkflows(orgId);
   const queryClient = useQueryClient();
   const [isEnabling, setIsEnabling] = useState(false);
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
@@ -87,8 +95,8 @@ export const useAgentReadiness = (): AgentReadinessStatus => {
   const labels = useMemo(() => getAutomationLabels('assign_escalate'), []);
 
   const { data: fetched, isLoading: cfgLoading } = useQuery<FetchedCategoryConfig>({
-    queryKey: ['agent-readiness-category-config'],
-    queryFn: fetchIncidentsCategoryConfig,
+    queryKey: ['agent-readiness-category-config', orgId || 'active'],
+    queryFn: () => fetchIncidentsCategoryConfig(orgId),
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 2,
