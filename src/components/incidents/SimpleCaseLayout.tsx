@@ -67,6 +67,28 @@ export const SimpleCaseLayout = ({
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // The timeline column is sticky, but before the page is scrolled its top
+  // starts below the incident header, so a flat 100vh height overflows the
+  // screen and hides the comment box. Measure the available space instead.
+  const timelineColRef = useRef<HTMLDivElement | null>(null);
+  const [timelineHeight, setTimelineHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const update = () => {
+      const el = timelineColRef.current;
+      if (!el) return;
+      const top = Math.max(el.getBoundingClientRect().top, 24);
+      setTimelineHeight(Math.max(320, window.innerHeight - top - 24));
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
   const openTasks = taskItems.filter((task) => !task.completed && !task.disabled);
   const sectionData: Array<{ key: SectionKey; label: string; count?: number; icon: typeof FileText }> = [
     { key: 'narrative', label: narrativeLabel, icon: SECTION_ICONS.narrative },
@@ -82,7 +104,7 @@ export const SimpleCaseLayout = ({
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(180px, 220px) minmax(0, 1fr)', lg: 'minmax(220px, 260px) minmax(0, 1fr) minmax(180px, 220px)' }, gap: { xs: 3, md: 3 }, alignItems: 'start' }}>
-      <Box sx={{ order: { xs: 2, md: 1 }, position: { md: 'sticky' }, top: { md: 24 }, minWidth: 0, height: { md: 'calc(100vh - 48px)' }, display: 'flex', flexDirection: 'column' }}>
+      <Box ref={timelineColRef} sx={{ order: { xs: 2, md: 1 }, position: { md: 'sticky' }, top: { md: 24 }, minWidth: 0, height: { xs: 'auto', md: timelineHeight ? `${timelineHeight}px` : 'calc(100vh - 48px)' }, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', mb: 1.5, flexShrink: 0 }}>
           Timeline
         </Typography>

@@ -1041,6 +1041,8 @@ const IncidentDetailPage = () => {
   // to the new comment when it's submitted. Cleared after submit / cancel.
   const [replyingTo, setReplyingTo] = useState<{ id: string; label: string; preview: string } | null>(null);
   const commentInputRef = useRef<HTMLDivElement>(null);
+  // Simple-view timeline feed: always parked at the newest (bottom) entry.
+  const simpleFeedRef = useRef<HTMLDivElement | null>(null);
   const [commentUploading, setCommentUploading] = useState(false);
   const handleCommentAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -2885,6 +2887,17 @@ const IncidentDetailPage = () => {
 
     return [...fromNotifications, ...synthetic];
   }, [agentNotifications, id, agentRuns, allIncidentWorkflowRuns]);
+
+  // Simple view: keep the timeline scrolled to the newest entry at the bottom.
+  useEffect(() => {
+    const el = simpleFeedRef.current;
+    if (!el) return;
+    const park = () => { el.scrollTop = el.scrollHeight; };
+    park();
+    const raf = requestAnimationFrame(park);
+    const timer = setTimeout(park, 250);
+    return () => { cancelAnimationFrame(raf); clearTimeout(timer); };
+  }, [activeTab, revisions.length, commentActivity.length, agentRuns?.length]);
 
 
   const workflowOnlyRuns = useMemo(() => {
@@ -6130,7 +6143,7 @@ const IncidentDetailPage = () => {
           <Box sx={{ flexShrink: 0, mb: 1 }}>
             {renderTimelineActionsChip(isSimple)}
           </Box>
-          <Box sx={{ flex: 1, overflowY: 'auto', pb: '150px' }}>
+          <Box ref={simpleFeedRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 0 }}>
             {renderTimelineFeedItems(variant)}
           </Box>
           {renderTimelineInputArea(isSimple)}
