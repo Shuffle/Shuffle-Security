@@ -140,7 +140,12 @@ export const MarkdownDescriptionEditor = ({
     editable: !readOnly,
     extensions: [
       StarterKit,
-      Link.configure({ openOnClick: false, autolink: true }),
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        protocols: ['http', 'https', 'mailto'],
+        validate: (href: string) => isSafeHref(href),
+      }),
       Image,
       Placeholder.configure({ placeholder }),
       Markdown.configure({ html: false, transformPastedText: true, linkify: true, breaks: true }),
