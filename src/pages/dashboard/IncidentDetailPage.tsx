@@ -63,7 +63,7 @@ import IncidentReportDialog from '@/components/incidents/IncidentReportDialog';
 import type { GenerateReportInput } from '@/services/incidentReports';
 import { API_CONFIG, getApiUrl, getAuthHeader, getShuffleCoreUrl, getShuffleCoreWorkflowUrl } from '@/Shuffle-MCPs/api';
 import { navigateToShuffleCore } from '@/lib/authHandoff';
-import { resyncState } from '@/lib/resyncState';
+import { resyncState, getResyncBlockedReason, extractResyncFailureReason } from '@/lib/resyncState';
 import { autoCorrectTranslatedString, repairCorruptedOcsfFields, type FieldRepair } from '@/lib/translationFallback';
 import { useUsers } from '@/hooks/useUsers';
 import { useSubOrgs } from '@/hooks/useSubOrgs';
