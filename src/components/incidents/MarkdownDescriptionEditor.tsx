@@ -42,6 +42,15 @@ type BarAction = {
   active: (editor: Editor) => boolean;
 };
 
+/** Only http(s), mailto and relative app paths may become links. */
+const isSafeHref = (raw: string): boolean => {
+  const href = (raw || '').trim();
+  if (!href) return false;
+  if (/^[/#?]/.test(href)) return true;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(href)) return true;
+  return /^(https?:|mailto:)/i.test(href);
+};
+
 const ACTIONS: BarAction[] = [
   {
     id: 'bold',
