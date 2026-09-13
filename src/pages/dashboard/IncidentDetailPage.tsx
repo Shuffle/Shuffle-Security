@@ -8972,8 +8972,9 @@ const IncidentDetailPage = () => {
         );
       })()}
 
-      {/* Compact Header */}
-      <Box sx={{ mb: 2 }}>
+      {/* Compact Header — hidden in the Simple view, where the overview column
+          already carries the title, severity, status, assignee and timestamp. */}
+      <Box sx={{ mb: 2, display: isSupportUser && activeTab === 7 ? 'none' : 'block' }}>
         <Box
           sx={{
             display: 'flex',
