@@ -3540,10 +3540,7 @@ const IncidentDetailPage = () => {
     // Only trigger if incident has no meaningful title and has a resyncable source
     if (incident.title && incident.title !== incident.id) return;
     const source = incident.source || '';
-    if (!source || source === 'Tenzir') return;
-    // Check source is not a product id/uid (same guard as manual resync)
-    const product = incident.rawOCSF?.product || incident.rawOCSF?.metadata?.product;
-    if (product?.name && (product.name === product.id || product.name === product.uid)) return;
+    if (getResyncBlockedReason(incident)) return;
 
     autoResyncTriggeredRef.current = true;
     setIsResyncing(true);
@@ -3566,8 +3563,10 @@ const IncidentDetailPage = () => {
             app_name: source,
           }),
         });
-        if (!response.ok) {
-          toast.error('Auto-resync failed');
+        const responseBody = await response.json().catch(() => null);
+        const failureReason = extractResyncFailureReason(responseBody);
+        if (!response.ok || responseBody?.success === false) {
+          toast.error(failureReason ? `Auto-resync failed: ${failureReason}` : 'Auto-resync failed', { duration: 10000 });
           setIsResyncing(false);
           resyncState.remove(incident.id);
           return;
