@@ -7426,6 +7426,7 @@ const IncidentDetailPage = () => {
                 {timeAgo}
               </Typography>
             )}
+            {replyButtonCompact}
           </Box>
           {questionNotif && (
             <InlineAgentQuestion
