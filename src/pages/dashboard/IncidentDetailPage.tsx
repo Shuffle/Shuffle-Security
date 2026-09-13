@@ -2888,6 +2888,17 @@ const IncidentDetailPage = () => {
     return [...fromNotifications, ...synthetic];
   }, [agentNotifications, id, agentRuns, allIncidentWorkflowRuns]);
 
+  // Simple view: keep the timeline scrolled to the newest entry at the bottom.
+  useEffect(() => {
+    const el = simpleFeedRef.current;
+    if (!el) return;
+    const park = () => { el.scrollTop = el.scrollHeight; };
+    park();
+    const raf = requestAnimationFrame(park);
+    const timer = setTimeout(park, 250);
+    return () => { cancelAnimationFrame(raf); clearTimeout(timer); };
+  }, [activeTab, revisions.length, commentActivity.length, agentRuns?.length]);
+
 
   const workflowOnlyRuns = useMemo(() => {
     // Do not render any workflow rows until BOTH the agent runs and the
