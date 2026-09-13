@@ -35,3 +35,41 @@ export const resyncState = {
     return snapshot;
   },
 };
+
+/** Sources that cannot be resynced because there is no upstream ticket to pull from. */
+const NON_RESYNCABLE_SOURCES = ['manual', 'tenzir', 'shuffle', 'unknown', 'n/a'];
+
+/**
+ * Returns a human readable reason why the incident cannot be resynced,
+ * or an empty string when resync is allowed.
+ */
+export const getResyncBlockedReason = (incident: any, isSaving = false): string => {
+  if (isSaving) return 'Saving in progress — please wait';
+  const source = (incident?.source || '').trim();
+  if (!source) return 'No source app recorded — cannot resync';
+  if (NON_RESYNCABLE_SOURCES.includes(source.toLowerCase())) {
+    return `${source} incidents have no external source to resync from`;
+  }
+  const product = incident?.rawOCSF?.product || incident?.rawOCSF?.metadata?.product;
+  const name = product?.name;
+  if (name && (name === product?.id || name === product?.uid)) {
+    return 'Source product metadata is incomplete — cannot resync';
+  }
+  return '';
+};
+
+/** Pulls the backend "reason" out of a categories/run response body. */
+export const extractResyncFailureReason = (body: any): string => {
+  if (!body || typeof body !== 'object') return '';
+  const candidates = [
+    body.reason,
+    body.error,
+    body.details,
+    body.result?.reason,
+    body.data?.reason,
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c.trim();
+  }
+  return '';
+};
