@@ -18,6 +18,13 @@ interface SimpleCaseLayoutProps {
 const SECTIONS = ['narrative', 'tasks', 'observables', 'correlations'] as const;
 type SectionKey = typeof SECTIONS[number];
 
+const SECTION_ICONS: Record<SectionKey, typeof FileText> = {
+  narrative: FileText,
+  tasks: ListChecks,
+  observables: ScanEye,
+  correlations: GitBranch,
+};
+
 export const SimpleCaseLayout = ({
   narrativeLabel,
   narrative,
