@@ -1307,9 +1307,7 @@ const IncidentDetailPage = () => {
        }
        return tab;
      });
-     if (isSupportUser) {
-       try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, tab === 7 ? 'simple' : 'detailed'); } catch { /* ignore */ }
-     }
+     try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, tab === 7 ? 'simple' : 'detailed'); } catch { /* ignore */ }
      const newParams = new URLSearchParams(searchParams);
       if (tab === 7) { newParams.delete('tab'); } else { newParams.set('tab', TAB_NAMES[tab] || ''); }
      const paramStr = newParams.toString();
