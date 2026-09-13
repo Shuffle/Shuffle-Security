@@ -10370,6 +10370,7 @@ const IncidentDetailPage = () => {
               </Typography>
             )}
           </Box>
+          </>
         );
 
         // Overview block at the top of the center column: source icon + title,
