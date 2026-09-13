@@ -168,6 +168,12 @@ export const SimpleCaseLayout = ({
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Tasks</Typography>
           {tasks}
         </Box>
+        {customFields && (
+          <Box id="simple-case-custom-fields" sx={sectionSx}>
+            <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Custom Fields</Typography>
+            {customFields}
+          </Box>
+        )}
         <Box id="simple-case-observables" ref={(node: HTMLElement | null) => { refs.current.observables = node; }} data-simple-section="observables" sx={sectionSx}>
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Observables</Typography>
           {observables}
