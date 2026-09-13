@@ -1021,7 +1021,9 @@ const IncidentDetailPage = () => {
   const [askAgentAnchor, setAskAgentAnchor] = useState<HTMLElement | null>(null);
   const [askAgentText, setAskAgentText] = useState('');
   const [askAgentSending, setAskAgentSending] = useState(false);
-  const agentReadiness = useAgentReadiness();
+  // Sub-org incidents must be validated against THEIR tenant, not the active
+  // org — otherwise readiness reports the parent org's wiring.
+  const agentReadiness = useAgentReadiness(crossOrgId || undefined);
   // Assigned agent tools, mirrored into the "Ask the AI agent" popover so it
   // is obvious which apps the agent may use before asking a question.
   const [askAgentTools, setAskAgentTools] = useState<string[]>(() => getAssignedAgentTools().map((t) => t.name));
