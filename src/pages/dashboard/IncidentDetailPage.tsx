@@ -5892,13 +5892,18 @@ const IncidentDetailPage = () => {
     return (
       <Box sx={{ p: { xs: 1, sm: 2 }, borderBottom: isSimple ? 'none' : '1px solid hsl(var(--border-subtle))' }}>
         <Box sx={{ display: 'flex', gap: 1 }}>
-          <Avatar
-            src={resolveUserAvatar(currentUsername, users).src || undefined}
-            alt={currentUsername || 'You'}
-            sx={{ width: 28, height: 28, bgcolor: 'hsl(var(--primary) / 0.2)' }}
-          >
-            <PersonIcon size={16} style={{ color: 'hsl(var(--primary))' }} />
-          </Avatar>
+          {/* The simple view drops the avatar next to the input — the column is
+              narrow and the spacing-first layout reads cleaner without it. */}
+          {!isSimple && (
+            <Avatar
+              src={resolveUserAvatar(currentUsername, users).src || undefined}
+              alt={currentUsername || 'You'}
+              sx={{ width: 28, height: 28, bgcolor: 'hsl(var(--primary) / 0.2)' }}
+            >
+              <PersonIcon size={16} style={{ color: 'hsl(var(--primary))' }} />
+            </Avatar>
+          )}
+
 
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }} ref={commentInputRef}>
             {replyingTo && (
@@ -6153,7 +6158,7 @@ const IncidentDetailPage = () => {
           <Box sx={{ flexShrink: 0, mb: 1 }}>
             {renderTimelineActionsChip(isSimple)}
           </Box>
-          <Box ref={simpleFeedRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 0 }}>
+          <Box ref={simpleFeedRef} data-simple-timeline-feed="true" sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', pb: 0 }}>
             {renderTimelineFeedItems(variant)}
           </Box>
           {renderTimelineInputArea(isSimple)}
