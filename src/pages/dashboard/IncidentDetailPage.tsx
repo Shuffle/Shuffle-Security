@@ -5982,10 +5982,9 @@ const IncidentDetailPage = () => {
 
 
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }} ref={commentInputRef}>
-            {/* The simple view keeps threads one level deep and bumps the
-                conversation to the bottom when it gets an answer, so the
-                "Replying to" banner adds nothing there. */}
-            {replyingTo && !isSimple && (
+            {/* The reply reference is shown in both views so it is always clear
+                which entry the comment will attach to. */}
+            {replyingTo && (
               <Box
                 sx={{
                   display: 'flex',
