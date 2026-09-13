@@ -904,6 +904,8 @@ const IncidentDetailPage = () => {
   // Correlations tab without losing track of which item they followed.
   const [flashedObsKey, setFlashedObsKey] = useState<string | null>(null);
   const [flashedCorrelationKey, setFlashedCorrelationKey] = useState<string | null>(null);
+  const [flashedTaskId, setFlashedTaskId] = useState<string | null>(null);
+  const flashedTaskTimerRef = useRef<any>(null);
   const flashedObsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashedCorrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track the user's most recent keystroke so background polls can defer
@@ -1346,10 +1348,13 @@ const IncidentDetailPage = () => {
      * Jump to the Tasks tab and scroll to the task card matching the given id.
      * Used by clickable task pills in the timeline.
      */
-    const focusTaskFromTimeline = (taskId: string | null) => {
-      setActiveTab(1);
-      if (!taskId) return;
-      setTimeout(() => {
+     const focusTaskFromTimeline = (taskId: string | null) => {
+       setActiveTab(1);
+       if (!taskId) return;
+       setFlashedTaskId(taskId);
+       if (flashedTaskTimerRef.current) clearTimeout(flashedTaskTimerRef.current);
+       flashedTaskTimerRef.current = setTimeout(() => setFlashedTaskId(null), 2200);
+       setTimeout(() => {
         try {
           const escaped = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(taskId) : taskId;
           const el = document.querySelector(`[data-task-id="${escaped}"]`) as HTMLElement | null;
@@ -10755,6 +10760,7 @@ const IncidentDetailPage = () => {
           onTasksChange={setTasks}
           incidentId={id || 'new'}
           currentUser={currentUsername || 'You'}
+          highlightTaskId={flashedTaskId}
         />
       )}
 
