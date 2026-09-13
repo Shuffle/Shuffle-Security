@@ -3543,7 +3543,7 @@ const IncidentDetailPage = () => {
         setEnrichments(reParsed.enrichments || []);
         setEditedStakeholders(reParsed.stakeholders || []);
         setEditedLabels(reParsed.labels || []);
-        setActivity(reParsed.activity || []);
+        setActivity(mergePendingActivity(reParsed.activity || []));
         const loadedTasks = reParsed.tasks || [];
         const normalizedTasks = loadedTasks.map((task: IncidentTask, index: number) => ({
           ...task,
