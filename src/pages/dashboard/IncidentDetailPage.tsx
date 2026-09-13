@@ -6236,7 +6236,7 @@ const IncidentDetailPage = () => {
   // Builder for the unified timeline items (revisions + agent runs + comments).
   // Returns an array of JSX nodes (or a single empty-state node).
   const renderTimelineFeedItems = (variant: 'sidebar' | 'inline' | 'simple' = 'sidebar') => {
-    type StepKind = 'task-created' | 'task-completed' | 'task-status-changed' | 'observable-added' | 'correlation-found' | 'incident-created' | 'routing-matched';
+    type StepKind = 'task-created' | 'task-completed' | 'task-status-changed' | 'observable-added' | 'correlation-found' | 'incident-created' | 'routing-matched' | 'attribute-changed';
     type TimelineItem =
       | { type: 'revision'; timestamp: number; data: any; idx: number; parsedCurrent: any; parsedPrevious: any | null }
       | { type: 'agent'; timestamp: number; data: typeof agentRuns[number] }
