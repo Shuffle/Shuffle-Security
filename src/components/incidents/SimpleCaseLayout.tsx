@@ -154,6 +154,7 @@ export const SimpleCaseLayout = ({
   const sectionData: Array<{ key: SectionKey; label: string; count?: number; icon: typeof FileText }> = [
     { key: 'narrative', label: narrativeLabel, icon: SECTION_ICONS.narrative },
     { key: 'tasks', label: 'Tasks', count: openTasks.length, icon: SECTION_ICONS.tasks },
+    ...(customFields ? [{ key: 'customFields' as SectionKey, label: 'Custom Fields', icon: SECTION_ICONS.customFields }] : []),
     { key: 'observables', label: 'Observables', count: observableCount, icon: SECTION_ICONS.observables },
     { key: 'correlations', label: 'Correlations', count: correlationCount, icon: SECTION_ICONS.correlations },
   ];
