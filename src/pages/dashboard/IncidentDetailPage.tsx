@@ -2799,7 +2799,14 @@ const IncidentDetailPage = () => {
   }, [runsWindow.startTime, runsWindow.endTime]);
 
 
-  const { runsForIncident: agentRuns, isLoading: agentRunsLoading, refetch: refetchAgentRuns } = useIncidentAgentRuns(!loading ? id : undefined, hasPendingAgentMention, activeRunsWindow);
+  // Executions live in the tenant that owns the incident, so sub-org incidents
+  // must search that org — searching the active org returns zero runs.
+  const { runsForIncident: agentRuns, isLoading: agentRunsLoading, refetch: refetchAgentRuns } = useIncidentAgentRuns(
+    !loading ? id : undefined,
+    hasPendingAgentMention,
+    activeRunsWindow,
+    crossOrgId || undefined,
+  );
   // Every OTHER workflow execution that touched this incident (datastore
   // triggers, enrichment / indicator-check workflows, forward-to-tool runs).
   // The list is polled at 60s and folded into the timeline as a "workflow
@@ -2809,6 +2816,7 @@ const IncidentDetailPage = () => {
     !loading ? id : undefined,
     hasPendingAgentMention || refreshingObservables,
     workflowRunsWindow,
+    crossOrgId || undefined,
   );
   // When a workflow execution changes state from within the run explorer
   // (e.g. the user aborts it), refetch both the workflow-run and agent-run
