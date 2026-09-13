@@ -5,6 +5,7 @@ import type { IncidentTask } from '@/config/ocsfIncidentSchema';
 
 interface SimpleCaseLayoutProps {
   narrativeLabel: string;
+  overview?: ReactNode;
   narrative: ReactNode;
   timeline: ReactNode;
   tasks: ReactNode;
@@ -27,6 +28,7 @@ const SECTION_ICONS: Record<SectionKey, typeof FileText> = {
 
 export const SimpleCaseLayout = ({
   narrativeLabel,
+  overview,
   narrative,
   timeline,
   tasks,
@@ -114,6 +116,7 @@ export const SimpleCaseLayout = ({
       </Box>
 
       <Box sx={{ order: { xs: 1, md: 2 }, minWidth: 0, maxWidth: 820, width: '100%', mx: 'auto' }}>
+        {overview}
         <Box id="simple-case-narrative" ref={(node: HTMLElement | null) => { refs.current.narrative = node; }} data-simple-section="narrative" sx={sectionSx}>
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>{narrativeLabel}</Typography>
           {narrative}

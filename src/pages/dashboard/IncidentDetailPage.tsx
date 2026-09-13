@@ -10149,6 +10149,113 @@ const IncidentDetailPage = () => {
           </Box>
         );
 
+        // Overview block at the top of the center column: source + title, then
+        // the three fields that matter most (severity, status, assignee).
+        const simpleOverview = (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 4 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+              <Box sx={{ width: 32, height: 32, mt: 0.75, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 1.5, overflow: 'hidden' }}>
+                {sourceAppImage ? (
+                  <img src={sourceAppImage} alt={incident?.source || ''} style={{ width: 30, height: 30, objectFit: 'contain', borderRadius: 6 }} />
+                ) : (
+                  <TaskAltIcon size={24} style={{ color: severityColors[editedSeverity] }} />
+                )}
+              </Box>
+              <TextField
+                value={editedTitle}
+                onChange={(e) => !isPublicView && setEditedTitle(e.target.value)}
+                variant="standard"
+                placeholder="Untitled incident"
+                multiline
+                fullWidth
+                inputProps={{ readOnly: isPublicView }}
+                slotProps={{ input: { disableUnderline: true } }}
+                sx={{ '& textarea, & input': { fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.25, color: 'hsl(var(--foreground))' } }}
+              />
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, flexWrap: 'wrap', pl: { sm: 6 }, ...(isPublicView && { pointerEvents: 'none' }) }}>
+              <FormControl size="small" variant="standard">
+                <Select
+                  value={editedSeverity}
+                  onChange={(e) => setEditedSeverity(e.target.value)}
+                  disableUnderline
+                  sx={{
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    color: severityColors[editedSeverity],
+                    textTransform: 'capitalize',
+                    '& .MuiSelect-select': { py: 0.25, pr: 3 },
+                    '& .MuiSvgIcon-root': { color: severityColors[editedSeverity], fontSize: 16 },
+                  }}
+                  MenuProps={{ PaperProps: { sx: { bgcolor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' } } }}
+                >
+                  <MenuItem value="critical">Critical</MenuItem>
+                  <MenuItem value="high">High</MenuItem>
+                  <MenuItem value="medium">Medium</MenuItem>
+                  <MenuItem value="low">Low</MenuItem>
+                  <MenuItem value="informational">Informational</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl size="small" variant="standard">
+                <Select
+                  value={editedStatus}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === 'resolved') { setShowResolveDialog(true); return; }
+                    setEditedStatus(val);
+                  }}
+                  disableUnderline
+                  sx={{
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    color: statusConfig[editedStatus]?.color || '#f59e0b',
+                    '& .MuiSelect-select': { py: 0.25, pr: 3 },
+                    '& .MuiSelect-icon': { color: statusConfig[editedStatus]?.color || '#f59e0b', fontSize: 16 },
+                  }}
+                  MenuProps={{ PaperProps: { sx: { bgcolor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' } } }}
+                  renderValue={(val) => statusConfig[val]?.label || String(val).replace(/_/g, ' ')}
+                >
+                  {Object.entries(statusConfig)
+                    .filter(([key]) => key !== 'merged')
+                    .map(([key, cfg]) => {
+                      const isDisabled = key === 'on_hold' || key === 'escalated';
+                      return (
+                        <MenuItem key={key} value={key} disabled={isDisabled} sx={{ fontSize: '0.8rem', gap: 1, opacity: isDisabled ? 0.4 : 1 }}>
+                          <cfg.icon size={14} color={cfg.color} />
+                          {cfg.label}
+                        </MenuItem>
+                      );
+                    })}
+                </Select>
+              </FormControl>
+              <FormControl size="small" variant="standard">
+                <Select
+                  value={editedAssignee || ''}
+                  onChange={(e) => setEditedAssignee(e.target.value)}
+                  displayEmpty
+                  disableUnderline
+                  disabled={usersLoading}
+                  sx={{
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                    color: isAIAssignee(editedAssignee) ? '#22c55e' : editedAssignee ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
+                    '& .MuiSelect-select': { py: 0.25, pr: 3 },
+                    '& .MuiSvgIcon-root': { color: 'hsl(var(--muted-foreground))', fontSize: 16 },
+                  }}
+                  MenuProps={{ PaperProps: { sx: { bgcolor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' } } }}
+                  renderValue={(value) => (isAIAssignee(value as string) ? 'AI Agent' : (value as string) || 'Unassigned')}
+                >
+                  <MenuItem value="">Unassigned</MenuItem>
+                  <MenuItem value="AI Agent">AI Agent</MenuItem>
+                  {users.map((user) => (
+                    <MenuItem key={user.id} value={user.username}>{user.username}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Box>
+          </Box>
+        );
+
         const simpleTasks = (
           <Box>
             {visibleTasks.length === 0 && (
@@ -10213,6 +10320,7 @@ const IncidentDetailPage = () => {
         return (
           <SimpleCaseLayout
             narrativeLabel={simpleHasEmail ? 'Email' : 'Description'}
+            overview={simpleOverview}
             narrative={simpleNarrative}
             timeline={renderTimelinePanel('simple')}
             tasks={simpleTasks}
