@@ -7245,6 +7245,7 @@ const IncidentDetailPage = () => {
           'correlation-found':    { icon: <LinkIcon size={12} /> },
           'incident-created':     { icon: <HistoryIcon size={12} /> },
           'routing-matched':      { icon: <CallSplitIcon size={12} /> },
+          'attribute-changed':    { icon: <EditIcon size={12} /> },
         };
         const cfg = stepStyle[item.kind];
         // Highlight observable-added pills when the underlying observable
