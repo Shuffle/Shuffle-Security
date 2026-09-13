@@ -42,6 +42,15 @@ type BarAction = {
   active: (editor: Editor) => boolean;
 };
 
+/** Only http(s), mailto and relative app paths may become links. */
+const isSafeHref = (raw: string): boolean => {
+  const href = (raw || '').trim();
+  if (!href) return false;
+  if (/^[/#?]/.test(href)) return true;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(href)) return true;
+  return /^(https?:|mailto:)/i.test(href);
+};
+
 const ACTIONS: BarAction[] = [
   {
     id: 'bold',
@@ -140,7 +149,12 @@ export const MarkdownDescriptionEditor = ({
     editable: !readOnly,
     extensions: [
       StarterKit,
-      Link.configure({ openOnClick: false, autolink: true }),
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        protocols: ['http', 'https', 'mailto'],
+        validate: (href: string) => isSafeHref(href),
+      }),
       Image,
       Placeholder.configure({ placeholder }),
       Markdown.configure({ html: false, transformPastedText: true, linkify: true, breaks: true }),
@@ -213,6 +227,9 @@ export const MarkdownDescriptionEditor = ({
     const href = linkUrl.trim();
     if (!href) {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    } else if (!isSafeHref(href)) {
+      // Ignore anything that could execute (javascript:, data:text/html, ...).
+      return;
     } else {
       editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
     }
