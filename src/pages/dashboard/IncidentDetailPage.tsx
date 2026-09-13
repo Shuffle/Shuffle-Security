@@ -10257,21 +10257,19 @@ const IncidentDetailPage = () => {
           >
 
             {isEditingDescription ? (
-              <DeferredMentionInput
+              <MarkdownDescriptionEditor
                 value={editedMessage}
                 onCommit={setEditedMessage}
-                fullWidth
-                multiline
-                minRows={5}
-                placeholder="Add a description..."
-                variant="standard"
+                placeholder="Add a description... Markdown supported, paste images directly."
                 autoFocus
-                sx={{ '& .MuiInput-root:before, & .MuiInput-root:after': { display: 'none' }, '& textarea': { fontSize: '0.95rem', lineHeight: 1.8 } }}
+                readOnly={isPublicView}
               />
 
+            ) : editedMessage ? (
+              <SafeMarkdown text={editedMessage} />
             ) : (
-              <Typography sx={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem', lineHeight: 1.8, color: editedMessage ? 'inherit' : 'hsl(var(--muted-foreground))' }}>
-                {editedMessage || 'Click to add a description.'}
+              <Typography sx={{ fontSize: '0.95rem', lineHeight: 1.8, color: 'hsl(var(--muted-foreground))' }}>
+                Click to add a description.
               </Typography>
             )}
           </Box>
