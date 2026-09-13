@@ -26,12 +26,13 @@ interface SimpleCaseLayoutProps {
   relatedIncidents?: LinkedIncidentSummary[];
 }
 
-const SECTIONS = ['narrative', 'tasks', 'observables', 'correlations'] as const;
+const SECTIONS = ['narrative', 'tasks', 'customFields', 'observables', 'correlations'] as const;
 type SectionKey = typeof SECTIONS[number];
 
 const SECTION_ICONS: Record<SectionKey, typeof FileText> = {
   narrative: FileText,
   tasks: ListChecks,
+  customFields: ListChecks,
   observables: ScanEye,
   correlations: GitBranch,
 };
@@ -57,6 +58,7 @@ export const SimpleCaseLayout = ({
   const refs = useRef<Record<SectionKey, HTMLElement | null>>({
     narrative: null,
     tasks: null,
+    customFields: null,
     observables: null,
     correlations: null,
   });
@@ -152,6 +154,7 @@ export const SimpleCaseLayout = ({
   const sectionData: Array<{ key: SectionKey; label: string; count?: number; icon: typeof FileText }> = [
     { key: 'narrative', label: narrativeLabel, icon: SECTION_ICONS.narrative },
     { key: 'tasks', label: 'Tasks', count: openTasks.length, icon: SECTION_ICONS.tasks },
+    ...(customFields ? [{ key: 'customFields' as SectionKey, label: 'Custom Fields', icon: SECTION_ICONS.customFields }] : []),
     { key: 'observables', label: 'Observables', count: observableCount, icon: SECTION_ICONS.observables },
     { key: 'correlations', label: 'Correlations', count: correlationCount, icon: SECTION_ICONS.correlations },
   ];
@@ -200,7 +203,7 @@ export const SimpleCaseLayout = ({
           {tasks}
         </Box>
         {customFields && (
-          <Box id="simple-case-custom-fields" sx={sectionSx}>
+          <Box id="simple-case-custom-fields" ref={(node: HTMLElement | null) => { refs.current.customFields = node; }} data-simple-section="customFields" sx={sectionSx} {...sectionActivation('customFields')}>
             <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Custom Fields</Typography>
             {customFields}
           </Box>
