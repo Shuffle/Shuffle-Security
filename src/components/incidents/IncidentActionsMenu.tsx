@@ -399,10 +399,14 @@ export const IncidentActionsMenu = ({
 
         <Divider />
 
-        <MenuItem disabled={resyncDisabled || isResyncing} onClick={handleResync}>
-          <RefreshIcon size={16} style={{ marginRight: '8px' }} />
-          Resync
-        </MenuItem>
+        <Tooltip title={resyncBlockedReason} placement="left">
+          <span>
+            <MenuItem disabled={resyncDisabled || isResyncing} onClick={handleResync} sx={{ width: '100%' }}>
+              <RefreshIcon size={16} style={{ marginRight: '8px' }} />
+              Resync
+            </MenuItem>
+          </span>
+        </Tooltip>
 
         <MenuItem disabled onClick={openForwardDialog}>
           <ForwardIcon size={16} style={{ marginRight: '8px' }} />
