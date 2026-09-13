@@ -10303,14 +10303,43 @@ const IncidentDetailPage = () => {
       <Box sx={isPublicView ? { pointerEvents: 'none', '& input, & textarea, & select, & button:not([data-public-ok])': { opacity: 0.7 } } : {}}>
       {isSupportUser && activeTab === 7 && (() => {
         const simpleHasEmail = !!incident && isEmailContent(editedMessage || '', rawDescriptionHtml || '', incident.rawOCSF);
-        const simpleNarrative = simpleHasEmail ? (
-          <EmailThreadPanel
-            descriptionHtml={rawDescriptionHtml || ''}
-            descriptionText={editedMessage || ''}
-            rawOCSF={incident?.rawOCSF}
-            borderless
-          />
-        ) : (
+        // When the case came in as an email we show the email renderer above the
+        // description, collapsed by default, so the description stays available
+        // for the analyst to write their own details.
+        const simpleEmail = simpleHasEmail ? (
+          <Box sx={{ mb: 3 }}>
+            <Box
+              onClick={() => setSimpleEmailOpen((v) => !v)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                cursor: 'pointer',
+                userSelect: 'none',
+                mb: simpleEmailOpen ? 1.5 : 0,
+              }}
+            >
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'hsl(var(--muted-foreground))' }}>
+                Email
+              </Typography>
+              <Typography sx={{ fontSize: '0.72rem', color: 'hsl(var(--muted-foreground))' }}>
+                {simpleEmailOpen ? 'Hide' : 'Show'}
+              </Typography>
+            </Box>
+            {simpleEmailOpen && (
+              <EmailThreadPanel
+                descriptionHtml={rawDescriptionHtml || ''}
+                descriptionText={editedMessage || ''}
+                rawOCSF={incident?.rawOCSF}
+                borderless
+              />
+            )}
+          </Box>
+        ) : null;
+
+        const simpleNarrative = (
+          <>
+          {simpleEmail}
           <Box
             onClick={() => !isPublicView && setIsEditingDescription(true)}
             sx={{
