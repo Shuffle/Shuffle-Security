@@ -31,7 +31,22 @@ interface UserHoverCardProps {
   isAgent?: boolean;
   /** Optional override for the rendered text styling. */
   className?: string;
+  /**
+   * Truncate the visible username to this many characters. The full name is
+   * always available through the native tooltip and the hover card itself,
+   * so shortening never loses information.
+   */
+  maxChars?: number;
 }
+
+/** Shorten a username for dense layouts, keeping it recognisable. */
+const shortenName = (name: string, maxChars?: number): string => {
+  if (!maxChars || !name || name.length <= maxChars) return name;
+  // Emails shorten to the local part first — that is the recognisable bit.
+  const local = name.includes('@') ? name.split('@')[0] : name;
+  if (local.length <= maxChars) return local;
+  return `${local.slice(0, Math.max(1, maxChars - 1))}\u2026`;
+};
 
 const findRealUser = (users: User[], name: string): User | undefined => {
   if (!name) return undefined;
@@ -62,7 +77,7 @@ export const resolveUserAvatar = (
   };
 };
 
-export const UserHoverCard = ({ username, isAgent, className }: UserHoverCardProps) => {
+export const UserHoverCard = ({ username, isAgent, className, maxChars }: UserHoverCardProps) => {
   const { users } = useUsers();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -95,9 +110,10 @@ export const UserHoverCard = ({ username, isAgent, className }: UserHoverCardPro
         component="span"
         variant="caption"
         className={className}
+        title={username}
         sx={{ fontWeight: 600, fontSize: '0.75rem' }}
       >
-        {username}
+        {shortenName(username, maxChars)}
       </Typography>
     );
   }
@@ -130,8 +146,9 @@ export const UserHoverCard = ({ username, isAgent, className }: UserHoverCardPro
               fontSize: '0.75rem',
               color: verifiedAgent ? 'hsl(var(--primary))' : 'text.primary',
             }}
+            title={username}
           >
-            {username}
+            {shortenName(username, maxChars)}
           </Typography>
         </Box>
       </HoverCardTrigger>
