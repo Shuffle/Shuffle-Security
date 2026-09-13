@@ -1,35 +1,29 @@
 /**
- * MarkdownDescriptionEditor — plain-text markdown editing with a Medium-style
- * floating format bar.
+ * MarkdownDescriptionEditor — WYSIWYG markdown editing.
  *
- * The underlying value stays markdown text (so it round-trips through the
- * datastore unchanged), but selecting text pops a small bar that wraps the
- * selection in the matching markdown syntax. Pasting or dropping an image
- * uploads it through the Shuffle file API and inserts a markdown image link.
+ * The value stored on the incident stays markdown text (so it round-trips
+ * through the datastore unchanged), but editing happens on the *rendered*
+ * document: bold text looks bold, headings look like headings, links look like
+ * links. A small "Raw" toggle switches to the plain markdown source for people
+ * who want to see or paste the syntax directly.
+ *
+ * Selecting text pops a small Medium-style bar. "Link" asks for the URL in the
+ * bar itself instead of dumping markdown syntax into the text. Pasting or
+ * dropping an image uploads it through the Shuffle file API and inserts it.
  *
  * Like the other incident inputs, the draft is local while typing and only
  * pushed upwards on blur to keep the (very large) incident page responsive.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Box, CircularProgress, Tooltip } from '@mui/material';
-import { MentionInput } from '@/components/incidents/MentionInput';
+import { Box, CircularProgress, TextField, Tooltip } from '@mui/material';
+import { EditorContent, useEditor, type Editor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Link from '@tiptap/extension-link';
+import Image from '@tiptap/extension-image';
+import Placeholder from '@tiptap/extension-placeholder';
+import { Markdown } from 'tiptap-markdown';
 import { createAndUploadFile } from '@/services/files';
-
-type Action =
-  | { id: string; label: string; title: string; wrap: [string, string] }
-  | { id: string; label: string; title: string; prefix: string };
-
-const ACTIONS: Action[] = [
-  { id: 'bold', label: 'B', title: 'Bold', wrap: ['**', '**'] },
-  { id: 'italic', label: 'I', title: 'Italic', wrap: ['_', '_'] },
-  { id: 'strike', label: 'S', title: 'Strikethrough', wrap: ['~~', '~~'] },
-  { id: 'code', label: 'Code', title: 'Inline code', wrap: ['`', '`'] },
-  { id: 'link', label: 'Link', title: 'Link', wrap: ['[', '](url)'] },
-  { id: 'h2', label: 'H2', title: 'Heading', prefix: '## ' },
-  { id: 'quote', label: 'Quote', title: 'Quote', prefix: '> ' },
-  { id: 'list', label: 'List', title: 'Bullet list', prefix: '- ' },
-];
 
 interface MarkdownDescriptionEditorProps {
   value: string;
@@ -40,6 +34,79 @@ interface MarkdownDescriptionEditorProps {
   minRows?: number;
 }
 
+type BarAction = {
+  id: string;
+  label: string;
+  title: string;
+  run: (editor: Editor) => void;
+  active: (editor: Editor) => boolean;
+};
+
+const ACTIONS: BarAction[] = [
+  {
+    id: 'bold',
+    label: 'B',
+    title: 'Bold',
+    run: (e) => e.chain().focus().toggleBold().run(),
+    active: (e) => e.isActive('bold'),
+  },
+  {
+    id: 'italic',
+    label: 'I',
+    title: 'Italic',
+    run: (e) => e.chain().focus().toggleItalic().run(),
+    active: (e) => e.isActive('italic'),
+  },
+  {
+    id: 'strike',
+    label: 'S',
+    title: 'Strikethrough',
+    run: (e) => e.chain().focus().toggleStrike().run(),
+    active: (e) => e.isActive('strike'),
+  },
+  {
+    id: 'code',
+    label: 'Code',
+    title: 'Inline code',
+    run: (e) => e.chain().focus().toggleCode().run(),
+    active: (e) => e.isActive('code'),
+  },
+  {
+    id: 'h2',
+    label: 'H2',
+    title: 'Heading',
+    run: (e) => e.chain().focus().toggleHeading({ level: 2 }).run(),
+    active: (e) => e.isActive('heading', { level: 2 }),
+  },
+  {
+    id: 'quote',
+    label: 'Quote',
+    title: 'Quote',
+    run: (e) => e.chain().focus().toggleBlockquote().run(),
+    active: (e) => e.isActive('blockquote'),
+  },
+  {
+    id: 'list',
+    label: 'List',
+    title: 'Bullet list',
+    run: (e) => e.chain().focus().toggleBulletList().run(),
+    active: (e) => e.isActive('bulletList'),
+  },
+];
+
+const barButtonSx = (activeState: boolean) => ({
+  border: 0,
+  background: activeState ? 'hsl(var(--muted))' : 'transparent',
+  cursor: 'pointer',
+  px: 0.75,
+  py: 0.25,
+  borderRadius: 1,
+  fontSize: '0.78rem',
+  fontWeight: 500,
+  color: 'hsl(var(--foreground))',
+  '&:hover': { bgcolor: 'hsl(var(--muted))' },
+});
+
 export const MarkdownDescriptionEditor = ({
   value,
   onCommit,
@@ -48,179 +115,281 @@ export const MarkdownDescriptionEditor = ({
   readOnly,
   minRows = 5,
 }: MarkdownDescriptionEditorProps) => {
-  const [draft, setDraft] = useState(value);
+  const [raw, setRaw] = useState(false);
+  const [rawDraft, setRawDraft] = useState(value);
   const [bar, setBar] = useState<{ top: number; left: number } | null>(null);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
   const [uploading, setUploading] = useState(false);
-  const dirty = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const latest = useRef(value);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+
+  const commit = useCallback(
+    (next: string) => {
+      latest.current = next;
+      if (next !== valueRef.current) onCommit(next);
+    },
+    [onCommit],
+  );
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    autofocus: autoFocus ? 'end' : false,
+    editable: !readOnly,
+    extensions: [
+      StarterKit,
+      Link.configure({ openOnClick: false, autolink: true }),
+      Image,
+      Placeholder.configure({ placeholder }),
+      Markdown.configure({ html: false, transformPastedText: true, linkify: true, breaks: true }),
+    ],
+    content: value,
+    onUpdate: ({ editor: instance }) => {
+      latest.current = instance.storage.markdown.getMarkdown();
+    },
+    onBlur: ({ editor: instance }) => {
+      commit(instance.storage.markdown.getMarkdown());
+    },
+    editorProps: {
+      attributes: {
+        class: 'markdown-wysiwyg',
+      },
+    },
+  });
+
+  // Keep the editor in sync when the incident value changes from the outside
+  // (a reload, a merge, another user's save) without clobbering local edits.
+  useEffect(() => {
+    if (!editor || raw) return;
+    if (value === latest.current) return;
+    editor.commands.setContent(value, false);
+    latest.current = value;
+  }, [editor, value, raw]);
 
   useEffect(() => {
-    if (!dirty.current) setDraft(value);
-  }, [value]);
+    if (editor) editor.setEditable(!readOnly);
+  }, [editor, readOnly]);
 
-  const getTextarea = useCallback(
-    () => containerRef.current?.querySelector('textarea') as HTMLTextAreaElement | null,
-    [],
-  );
-
-  const update = useCallback(
-    (next: string, selStart: number, selEnd: number) => {
-      dirty.current = true;
-      setDraft(next);
-      requestAnimationFrame(() => {
-        const el = getTextarea();
-        if (!el) return;
-        el.focus();
-        el.setSelectionRange(selStart, selEnd);
-      });
-    },
-    [getTextarea],
-  );
-
-  /** Position the format bar just above the start of the selection. */
+  /** Position the format bar just above the current selection. */
   const refreshBar = useCallback(() => {
-    const el = getTextarea();
-    if (!el || readOnly) return setBar(null);
-    const { selectionStart, selectionEnd } = el;
-    if (selectionStart === selectionEnd) return setBar(null);
-
-    const style = window.getComputedStyle(el);
-    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.6;
-    const before = el.value.slice(0, selectionStart);
-    const lines = before.split('\n');
-    const lineIndex = lines.length - 1;
-    const currentLine = lines[lineIndex] || '';
-
-    let textWidth = 0;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-      textWidth = ctx.measureText(currentLine).width;
+    if (!editor || readOnly) return setBar(null);
+    const { from, to, empty } = editor.state.selection;
+    if (empty || from === to) {
+      setBar(null);
+      setLinkOpen(false);
+      return;
     }
-
-    const paddingLeft = parseFloat(style.paddingLeft) || 0;
-    const paddingTop = parseFloat(style.paddingTop) || 0;
-    const maxLeft = Math.max(el.clientWidth - 24, 0);
-
+    const start = editor.view.coordsAtPos(from);
+    const end = editor.view.coordsAtPos(to, -1);
+    const box = containerRef.current?.getBoundingClientRect();
+    if (!box) return;
     setBar({
-      top: paddingTop + lineIndex * lineHeight - el.scrollTop - 8,
-      left: Math.min(paddingLeft + textWidth, maxLeft),
+      top: start.top - box.top - 8,
+      left: Math.min(Math.max((start.left + end.right) / 2 - box.left, 24), box.width - 24),
     });
-  }, [getTextarea, readOnly]);
+  }, [editor, readOnly]);
 
-  const applyAction = useCallback(
-    (action: Action) => {
-      const el = getTextarea();
-      if (!el) return;
-      const start = el.selectionStart;
-      const end = el.selectionEnd;
-      const selected = draft.slice(start, end);
+  useEffect(() => {
+    if (!editor) return;
+    const handler = () => refreshBar();
+    editor.on('selectionUpdate', handler);
+    editor.on('transaction', handler);
+    return () => {
+      editor.off('selectionUpdate', handler);
+      editor.off('transaction', handler);
+    };
+  }, [editor, refreshBar]);
 
-      if ('wrap' in action) {
-        const [open, close] = action.wrap;
-        const alreadyWrapped =
-          draft.slice(start - open.length, start) === open && draft.slice(end, end + close.length) === close;
-        if (alreadyWrapped) {
-          const next =
-            draft.slice(0, start - open.length) + selected + draft.slice(end + close.length);
-          update(next, start - open.length, end - open.length);
-          return;
-        }
-        const next = draft.slice(0, start) + open + selected + close + draft.slice(end);
-        update(next, start + open.length, start + open.length + selected.length);
-        return;
-      }
+  const openLink = useCallback(() => {
+    if (!editor) return;
+    setLinkUrl(editor.getAttributes('link').href || '');
+    setLinkOpen(true);
+  }, [editor]);
 
-      // Line prefix actions apply to every selected line.
-      const lineStart = draft.lastIndexOf('\n', start - 1) + 1;
-      const lineEndIdx = draft.indexOf('\n', end);
-      const lineEnd = lineEndIdx === -1 ? draft.length : lineEndIdx;
-      const block = draft.slice(lineStart, lineEnd);
-      const allPrefixed = block.split('\n').every((line) => line.startsWith(action.prefix));
-      const nextBlock = block
-        .split('\n')
-        .map((line) => (allPrefixed ? line.slice(action.prefix.length) : action.prefix + line))
-        .join('\n');
-      const next = draft.slice(0, lineStart) + nextBlock + draft.slice(lineEnd);
-      update(next, lineStart, lineStart + nextBlock.length);
-    },
-    [draft, getTextarea, update],
-  );
+  const applyLink = useCallback(() => {
+    if (!editor) return;
+    const href = linkUrl.trim();
+    if (!href) {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    } else {
+      editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+    }
+    setLinkOpen(false);
+    setLinkUrl('');
+  }, [editor, linkUrl]);
 
   const insertImages = useCallback(
     async (files: File[]) => {
-      if (!files.length || readOnly) return;
+      if (!files.length || readOnly || !editor) return;
       setUploading(true);
       try {
-        const el = getTextarea();
-        const caret = el ? el.selectionStart : draft.length;
-        const snippets: string[] = [];
         for (const file of files) {
           const result = await createAndUploadFile(file, 'incidents', ['description-image']);
           if (result.success && result.file?.id) {
-            snippets.push(`![${file.name}](/api/v1/files/${result.file.id}/content)`);
+            editor
+              .chain()
+              .focus()
+              .setImage({ src: `/api/v1/files/${result.file.id}/content`, alt: file.name })
+              .run();
           }
         }
-        if (!snippets.length) return;
-        const insert = `${snippets.join('\n')}\n`;
-        const next = draft.slice(0, caret) + insert + draft.slice(caret);
-        update(next, caret + insert.length, caret + insert.length);
+        latest.current = editor.storage.markdown.getMarkdown();
       } finally {
         setUploading(false);
       }
     },
-    [draft, getTextarea, readOnly, update],
+    [editor, readOnly],
   );
 
   const imagesFromDataTransfer = (data: DataTransfer | null) =>
     Array.from(data?.files || []).filter((f) => f.type.startsWith('image/'));
 
+  /** Switch between rendered editing and the plain markdown source. */
+  const toggleRaw = useCallback(() => {
+    if (!raw) {
+      setRawDraft(latest.current);
+      setRaw(true);
+      setBar(null);
+      setLinkOpen(false);
+      return;
+    }
+    latest.current = rawDraft;
+    editor?.commands.setContent(rawDraft, false);
+    commit(rawDraft);
+    setRaw(false);
+  }, [commit, editor, raw, rawDraft]);
+
   return (
     <Box ref={containerRef} sx={{ position: 'relative' }}>
-      <MentionInput
-        value={draft}
-        onChange={(next) => {
-          dirty.current = true;
-          setDraft(next);
-          setBar(null);
-        }}
-        fullWidth
-        multiline
-        minRows={minRows}
-        placeholder={placeholder}
-        variant="standard"
-        autoFocus={autoFocus}
-        inputProps={{ readOnly }}
-        onBlur={() => {
-          setBar(null);
-          if (draft !== value) onCommit(draft);
-        }}
-        onSelect={refreshBar}
-        onKeyUp={refreshBar}
-        onMouseUp={refreshBar}
-        onScroll={() => setBar(null)}
-        onPaste={(event) => {
-          const images = imagesFromDataTransfer(event.clipboardData);
-          if (images.length) {
-            event.preventDefault();
-            void insertImages(images);
-          }
-        }}
-        onDrop={(event) => {
-          const images = imagesFromDataTransfer(event.dataTransfer);
-          if (images.length) {
-            event.preventDefault();
-            void insertImages(images);
-          }
-        }}
-        sx={{
-          '& .MuiInput-root:before, & .MuiInput-root:after': { display: 'none' },
-          '& textarea': { fontSize: '0.95rem', lineHeight: 1.8 },
-        }}
-      />
+      {!readOnly && (
+        <Box
+          component="button"
+          type="button"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={toggleRaw}
+          sx={{
+            position: 'absolute',
+            top: -4,
+            right: 0,
+            zIndex: 5,
+            border: 0,
+            background: 'transparent',
+            cursor: 'pointer',
+            px: 0.75,
+            py: 0.25,
+            borderRadius: 1,
+            fontSize: '0.7rem',
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            color: raw ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))',
+            '&:hover': { bgcolor: 'hsl(var(--muted))' },
+          }}
+        >
+          Raw
+        </Box>
+      )}
 
-      {bar && (
+      {raw ? (
+        <TextField
+          value={rawDraft}
+          onChange={(event) => setRawDraft(event.target.value)}
+          onBlur={() => {
+            latest.current = rawDraft;
+            commit(rawDraft);
+          }}
+          fullWidth
+          multiline
+          minRows={minRows}
+          placeholder={placeholder}
+          variant="standard"
+          autoFocus
+          inputProps={{ readOnly }}
+          sx={{
+            '& .MuiInput-root:before, & .MuiInput-root:after': { display: 'none' },
+            '& textarea': {
+              fontSize: '0.9rem',
+              lineHeight: 1.7,
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            },
+          }}
+        />
+      ) : (
+        <Box
+          onPaste={(event) => {
+            const images = imagesFromDataTransfer(event.clipboardData);
+            if (images.length) {
+              event.preventDefault();
+              void insertImages(images);
+            }
+          }}
+          onDrop={(event) => {
+            const images = imagesFromDataTransfer(event.dataTransfer);
+            if (images.length) {
+              event.preventDefault();
+              void insertImages(images);
+            }
+          }}
+          sx={{
+            '& .markdown-wysiwyg': {
+              outline: 'none',
+              fontSize: '0.95rem',
+              lineHeight: 1.8,
+              minHeight: minRows * 28,
+              color: 'hsl(var(--foreground))',
+            },
+            '& .markdown-wysiwyg p': { m: 0, mb: 1.25 },
+            '& .markdown-wysiwyg p:last-child': { mb: 0 },
+            '& .markdown-wysiwyg h1, & .markdown-wysiwyg h2, & .markdown-wysiwyg h3': {
+              fontWeight: 700,
+              lineHeight: 1.35,
+              mt: 2,
+              mb: 1,
+            },
+            '& .markdown-wysiwyg h1': { fontSize: '1.25rem' },
+            '& .markdown-wysiwyg h2': { fontSize: '1.1rem' },
+            '& .markdown-wysiwyg h3': { fontSize: '1rem' },
+            '& .markdown-wysiwyg ul, & .markdown-wysiwyg ol': { pl: 3, mt: 0, mb: 1.25 },
+            '& .markdown-wysiwyg li p': { mb: 0.25 },
+            '& .markdown-wysiwyg blockquote': {
+              borderLeft: '2px solid hsl(var(--border))',
+              pl: 1.5,
+              ml: 0,
+              color: 'hsl(var(--muted-foreground))',
+            },
+            '& .markdown-wysiwyg code': {
+              bgcolor: 'hsl(var(--muted))',
+              px: 0.5,
+              borderRadius: 0.75,
+              fontSize: '0.85em',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            },
+            '& .markdown-wysiwyg pre': {
+              bgcolor: 'hsl(var(--muted))',
+              p: 1.5,
+              borderRadius: 1,
+              overflowX: 'auto',
+            },
+            '& .markdown-wysiwyg pre code': { bgcolor: 'transparent', p: 0 },
+            '& .markdown-wysiwyg a': { color: 'hsl(var(--primary))', textDecoration: 'underline' },
+            '& .markdown-wysiwyg img': { maxWidth: '100%', borderRadius: 6 },
+            '& .markdown-wysiwyg hr': { border: 0, borderTop: '1px solid hsl(var(--border))' },
+            '& .markdown-wysiwyg p.is-editor-empty:first-of-type::before': {
+              content: 'attr(data-placeholder)',
+              color: 'hsl(var(--muted-foreground))',
+              float: 'left',
+              height: 0,
+              pointerEvents: 'none',
+            },
+          }}
+        >
+          <EditorContent editor={editor} />
+        </Box>
+      )}
+
+      {bar && editor && !raw && (
         <Box
           onMouseDown={(event) => event.preventDefault()}
           sx={{
@@ -240,31 +409,73 @@ export const MarkdownDescriptionEditor = ({
             whiteSpace: 'nowrap',
           }}
         >
-          {ACTIONS.map((action) => (
-            <Tooltip key={action.id} title={action.title} arrow>
+          {linkOpen ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 0.5 }}>
+              <TextField
+                value={linkUrl}
+                onChange={(event) => setLinkUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    applyLink();
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    setLinkOpen(false);
+                  }
+                }}
+                placeholder="Paste or type a URL"
+                variant="standard"
+                autoFocus
+                sx={{
+                  width: 220,
+                  '& .MuiInput-root:before, & .MuiInput-root:after': { display: 'none' },
+                  '& input': { fontSize: '0.78rem' },
+                }}
+              />
+              <Box component="button" type="button" onClick={applyLink} sx={barButtonSx(false)}>
+                Apply
+              </Box>
               <Box
                 component="button"
                 type="button"
-                onClick={() => applyAction(action)}
-                sx={{
-                  border: 0,
-                  background: 'transparent',
-                  cursor: 'pointer',
-                  px: 0.75,
-                  py: 0.25,
-                  borderRadius: 1,
-                  fontSize: '0.78rem',
-                  fontWeight: action.id === 'bold' ? 700 : 500,
-                  fontStyle: action.id === 'italic' ? 'italic' : 'normal',
-                  textDecoration: action.id === 'strike' ? 'line-through' : 'none',
-                  color: 'hsl(var(--foreground))',
-                  '&:hover': { bgcolor: 'hsl(var(--muted))' },
-                }}
+                onClick={() => setLinkOpen(false)}
+                sx={barButtonSx(false)}
               >
-                {action.label}
+                Cancel
               </Box>
-            </Tooltip>
-          ))}
+            </Box>
+          ) : (
+            <>
+              {ACTIONS.map((action) => (
+                <Tooltip key={action.id} title={action.title} arrow>
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={() => action.run(editor)}
+                    sx={{
+                      ...barButtonSx(action.active(editor)),
+                      fontWeight: action.id === 'bold' ? 700 : 500,
+                      fontStyle: action.id === 'italic' ? 'italic' : 'normal',
+                      textDecoration: action.id === 'strike' ? 'line-through' : 'none',
+                    }}
+                  >
+                    {action.label}
+                  </Box>
+                </Tooltip>
+              ))}
+              <Tooltip title="Link" arrow>
+                <Box
+                  component="button"
+                  type="button"
+                  onClick={openLink}
+                  sx={barButtonSx(editor.isActive('link'))}
+                >
+                  Link
+                </Box>
+              </Tooltip>
+            </>
+          )}
         </Box>
       )}
 
