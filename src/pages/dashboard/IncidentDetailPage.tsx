@@ -5469,6 +5469,59 @@ const IncidentDetailPage = () => {
     },
   };
 
+  // Share (RBAC) for the incident itself — same access model as datastore keys
+  // on /admin/datastore. The RBAC lives on the datastore item, so read the
+  // stored item on open and write it back untouched apart from the rbac block.
+  const [simpleShareOpen, setSimpleShareOpen] = useState(false);
+  const [simpleShareLoading, setSimpleShareLoading] = useState(false);
+  const [simpleShareItem, setSimpleShareItem] = useState<DatastoreItem | null>(null);
+  const shareTargetOrgId = crossOrgId || userInfo?.active_org?.id || '';
+
+  const openSimpleShare = async () => {
+    if (!id) return;
+    setSimpleShareLoading(true);
+    try {
+      const result = await getDatastoreItem(id, DATASTORE_CATEGORIES.INCIDENTS, crossOrgId || undefined);
+      const item = result.item || result.data?.[0] || null;
+      if (!item) {
+        toast.error('Could not load access settings for this incident');
+        return;
+      }
+      setSimpleShareItem(item);
+      setSimpleShareOpen(true);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not load access settings');
+    } finally {
+      setSimpleShareLoading(false);
+    }
+  };
+
+  const handleSaveSimpleShare = async (rbac: RBACConfig | null) => {
+    if (!simpleShareItem || !shareTargetOrgId) throw new Error('Incident is not loaded yet');
+    const response = await fetch(getApiUrl(`/api/v1/orgs/${shareTargetOrgId}/set_cache`), {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...getAuthHeader(shareTargetOrgId),
+      },
+      body: JSON.stringify({
+        org_id: shareTargetOrgId,
+        key: simpleShareItem.key,
+        value: simpleShareItem.value,
+        category: simpleShareItem.category || DATASTORE_CATEGORIES.INCIDENTS,
+        rbac: rbac || undefined,
+      }),
+    });
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({} as Record<string, string>));
+      throw new Error(errData.reason || `Failed to update access: ${response.status}`);
+    }
+    setSimpleShareItem((prev) => (prev ? { ...prev, rbac: rbac || undefined } : prev));
+    toast.success('Access updated');
+  };
+
   const renderCustomField = (field: CustomField) => {
     const value = editedCustomFields[field.key];
 
