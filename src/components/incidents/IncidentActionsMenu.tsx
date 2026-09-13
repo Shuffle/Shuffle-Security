@@ -21,7 +21,7 @@ import { toast } from '@/lib/toast';
 import { DATASTORE_CATEGORIES, getDatastoreItem } from '@/Shuffle-MCPs/datastore';
 import { useAuth } from '@/context/AuthContext';
 import { getApiUrl, getAuthHeader } from '@/Shuffle-MCPs/api';
-import { resyncState } from '@/lib/resyncState';
+import { resyncState, getResyncBlockedReason, extractResyncFailureReason } from '@/lib/resyncState';
 import { useEntityText } from '@/hooks/useEntityLabel';
 import { writeIncidentSafe } from '@/lib/incidentRelations';
 import {
