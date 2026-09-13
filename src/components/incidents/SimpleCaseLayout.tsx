@@ -76,11 +76,34 @@ export const SimpleCaseLayout = ({
   const [timelineHeight, setTimelineHeight] = useState<number | null>(null);
 
   useEffect(() => {
+    const findFeed = () => {
+      const el = timelineColRef.current;
+      const feed = el?.querySelector('[data-simple-timeline-feed]');
+      return feed instanceof HTMLElement ? feed : null;
+    };
     const update = () => {
       const el = timelineColRef.current;
       if (!el) return;
       const top = Math.max(el.getBoundingClientRect().top, 24);
-      setTimelineHeight(Math.max(320, window.innerHeight - top - 24));
+      const next = Math.max(320, window.innerHeight - top - 24);
+      // Page scrolling changes the available height for the sticky column,
+      // which resizes the timeline's scroll box and makes its content appear
+      // to drift. Only react to meaningful changes, and re-pin the feed to the
+      // newest entry when it was already at the bottom.
+      setTimelineHeight((prev) => {
+        if (prev !== null && Math.abs(prev - next) < 8) return prev;
+        const feed = findFeed();
+        const wasAtBottom = feed
+          ? feed.scrollHeight - feed.scrollTop - feed.clientHeight < 48
+          : false;
+        if (wasAtBottom) {
+          requestAnimationFrame(() => {
+            const f = findFeed();
+            if (f) f.scrollTop = f.scrollHeight;
+          });
+        }
+        return next;
+      });
     };
     update();
     window.addEventListener('scroll', update, true);
