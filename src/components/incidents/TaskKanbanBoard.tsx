@@ -349,6 +349,7 @@ export const TaskKanbanBoard = ({
                       {renderDropSlot(idx)}
                       <Box
                         data-task-id={task.id}
+                        className={highlightTaskId === task.id ? 'incident-new-flash' : undefined}
                         draggable
                         onDragStart={() => setDraggedTaskId(task.id)}
                         onDragEnd={() => {
