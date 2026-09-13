@@ -6307,9 +6307,9 @@ const IncidentDetailPage = () => {
         const ts = normalizeToMs(revisions[idx]?.edited ?? revisions[idx]?.created);
         if (!(ts > 0)) continue;
         Object.keys(ATTRIBUTE_LABELS).forEach((field, fieldIdx) => {
-          const before = attributeText(current[field] === undefined ? '' : previous[field]);
-          const after = attributeText(current[field]);
           if (previous[field] === undefined && current[field] === undefined) return;
+          const before = attributeText(previous[field]);
+          const after = attributeText(current[field]);
           if (before === after) return;
           items.push({
             type: 'step',
