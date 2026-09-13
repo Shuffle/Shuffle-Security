@@ -6158,7 +6158,7 @@ const IncidentDetailPage = () => {
           <Box sx={{ flexShrink: 0, mb: 1 }}>
             {renderTimelineActionsChip(isSimple)}
           </Box>
-          <Box ref={simpleFeedRef} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', pb: 0 }}>
+          <Box ref={simpleFeedRef} data-simple-timeline-feed="true" sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', pb: 0 }}>
             {renderTimelineFeedItems(variant)}
           </Box>
           {renderTimelineInputArea(isSimple)}
