@@ -10468,19 +10468,84 @@ const IncidentDetailPage = () => {
           </Box>
         );
 
+        // Custom fields: defined org fields plus any keys present on the
+        // incident data without a definition. Rendered only when there is
+        // something to show.
+        const simpleCustomFieldDefs = (() => {
+          const definedFieldKeys = new Set(customFields.map((f) => f.key));
+          const dynamicFields: CustomField[] = Object.keys(editedCustomFields)
+            .filter((k) => !definedFieldKeys.has(k))
+            .map((key) => ({
+              name: key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase()),
+              key,
+              type: typeof editedCustomFields[key] === 'boolean' ? 'boolean' as const :
+                    typeof editedCustomFields[key] === 'number' ? 'number' as const : 'text' as const,
+              required: false,
+            }));
+          return [...customFields, ...dynamicFields];
+        })();
+
+        const simpleCustomFields = simpleCustomFieldDefs.length > 0 ? (
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, columnGap: 2.5, rowGap: 2.5 }}>
+            {simpleCustomFieldDefs.map((field) => renderCustomField(field))}
+          </Box>
+        ) : null;
+
+        const simpleContentsActions = isPublicView ? null : (
+          <>
+            <Button
+              size="small"
+              onClick={openSimpleShare}
+              disabled={simpleShareLoading}
+              sx={{ minHeight: 32, px: 1, textTransform: 'none', fontSize: '0.78rem', color: 'hsl(var(--muted-foreground))' }}
+            >
+              Share
+            </Button>
+            {incident && (
+              <IncidentActionsMenu
+                incident={{
+                  id: incident.id,
+                  title: editedTitle || incident.title,
+                  source: incident.source,
+                  status: editedStatus || incident.status,
+                  rawOCSF: incident.rawOCSF,
+                  customFields: editedCustomFields,
+                }}
+                crossOrgId={crossOrgId}
+                sharedOrgs={sharedOrgs}
+              />
+            )}
+          </>
+        );
+
         return (
-          <SimpleCaseLayout
-            narrativeLabel={simpleHasEmail ? 'Email' : 'Description'}
-            overview={simpleOverview}
-            narrative={simpleNarrative}
-            timeline={renderTimelinePanel('simple')}
-            tasks={simpleTasks}
-            observables={simpleObservables}
-            correlations={simpleCorrelations}
-            taskItems={visibleTasks}
-            observableCount={visibleObservablesCount}
-            correlationCount={visibleCorrelations.length}
-          />
+          <>
+            <SimpleCaseLayout
+              narrativeLabel={simpleHasEmail ? 'Email' : 'Description'}
+              overview={simpleOverview}
+              narrative={simpleNarrative}
+              timeline={renderTimelinePanel('simple')}
+              tasks={simpleTasks}
+              customFields={simpleCustomFields}
+              observables={simpleObservables}
+              correlations={simpleCorrelations}
+              contentsActions={simpleContentsActions}
+              taskItems={visibleTasks}
+              observableCount={visibleObservablesCount}
+              correlationCount={visibleCorrelations.length}
+            />
+            {simpleShareItem && (
+              <ShareAccessModal
+                open={simpleShareOpen}
+                onClose={() => setSimpleShareOpen(false)}
+                resourceType="key"
+                resourceName={editedTitle || incident?.title || simpleShareItem.key}
+                parentName={simpleShareItem.category || DATASTORE_CATEGORIES.INCIDENTS}
+                initialRBAC={simpleShareItem.rbac}
+                onSave={handleSaveSimpleShare}
+              />
+            )}
+          </>
         );
       })()}
       {activeTab === 1 && (
