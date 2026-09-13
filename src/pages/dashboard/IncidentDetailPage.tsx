@@ -982,6 +982,40 @@ const IncidentDetailPage = () => {
   const [commentAttachments, setCommentAttachments] = useState<FileAttachment[]>([]);
   const commentFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Locally added timeline entries (comments, agent asks) live here until the
+  // backend echoes them back. A background poll or re-parse can return an
+  // activity list that was assembled before our write landed, which used to
+  // make a fresh comment disappear and pop back seconds later. Merging keeps
+  // the local entry visible until the server confirms it — or until the write
+  // fails, in which case it is dropped so the server stays the source of truth.
+  const pendingLocalActivityRef = useRef<ActivityItem[]>([]);
+  const trackPendingActivity = useCallback((item: ActivityItem) => {
+    pendingLocalActivityRef.current = [
+      ...pendingLocalActivityRef.current.filter((p) => p.id !== item.id),
+      item,
+    ];
+  }, []);
+  const dropPendingActivity = useCallback((itemId: string) => {
+    pendingLocalActivityRef.current = pendingLocalActivityRef.current.filter((p) => p.id !== itemId);
+  }, []);
+  const mergePendingActivity = useCallback((serverActivity: ActivityItem[]): ActivityItem[] => {
+    const pending = pendingLocalActivityRef.current;
+    if (pending.length === 0) return serverActivity;
+    const list = Array.isArray(serverActivity) ? serverActivity : [];
+    const serverIds = new Set(list.map((a) => a.id).filter(Boolean));
+    const signature = (a: ActivityItem) => `${a.type}|${a.user || ''}|${(a.content || '').trim()}`;
+    const serverSignatures = new Set(list.map(signature));
+    const stillPending = pending.filter((p) => {
+      if (p.id && serverIds.has(p.id)) return false;
+      if (serverSignatures.has(signature(p))) return false;
+      // Safety valve: never hold a local-only entry for more than 2 minutes.
+      return Date.now() - (p.timestamp || 0) < 120_000;
+    });
+    pendingLocalActivityRef.current = stillPending;
+    if (stillPending.length === 0) return list;
+    return [...list, ...stillPending];
+  }, []);
+
   // "Ask the agent" popover state — quick way to send an @AIAgent question
   // from the incident header without scrolling down to the comment box.
   const [askAgentAnchor, setAskAgentAnchor] = useState<HTMLElement | null>(null);
@@ -3251,7 +3285,7 @@ const IncidentDetailPage = () => {
         
         setEditedCustomFields(flattenedCustomFields);
         setEditedLabels(parsed.labels || []);
-        setActivity(parsed.activity || []);
+        setActivity(mergePendingActivity(parsed.activity || []));
         const loadedTasks = parsed.tasks || customAttrs?.tasks || (parsed.rawOCSF as any)?.tasks || [];
         // Ensure all tasks have unique IDs (but don't filter duplicates - just normalize IDs)
         const normalizedTasks = loadedTasks.map((task: IncidentTask, index: number) => ({
@@ -3509,7 +3543,7 @@ const IncidentDetailPage = () => {
         setEnrichments(reParsed.enrichments || []);
         setEditedStakeholders(reParsed.stakeholders || []);
         setEditedLabels(reParsed.labels || []);
-        setActivity(reParsed.activity || []);
+        setActivity(mergePendingActivity(reParsed.activity || []));
         const loadedTasks = reParsed.tasks || [];
         const normalizedTasks = loadedTasks.map((task: IncidentTask, index: number) => ({
           ...task,
@@ -3850,7 +3884,7 @@ const IncidentDetailPage = () => {
     setEnrichments(reParsed.enrichments || []);
     setEditedStakeholders(reParsed.stakeholders || []);
     setEditedLabels(reParsed.labels || []);
-    setActivity(reParsed.activity || []);
+    setActivity(mergePendingActivity(reParsed.activity || []));
 
     // Compute what is STILL missing after we folded revisions into the base
     // and overlaid live edits. Only these should surface as "missing" in the
@@ -4206,7 +4240,7 @@ const IncidentDetailPage = () => {
         }
 
         // ─ Activity feed: only adopt if not dirty ──────────────────────
-        const newActivity = reParsed.activity || [];
+        const newActivity = mergePendingActivity(reParsed.activity || []);
         setActivity(prev => {
           // Only replace if the server has more / different items, otherwise
           // we'd risk wiping an optimistic local addition (e.g. a comment
@@ -4865,6 +4899,9 @@ const IncidentDetailPage = () => {
     };
     
     const updatedActivity = [...activity, commentActivity];
+    // Hold the local entry so a background poll that raced our write cannot
+    // remove it before the backend echoes it back.
+    trackPendingActivity(commentActivity);
     setActivity(updatedActivity);
     setNewComment('');
     setCommentAttachments([]);
@@ -4898,7 +4935,12 @@ const IncidentDetailPage = () => {
         },
       },
     };
-    await writeIncidentSafe(incident.id, updatedOCSF, crossOrgId || undefined);
+    const commentWrite = await writeIncidentSafe(incident.id, updatedOCSF, crossOrgId || undefined);
+    if (!commentWrite?.success) {
+      // The backend rejected the comment — stop protecting the local entry so
+      // the next refresh reflects what actually got stored.
+      dropPendingActivity(commentActivity.id);
+    }
     // No success toast — the new comment renders immediately in the timeline.
     // Demo Mode signal — lets the tour mark "ask the agent" as complete.
     try { window.dispatchEvent(new CustomEvent('demo:incident-comment-sent')); } catch { /* no-op */ }
