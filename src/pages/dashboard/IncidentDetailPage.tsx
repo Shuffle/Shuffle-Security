@@ -5934,8 +5934,9 @@ const IncidentDetailPage = () => {
       { key: 'observables' as const, label: 'Observables', count: visibleObservablesCount },
       { key: 'correlations' as const, label: 'Correlations', count: visibleCorrelations.length },
     ];
-    const activeCount = filterDefs.filter(f => isFilterActive(f.key)).length;
-    const allActive = activeCount === filterDefs.length;
+    const totalCount = filterDefs.reduce((sum, f) => sum + f.count, 0);
+    const shownCount = filterDefs.filter(f => isFilterActive(f.key)).reduce((sum, f) => sum + f.count, 0);
+    const allActive = activeTimelineFilters.size === filterDefs.length;
     return (
       <Tooltip title="Filter timeline" arrow>
         <Chip
@@ -5955,7 +5956,7 @@ const IncidentDetailPage = () => {
                   border: allActive ? 'none' : '1px solid rgba(255, 102, 0, 0.35)',
                 }}
               >
-                {allActive ? 'All' : `${activeCount}/${filterDefs.length}`}
+                {allActive ? `${totalCount}` : `${shownCount}/${totalCount}`}
               </Box>
             </Box>
           }
@@ -6276,9 +6277,6 @@ const IncidentDetailPage = () => {
       {isSimple ? (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', minHeight: 0 }}>
           {showEnrichmentInlineCTA && renderEnrichmentInlineCTA()}
-          <Box sx={{ flexShrink: 0, mb: 1 }}>
-            {renderTimelineActionsChip(isSimple)}
-          </Box>
           <Box ref={simpleFeedRef} data-simple-timeline-feed="true" sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', pb: 1.25 }}>
             {renderTimelineFeedItems(variant)}
           </Box>
@@ -10796,6 +10794,7 @@ const IncidentDetailPage = () => {
               overview={simpleOverview}
               narrative={simpleNarrative}
               timeline={renderTimelinePanel('simple')}
+              timelineActions={renderTimelineActionsChip(true)}
               tasks={simpleTasks}
               customFields={simpleCustomFields}
               observables={simpleObservables}

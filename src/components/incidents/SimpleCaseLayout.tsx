@@ -10,6 +10,8 @@ interface SimpleCaseLayoutProps {
   overview?: ReactNode;
   narrative: ReactNode;
   timeline: ReactNode;
+  /** Filter/count control rendered on the same line as the Timeline title. */
+  timelineActions?: ReactNode;
   tasks: ReactNode;
   /** Optional custom fields block, rendered below Tasks when the case has any. */
   customFields?: ReactNode;
@@ -39,6 +41,7 @@ export const SimpleCaseLayout = ({
   overview,
   narrative,
   timeline,
+  timelineActions,
   tasks,
   customFields,
   observables,
@@ -161,9 +164,12 @@ export const SimpleCaseLayout = ({
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', md: 'minmax(180px, 220px) minmax(0, 1fr)', lg: 'minmax(220px, 260px) minmax(0, 1fr) minmax(180px, 220px)' }, gap: { xs: 3, md: 3.625 }, alignItems: 'start' }}>
       <Box ref={timelineColRef} sx={{ order: { xs: 2, md: 1 }, position: { md: 'sticky' }, top: { md: 24 }, minWidth: 0, height: { xs: 'auto', md: timelineHeight ? `${timelineHeight}px` : 'calc(100vh - 48px)' }, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', mb: 1.5, flexShrink: 0 }}>
-          Timeline
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 1.5, flexShrink: 0 }}>
+          <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase' }}>
+            Timeline
+          </Typography>
+          {timelineActions}
+        </Box>
         <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {timeline}
         </Box>
