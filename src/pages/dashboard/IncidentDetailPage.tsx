@@ -8605,7 +8605,7 @@ const IncidentDetailPage = () => {
 
       const cappedDepth = Math.min(depth, 4);
       return (
-        <Box key={`thread-${itemKey}`} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Box key={`thread-${itemKey}`} sx={{ display: 'flex', flexDirection: 'column', gap: isReply ? 1 : 1.5 }}>
           {node}
           <Box
             sx={{
