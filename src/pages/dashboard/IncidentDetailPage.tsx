@@ -7941,7 +7941,8 @@ const IncidentDetailPage = () => {
             display: 'flex',
             flexDirection: isSimple ? 'column' : 'row',
             gap: isSimple ? 0.5 : 1.5,
-            p: isSimple ? 0.5 : 1.5,
+            px: isSimple ? 0.5 : 1.5,
+            py: isSimple ? 0.75 : 1.75,
             borderRadius: 1.5,
             bgcolor: isDeleted
               ? 'hsl(var(--muted) / 0.3)'
