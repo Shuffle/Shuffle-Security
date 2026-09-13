@@ -101,17 +101,8 @@ export const IncidentActionsMenu = ({
   const orgId = userInfo?.active_org?.id || '';
 
   // ---- Resync ---------------------------------------------------------------
-  const resyncDisabled =
-    isSaving ||
-    !incident?.source ||
-    incident?.source === 'Tenzir' ||
-    (() => {
-      const product = incident?.rawOCSF?.product || incident?.rawOCSF?.metadata?.product;
-      const name = product?.name;
-      const id = product?.id;
-      const uid = product?.uid;
-      return !!(name && (name === id || name === uid));
-    })();
+  const resyncBlockedReason = getResyncBlockedReason(incident, isSaving);
+  const resyncDisabled = !!resyncBlockedReason;
 
   const handleResync = async () => {
     setAnchor(null);
@@ -143,8 +134,10 @@ export const IncidentActionsMenu = ({
           app_name: source,
         }),
       });
-      if (!response.ok) {
-        toast.error('Resync failed');
+      const responseBody = await response.json().catch(() => null);
+      const failureReason = extractResyncFailureReason(responseBody);
+      if (!response.ok || responseBody?.success === false) {
+        toast.error(failureReason ? `Resync failed: ${failureReason}` : 'Resync failed', { duration: 10000 });
         setIsResyncing(false);
         resyncState.remove(incident.id);
         return;
