@@ -10505,7 +10505,7 @@ const IncidentDetailPage = () => {
               <IncidentActionsMenu
                 incident={{
                   id: incident.id,
-                  title: editedTitle || incident.title,
+                  title: editedTitle || incident.title || '',
                   source: incident.source,
                   status: editedStatus || incident.status,
                   rawOCSF: incident.rawOCSF,
