@@ -165,25 +165,27 @@ export const WorkflowEnvironmentSelector = ({
                 borderRadius: 1.5,
                 fontSize: "0.8125rem",
                 py: 0.25,
-                border: highlighted
-                  ? "1.5px solid hsl(var(--primary))"
+                border: highlighted || (selectedEnv && !isRunning(selectedEnv))
+                  ? "1.5px solid hsl(var(--destructive))"
                   : "none",
-                boxShadow: highlighted
-                  ? "0 0 0 3px hsla(var(--primary) / 0.15)"
+                boxShadow: highlighted || (selectedEnv && !isRunning(selectedEnv))
+                  ? "0 0 0 2px hsla(var(--destructive) / 0.15)"
                   : "none",
                 transition: "border 0.2s ease, box-shadow 0.2s ease",
                 "& fieldset": {
-                  borderColor: highlighted
+                  borderColor: highlighted || (selectedEnv && !isRunning(selectedEnv))
                     ? "transparent"
                     : "hsl(var(--border))",
                 },
                 "&:hover fieldset": {
-                  borderColor: highlighted
+                  borderColor: highlighted || (selectedEnv && !isRunning(selectedEnv))
                     ? "transparent"
                     : "hsl(var(--primary))",
                 },
                 "&.Mui-focused fieldset": {
-                  borderColor: "hsl(var(--primary))",
+                  borderColor: highlighted || (selectedEnv && !isRunning(selectedEnv))
+                    ? "hsl(var(--destructive))"
+                    : "hsl(var(--primary))",
                 },
               },
               "& .MuiInputBase-input": {

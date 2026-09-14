@@ -82,6 +82,8 @@ import { resolveOutcomeKind } from '../lib/outcomes';
 import { useWorkflowExecutionStats } from '../hooks/useWorkflowExecutionStats';
 import { useHostMonitorCount } from '@/hooks/useHostMonitorCount';
 import { ThreatIntelReadinessBanner } from '@/components/threat-intel/ThreatIntelReadinessBanner';
+import { useWorkflowHealth } from '@/hooks/useWorkflowHealth';
+import { diagnoseUsecase } from '@/services/workflowHealth';
 // ── Flow phases ────────────────────────────────────────────────────────────────
 
 export type FlowPhase = 'ingest' | 'correlation' | 'response';
@@ -3660,6 +3662,10 @@ function UsecaseDetailContent({
   };
 
   const effectiveEnabled = optimisticEnabled !== null ? optimisticEnabled : isEnabled;
+  const { environments } = useWorkflowHealth();
+  const linkedWfs = useMemo(() => (flow ? findWorkflowsForUsecase(flow, workflows) : []), [flow, workflows]);
+  const detailHealth = useMemo(() => diagnoseUsecase(linkedWfs, environments), [linkedWfs, environments]);
+  const detailIsBlocked = effectiveEnabled && detailHealth.hasProblem;
   // App-search drawer state — mirrors the alluvial diagram's "+" buttons so
   // users can force-add a Source or Destination tool from this view too.
   const [addToolFor, setAddToolFor] = useState<null | { side: 'source' | 'destination'; categoryId: string; multiDest?: boolean }>(null);
@@ -4353,9 +4359,21 @@ function UsecaseDetailContent({
       <Box sx={{
         p: 3,
         borderRadius: 2,
-        border: effectiveEnabled ? '1px solid hsl(var(--severity-low))' : CARD_BORDER,
-        bgcolor: effectiveEnabled ? 'hsl(var(--severity-low) / 0.04)' : CARD_BG,
-        boxShadow: effectiveEnabled ? '0 2px 8px hsl(var(--severity-low) / 0.08)' : 'none',
+        border: detailIsBlocked
+          ? '1px solid hsl(var(--destructive) / 0.5)'
+          : effectiveEnabled
+            ? '1px solid hsl(var(--severity-low))'
+            : CARD_BORDER,
+        bgcolor: detailIsBlocked
+          ? 'hsl(var(--destructive) / 0.04)'
+          : effectiveEnabled
+            ? 'hsl(var(--severity-low) / 0.04)'
+            : CARD_BG,
+        boxShadow: detailIsBlocked
+          ? '0 2px 8px hsl(var(--destructive) / 0.08)'
+          : effectiveEnabled
+            ? '0 2px 8px hsl(var(--severity-low) / 0.08)'
+            : 'none',
         mb: 3,
       }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
@@ -4425,13 +4443,15 @@ function UsecaseDetailContent({
               ) : canToggle && flow.automationLabel ? (
                 <Tooltip
                   title={
-                    !effectiveEnabled && !hasValidatedSource && !isShuffleSourcedFlow
-                      ? `No active ${sourceCat} integration is connected. Activating will not do anything until a ${sourceCat} tool is authenticated — the workflow will be disabled again automatically.`
-                      : !effectiveEnabled && (flow.id === 'case_management_cases_forward_1' || flow.id === 'case_management_communication_1')
-                        ? 'Click to activate (choose a destination tool)'
-                        : effectiveEnabled
-                          ? 'Click to disable'
-                          : 'Click to activate'
+                    detailIsBlocked
+                      ? `${detailHealth.primaryProblem?.title || 'Execution blocked'}: ${detailHealth.primaryProblem?.description || 'Runtime location is offline.'} Click to view details / fix.`
+                      : !effectiveEnabled && !hasValidatedSource && !isShuffleSourcedFlow
+                        ? `No active ${sourceCat} integration is connected. Activating will not do anything until a ${sourceCat} tool is authenticated — the workflow will be disabled again automatically.`
+                        : !effectiveEnabled && (flow.id === 'case_management_cases_forward_1' || flow.id === 'case_management_communication_1')
+                          ? 'Click to activate (choose a destination tool)'
+                          : effectiveEnabled
+                            ? 'Click to disable'
+                            : 'Click to activate'
                   }
                   placement="bottom"
                   arrow
@@ -4440,7 +4460,7 @@ function UsecaseDetailContent({
                     <Button
                       size="small"
                       disableElevation
-                      onClick={handleToggle}
+                      onClick={detailIsBlocked && detailHealth.primaryProblem?.actionUrl ? () => navigate(detailHealth.primaryProblem!.actionUrl!) : handleToggle}
                       disabled={toggling}
                       startIcon={
                         toggling ? (
@@ -4449,9 +4469,11 @@ function UsecaseDetailContent({
                           <Power
                             size={13}
                             style={{
-                              color: effectiveEnabled
-                                ? 'hsl(var(--severity-low))'
-                                : 'hsl(var(--destructive))',
+                              color: detailIsBlocked
+                                ? 'hsl(var(--destructive))'
+                                : effectiveEnabled
+                                  ? 'hsl(var(--severity-low))'
+                                  : 'hsl(var(--destructive))',
                             }}
                           />
                         )
@@ -4465,29 +4487,39 @@ function UsecaseDetailContent({
                         py: 0.5,
                         px: 1.2,
                         borderRadius: 1,
-                        bgcolor: effectiveEnabled
-                          ? 'hsl(var(--severity-low) / 0.12)'
-                          : 'hsl(var(--destructive) / 0.12)',
-                        color: effectiveEnabled
-                          ? 'hsl(var(--severity-low))'
-                          : 'hsl(var(--destructive))',
-                        border: effectiveEnabled
-                          ? '1px solid hsl(var(--severity-low) / 0.4)'
-                          : '1px solid hsl(var(--destructive) / 0.4)',
+                        bgcolor: detailIsBlocked
+                          ? 'hsl(var(--destructive) / 0.12)'
+                          : effectiveEnabled
+                            ? 'hsl(var(--severity-low) / 0.12)'
+                            : 'hsl(var(--destructive) / 0.12)',
+                        color: detailIsBlocked
+                          ? 'hsl(var(--destructive))'
+                          : effectiveEnabled
+                            ? 'hsl(var(--severity-low))'
+                            : 'hsl(var(--destructive))',
+                        border: detailIsBlocked
+                          ? '1px solid hsl(var(--destructive) / 0.45)'
+                          : effectiveEnabled
+                            ? '1px solid hsl(var(--severity-low) / 0.4)'
+                            : '1px solid hsl(var(--destructive) / 0.4)',
                         letterSpacing: 0.2,
                         boxShadow: 'none',
                         '&:hover': {
-                          bgcolor: effectiveEnabled
-                            ? 'hsl(var(--severity-low) / 0.22)'
-                            : 'hsl(var(--destructive) / 0.22)',
-                          borderColor: effectiveEnabled
-                            ? 'hsl(var(--severity-low) / 0.7)'
-                            : 'hsl(var(--destructive) / 0.7)',
+                          bgcolor: detailIsBlocked
+                            ? 'hsl(var(--destructive) / 0.22)'
+                            : effectiveEnabled
+                              ? 'hsl(var(--severity-low) / 0.22)'
+                              : 'hsl(var(--destructive) / 0.22)',
+                          borderColor: detailIsBlocked
+                            ? 'hsl(var(--destructive) / 0.7)'
+                            : effectiveEnabled
+                              ? 'hsl(var(--severity-low) / 0.7)'
+                              : 'hsl(var(--destructive) / 0.7)',
                           boxShadow: 'none',
                         },
                       }}
                     >
-                      {effectiveEnabled ? 'Active' : 'Activate'}
+                      {detailIsBlocked ? 'Active · Blocked' : effectiveEnabled ? 'Active' : 'Activate'}
                     </Button>
                   </span>
                 </Tooltip>
@@ -4542,6 +4574,52 @@ function UsecaseDetailContent({
             <Typography sx={{ fontSize: '0.88rem', color: MUTED, lineHeight: 1.7 }}>
               {flow.description || 'No description available.'}
             </Typography>
+            {detailIsBlocked && (
+              <Box
+                sx={{
+                  mt: 2,
+                  p: 1.5,
+                  borderRadius: 1.5,
+                  bgcolor: 'hsl(var(--destructive) / 0.08)',
+                  border: '1px solid hsl(var(--destructive) / 0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 2,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'hsl(var(--destructive))', flexShrink: 0 }} />
+                  <Box>
+                    <Typography sx={{ fontSize: '0.8125rem', fontWeight: 600, color: 'hsl(var(--destructive))' }}>
+                      {detailHealth.primaryProblem?.title || 'Execution Blocked'}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))' }}>
+                      {detailHealth.primaryProblem?.description || 'The runtime location used by this workflow is offline.'}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => navigate(detailHealth.primaryProblem?.actionUrl || '/admin/runtime-locations')}
+                  sx={{
+                    fontSize: '0.75rem',
+                    borderColor: 'hsl(var(--destructive))',
+                    color: 'hsl(var(--destructive))',
+                    textTransform: 'none',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    '&:hover': {
+                      borderColor: 'hsl(var(--destructive))',
+                      bgcolor: 'hsl(var(--destructive) / 0.1)',
+                    },
+                  }}
+                >
+                  Fix Runtime Location &rarr;
+                </Button>
+              </Box>
+            )}
             {(flow.id === 'threat_intel_ingest_1' || flow.label === 'IOC feeds') && (
               <Box
                 sx={{
@@ -6899,6 +6977,10 @@ function UsecaseCard({
   const [toggling, setToggling] = useState(false);
   const [optimisticEnabled, setOptimisticEnabled] = useState<boolean | null>(null);
   const effectiveEnabled = optimisticEnabled !== null ? optimisticEnabled : isEnabled;
+  const { environments } = useWorkflowHealth();
+  const linkedWfs = useMemo(() => findWorkflowsForUsecase(flow, workflows), [flow, workflows]);
+  const usecaseHealth = useMemo(() => diagnoseUsecase(linkedWfs, environments), [linkedWfs, environments]);
+  const isBlocked = effectiveEnabled && usecaseHealth.hasProblem;
   const { apiUrl, authHeader } = useApi();
 
   const { plural: entityPlural } = useEntityPreference();
@@ -7087,15 +7169,23 @@ function UsecaseCard({
       sx={{
         position: 'relative',
         height: '100%',
-        bgcolor: effectiveEnabled ? 'hsl(var(--severity-low) / 0.05)' : 'hsl(var(--card))',
-        border: effectiveEnabled
-          ? '1px solid hsl(var(--severity-low))'
-          : showDrift
-            ? `1px solid ${driftColor.replace(')', ' / 0.5)')}`
-            : '1px solid hsl(var(--border))',
-        boxShadow: effectiveEnabled
-          ? '0 2px 8px hsl(var(--severity-low) / 0.12)'
-          : undefined,
+        bgcolor: isBlocked
+          ? 'hsl(var(--destructive) / 0.05)'
+          : effectiveEnabled
+            ? 'hsl(var(--severity-low) / 0.05)'
+            : 'hsl(var(--card))',
+        border: isBlocked
+          ? '1px solid hsl(var(--destructive) / 0.5)'
+          : effectiveEnabled
+            ? '1px solid hsl(var(--severity-low))'
+            : showDrift
+              ? `1px solid ${driftColor.replace(')', ' / 0.5)')}`
+              : '1px solid hsl(var(--border))',
+        boxShadow: isBlocked
+          ? '0 2px 8px hsl(var(--destructive) / 0.12)'
+          : effectiveEnabled
+            ? '0 2px 8px hsl(var(--severity-low) / 0.12)'
+            : undefined,
         transition: 'border-color 0.15s, box-shadow 0.15s, background-color 0.15s',
         '&:hover': {
           borderColor: 'hsl(var(--primary) / 0.4)',
@@ -7200,11 +7290,13 @@ function UsecaseCard({
             {effectiveEnabled ? (
               <Tooltip
                 title={
-                  isMonitorsFlow
-                    ? 'Host Monitoring is active on endpoints · Managed in Monitors view'
-                    : canDisable
-                      ? 'Automation active · Click to disable'
-                      : 'Automation active'
+                  isBlocked
+                    ? `${usecaseHealth.primaryProblem?.title || 'Execution blocked'}: ${usecaseHealth.primaryProblem?.description || 'Runtime location is offline.'} Click to fix.`
+                    : isMonitorsFlow
+                      ? 'Host Monitoring is active on endpoints · Managed in Monitors view'
+                      : canDisable
+                        ? 'Automation active · Click to disable'
+                        : 'Automation active'
                 }
                 placement="top"
                 arrow
@@ -7214,15 +7306,24 @@ function UsecaseCard({
                   type="button"
                   disabled={toggling}
                   onClick={
-                    isMonitorsFlow
+                    isBlocked
                       ? (e: React.MouseEvent) => {
                           e.stopPropagation();
-                          e.preventDefault();
-                          navigate('/monitors');
+                          if (usecaseHealth.primaryProblem?.actionUrl) {
+                            navigate(usecaseHealth.primaryProblem.actionUrl);
+                          } else {
+                            onClick();
+                          }
                         }
-                      : canDisable
-                        ? handleToggle
-                        : undefined
+                      : isMonitorsFlow
+                        ? (e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            navigate('/monitors');
+                          }
+                        : canDisable
+                          ? handleToggle
+                          : undefined
                   }
                   sx={{
                     display: 'inline-flex',
@@ -7232,21 +7333,31 @@ function UsecaseCard({
                     py: 0.2,
                     height: 22,
                     borderRadius: 0.75,
-                    bgcolor: 'hsl(var(--severity-low) / 0.12)',
-                    border: '1px solid hsl(var(--severity-low) / 0.4)',
-                    color: 'hsl(var(--severity-low))',
+                    bgcolor: isBlocked
+                      ? 'hsl(var(--destructive) / 0.12)'
+                      : 'hsl(var(--severity-low) / 0.12)',
+                    border: isBlocked
+                      ? '1px solid hsl(var(--destructive) / 0.45)'
+                      : '1px solid hsl(var(--severity-low) / 0.4)',
+                    color: isBlocked
+                      ? 'hsl(var(--destructive))'
+                      : 'hsl(var(--severity-low))',
                     fontSize: '0.65rem',
                     fontWeight: 700,
                     letterSpacing: '0.02em',
                     lineHeight: 1,
-                    cursor: isMonitorsFlow ? 'pointer' : canDisable ? (toggling ? 'default' : 'pointer') : 'default',
+                    cursor: (isBlocked || isMonitorsFlow) ? 'pointer' : canDisable ? (toggling ? 'default' : 'pointer') : 'default',
                     outline: 'none',
                     boxShadow: 'none',
                     flexShrink: 0,
                     transition: 'all 0.15s ease',
-                    '&:hover': (isMonitorsFlow || canDisable) ? {
-                      bgcolor: 'hsl(var(--severity-low) / 0.22)',
-                      borderColor: 'hsl(var(--severity-low) / 0.7)',
+                    '&:hover': (isBlocked || isMonitorsFlow || canDisable) ? {
+                      bgcolor: isBlocked
+                        ? 'hsl(var(--destructive) / 0.22)'
+                        : 'hsl(var(--severity-low) / 0.22)',
+                      borderColor: isBlocked
+                        ? 'hsl(var(--destructive) / 0.7)'
+                        : 'hsl(var(--severity-low) / 0.7)',
                     } : {},
                   }}
                 >
@@ -7255,7 +7366,7 @@ function UsecaseCard({
                   ) : (
                     <Power size={11} style={{ color: 'inherit' }} />
                   )}
-                  <span>Active</span>
+                  <span>{isBlocked ? 'Active · Blocked' : 'Active'}</span>
                 </Box>
               </Tooltip>
             ) : (flow.customAction?.href || flow.customAction?.url) && (!canToggle || (flow.id !== 'threat_intel_ingest_1' && flow.id !== 'case_management_agent_ai_incident_handling_1')) ? (

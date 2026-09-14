@@ -351,10 +351,26 @@ export const DefaultEnvironmentSelector = ({
                 borderRadius: 1.5,
                 fontSize: "0.8125rem",
                 py: 0.25,
-                "& fieldset": { borderColor: "hsl(var(--border))" },
-                "&:hover fieldset": { borderColor: "hsl(var(--primary))" },
+                border: selected && !isRunning(selected)
+                  ? "1.5px solid hsl(var(--destructive))"
+                  : "none",
+                boxShadow: selected && !isRunning(selected)
+                  ? "0 0 0 2px hsla(var(--destructive) / 0.15)"
+                  : "none",
+                "& fieldset": {
+                  borderColor: selected && !isRunning(selected)
+                    ? "transparent"
+                    : "hsl(var(--border))",
+                },
+                "&:hover fieldset": {
+                  borderColor: selected && !isRunning(selected)
+                    ? "transparent"
+                    : "hsl(var(--primary))",
+                },
                 "&.Mui-focused fieldset": {
-                  borderColor: "hsl(var(--primary))",
+                  borderColor: selected && !isRunning(selected)
+                    ? "hsl(var(--destructive))"
+                    : "hsl(var(--primary))",
                 },
               },
               "& .MuiInputBase-input": {

@@ -15,6 +15,7 @@ import { WebhookIngestionButton, WebhookIngestionInfo } from '@/components/incid
 import { AppSearchDrawer } from '@/Shuffle-MCPs';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { useWorkflowHealth } from '@/hooks/useWorkflowHealth';
 
 interface IngestionSourcesRowProps {
   /** Workflow label used with /api/v2/workflows/generate.
@@ -86,6 +87,21 @@ export const IngestionSourcesRow = ({
   const [appSearchOpen, setAppSearchOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { workflows: allWorkflows, getWorkflowHealth } = useWorkflowHealth();
+
+  const parentWorkflow = allWorkflows.find(
+    (w) => (w.name || '').toLowerCase() === workflowLabel.toLowerCase()
+  );
+  const webhookWorkflow = allWorkflows.find(
+    (w) => (w.name || '').toLowerCase() === webhookWorkflowName.toLowerCase()
+  );
+
+  const parentHealth = parentWorkflow ? getWorkflowHealth(parentWorkflow) : null;
+  const webhookHealth = webhookWorkflow ? getWorkflowHealth(webhookWorkflow) : null;
+
+  const isWebhookBlocked = Boolean(webhook.enabled && webhookHealth?.hasProblem);
+  const isParentBlocked = Boolean(parentHealth?.hasProblem);
 
   const pendingTogglesRef = useRef<Map<string, boolean>>(new Map());
   // Reactive mirror of pending toggles so the multi-select picker reflects
@@ -334,6 +350,9 @@ export const IngestionSourcesRow = ({
   const overflowApps = allApps.slice(3);
   const incidentCountsBySource = new Map<string, number>(); // reserved — count not tracked here
 
+  const hasEnabledApps = allApps.some(a => a.enabled);
+  const hasIngestionProblem = isWebhookBlocked || (hasEnabledApps && isParentBlocked);
+
   return (
     <>
       <Box
@@ -346,7 +365,9 @@ export const IngestionSourcesRow = ({
           alignItems: 'center',
           gap: 0.5,
           bgcolor: 'hsl(var(--muted) / 0.4)',
-          border: '1px solid hsl(var(--border))',
+          border: hasIngestionProblem
+            ? '1px solid hsla(var(--destructive) / 0.5)'
+            : '1px solid hsl(var(--border))',
           borderRadius: 1.5,
           px: 0.75,
           py: 0.5,
@@ -396,9 +417,9 @@ export const IngestionSourcesRow = ({
           transform: 'translateX(-50%)',
           fontSize: '0.55rem',
           fontWeight: 600,
-          color: 'hsl(var(--muted-foreground))',
-          bgcolor: 'hsl(var(--muted))',
-          border: '1px solid hsl(var(--border))',
+          color: hasIngestionProblem ? 'hsl(var(--destructive))' : 'hsl(var(--muted-foreground))',
+          bgcolor: hasIngestionProblem ? 'hsla(var(--destructive) / 0.12)' : 'hsl(var(--muted))',
+          border: hasIngestionProblem ? '1px solid hsla(var(--destructive) / 0.5)' : '1px solid hsl(var(--border))',
           borderRadius: 10,
           px: 1,
           py: 0.15,
@@ -406,9 +427,15 @@ export const IngestionSourcesRow = ({
           letterSpacing: '0.05em',
           textTransform: 'uppercase',
           whiteSpace: 'nowrap',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.5,
         }}>
+          {hasIngestionProblem && (
+            <Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: 'hsl(var(--destructive))', flexShrink: 0 }} />
+          )}
           {titleTooltip ? (
-            <Tooltip title={titleTooltip} placement="top" arrow>
+            <Tooltip title={hasIngestionProblem ? `${title} (Offline runtime location)` : titleTooltip} placement="top" arrow>
               <span style={{ cursor: 'help' }}>{title}</span>
             </Tooltip>
           ) : (
@@ -420,11 +447,11 @@ export const IngestionSourcesRow = ({
           webhook={webhook}
           onToggled={fetchIngestionApps}
           workflowLabel={webhookLabel}
+          isBlocked={isWebhookBlocked}
+          health={webhookHealth}
         />
 
         {afterWebhook}
-
-
 
         {visibleApps.map(app => (
           <IngestionSourceButton
@@ -432,6 +459,8 @@ export const IngestionSourcesRow = ({
             app={app}
             onToggle={handleToggleApp}
             incidentCount={incidentCountsBySource.get(normalizeAppName(app.name)) || 0}
+            isBlocked={Boolean(app.enabled && isParentBlocked)}
+            health={parentHealth}
           />
         ))}
 
@@ -447,6 +476,8 @@ export const IngestionSourcesRow = ({
                   app={app}
                   onToggle={handleToggleApp}
                   incidentCount={incidentCountsBySource.get(normalizeAppName(app.name)) || 0}
+                  isBlocked={Boolean(app.enabled && isParentBlocked)}
+                  health={parentHealth}
                 />
               ))}
             </Box>

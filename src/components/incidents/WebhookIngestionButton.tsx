@@ -7,6 +7,8 @@ import { toast } from '@/lib/toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDemo } from '@/context/DemoContext';
 
+import { EntityHealth } from '@/services/workflowHealth';
+
 export interface WebhookIngestionInfo {
   /** Webhook URL to display (null if workflow doesn't exist yet) */
   url: string | null;
@@ -26,9 +28,17 @@ interface WebhookIngestionButtonProps {
    *  the vulnerabilities row overrides this to 'Ingest Vulnerabilities_webhook'
    *  so both webhooks stay unique server-side. */
   workflowLabel?: string;
+  isBlocked?: boolean;
+  health?: EntityHealth | null;
 }
 
-export const WebhookIngestionButton = ({ webhook, onToggled, workflowLabel = 'Ingest Tickets_webhook' }: WebhookIngestionButtonProps) => {
+export const WebhookIngestionButton = ({
+  webhook,
+  onToggled,
+  workflowLabel = 'Ingest Tickets_webhook',
+  isBlocked = false,
+  health,
+}: WebhookIngestionButtonProps) => {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [copied, setCopied] = useState(false);
   const [optimisticEnabled, setOptimisticEnabled] = useState<boolean | null>(null);
@@ -140,27 +150,39 @@ export const WebhookIngestionButton = ({ webhook, onToggled, workflowLabel = 'In
 
   return (
     <Box sx={{ position: 'relative' }} data-tour="webhook-ingestion-button">
-      <Tooltip title={isEnabled ? 'Ingestion Webhook (push)' : 'Ingestion Webhook (inactive)'} placement="bottom">
+      <Tooltip title={isEnabled ? (isBlocked ? 'Ingestion Webhook (blocked - runtime offline)' : 'Ingestion Webhook (push)') : 'Ingestion Webhook (inactive)'} placement="bottom">
         <IconButton
           onClick={(e) => setAnchorEl(e.currentTarget)}
           size="small"
           sx={{
             width: 30,
             height: 30,
-            border: isEnabled ? '1px solid hsl(var(--severity-low))' : '1px solid hsl(var(--border))',
-            bgcolor: isEnabled ? 'hsl(var(--severity-low) / 0.14)' : 'hsl(var(--card))',
+            border: isBlocked
+              ? '1px solid hsl(var(--destructive))'
+              : isEnabled
+                ? '1px solid hsl(var(--severity-low))'
+                : '1px solid hsl(var(--border))',
+            bgcolor: isBlocked
+              ? 'hsl(var(--destructive) / 0.15)'
+              : isEnabled
+                ? 'hsl(var(--severity-low) / 0.14)'
+                : 'hsl(var(--card))',
             borderRadius: 1,
-            opacity: isEnabled ? 1 : 0.45,
-            filter: isEnabled ? 'none' : 'grayscale(1)',
+            opacity: (isEnabled || isBlocked) ? 1 : 0.45,
+            filter: (isEnabled || isBlocked) ? 'none' : 'grayscale(1)',
             transition: 'opacity 0.15s ease, filter 0.15s ease',
             '&:hover': {
-              bgcolor: isEnabled ? 'hsl(var(--severity-low) / 0.22)' : 'hsl(var(--accent))',
+              bgcolor: isBlocked
+                ? 'hsl(var(--destructive) / 0.25)'
+                : isEnabled
+                  ? 'hsl(var(--severity-low) / 0.22)'
+                  : 'hsl(var(--accent))',
               opacity: 1,
               filter: 'none',
             },
           }}
         >
-          <WebhookIcon size={16} style={{ color: isEnabled ? 'hsl(var(--severity-low))' : 'hsl(var(--muted-foreground))' }} />
+          <WebhookIcon size={16} style={{ color: isBlocked ? 'hsl(var(--destructive))' : isEnabled ? 'hsl(var(--severity-low))' : 'hsl(var(--muted-foreground))' }} />
         </IconButton>
       </Tooltip>
       <Popover
@@ -183,11 +205,55 @@ export const WebhookIngestionButton = ({ webhook, onToggled, workflowLabel = 'In
           },
         }}
       >
+        {isBlocked && (
+          <Box sx={{
+            p: 1.25,
+            mb: 1.25,
+            borderRadius: 1,
+            bgcolor: 'hsla(var(--destructive) / 0.1)',
+            border: '1px solid hsla(var(--destructive) / 0.3)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 0.75,
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'hsl(var(--destructive))' }} />
+              <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'hsl(var(--destructive))' }}>
+                Runtime Location Offline
+              </Typography>
+            </Box>
+            <Typography sx={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))', lineHeight: 1.35 }}>
+              {health?.primaryProblem?.description || 'The runtime location assigned to this webhook is offline. Ingestion events cannot be received.'}
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              href={health?.primaryProblem?.actionUrl || '/admin/runtime-locations'}
+              sx={{
+                fontSize: '0.7rem',
+                py: 0.25,
+                px: 1,
+                alignSelf: 'flex-start',
+                borderColor: 'hsl(var(--destructive))',
+                color: 'hsl(var(--destructive))',
+                textTransform: 'none',
+                '&:hover': {
+                  borderColor: 'hsl(var(--destructive))',
+                  bgcolor: 'hsla(var(--destructive) / 0.1)',
+                },
+              }}
+            >
+              Fix Runtime Location &rarr;
+            </Button>
+          </Box>
+        )}
         <Typography variant="caption" sx={{ fontWeight: 600, color: 'hsl(var(--foreground))', mb: 0.5, display: 'block' }}>
           Ingestion Webhook
-          {!isEnabled && (
+          {isBlocked ? (
+            <Chip label="Blocked" size="small" sx={{ ml: 0.5, height: 18, fontSize: '0.65rem', bgcolor: 'hsla(var(--destructive) / 0.15)', color: 'hsl(var(--destructive))', border: '1px solid hsla(var(--destructive) / 0.3)' }} />
+          ) : !isEnabled ? (
             <Chip label="Not Active" size="small" sx={{ ml: 0.5, height: 18, fontSize: '0.65rem', bgcolor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }} />
-          )}
+          ) : null}
         </Typography>
         <Typography variant="caption" sx={{ color: 'hsl(var(--muted-foreground))', mb: 1, display: 'block', lineHeight: 1.4 }}>
           {isEnabled

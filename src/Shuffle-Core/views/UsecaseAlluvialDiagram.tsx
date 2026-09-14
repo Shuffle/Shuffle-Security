@@ -55,6 +55,8 @@ import shuffleInfraLogo from '../assets/shuffle-infrastructure-logo.png';
 import shuffleIcon from '../assets/shuffle-icon.png';
 import singulAgentIcon from '../assets/singul-agent-icon.png';
 
+import { useWorkflowHealth } from '@/hooks/useWorkflowHealth';
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface AppNode {
@@ -67,6 +69,12 @@ interface AppNode {
   isHighlighted?: boolean;
   /** Whether this app is enabled in the workflow (false = greyed out) */
   isEnabled?: boolean;
+  /** Whether this app's runtime execution is blocked (e.g. stopped runtime location) */
+  isBlocked?: boolean;
+  /** Diagnostic details when execution is blocked */
+  blockReason?: string;
+  /** Direct action URL to fix the blockage */
+  actionUrl?: string;
 }
 
 export interface UsecaseAlluvialDiagramProps extends ShuffleCoreHostProps {
@@ -295,6 +303,7 @@ function getSampleApps(categoryId: string): AppNode[] {
 // ── Status dot color ───────────────────────────────────────────────────────────
 
 function getStatusColor(app: AppNode): string {
+  if (app.isBlocked) return 'hsl(var(--destructive))';
   if (app.isEnabled === false) return 'hsl(var(--muted-foreground) / 0.4)';
   if (app.hasValidAuth) return 'hsl(var(--severity-low))';       // Green — validated
   if (app.isActiveOnly) return 'hsl(var(--destructive))';        // Red — activated, no auth
@@ -398,7 +407,18 @@ function AppBubble({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {highlighted && (
+      {app.isBlocked ? (
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: -3,
+            borderRadius: '50%',
+            border: '2px solid hsl(var(--destructive))',
+            boxShadow: '0 0 10px hsla(var(--destructive) / 0.5)',
+            pointerEvents: 'none',
+          }}
+        />
+      ) : highlighted && (
         <Box
           sx={{
             position: 'absolute',
@@ -514,8 +534,10 @@ function AppBubble({
               {displayName}
             </Typography>
             {!isSample && (
-              <Typography sx={{ fontSize: '0.7rem', color: disabled ? 'hsl(var(--muted-foreground))' : (app.isEnabled === false) ? 'hsl(var(--muted-foreground))' : app.hasValidAuth ? 'hsl(var(--severity-low))' : 'hsl(var(--muted-foreground))' }}>
-                {disabled
+              <Typography sx={{ fontSize: '0.7rem', color: app.isBlocked ? 'hsl(var(--destructive))' : disabled ? 'hsl(var(--muted-foreground))' : (app.isEnabled === false) ? 'hsl(var(--muted-foreground))' : app.hasValidAuth ? 'hsl(var(--severity-low))' : 'hsl(var(--muted-foreground))' }}>
+                {app.isBlocked
+                  ? 'Runtime offline'
+                  : disabled
                   ? 'Not enabled for ingestion'
                   : (app.isEnabled === false)
                     ? (side === 'right' ? (isNotification ? 'Notifications disabled' : 'Not forwarding') : 'Not enabled')
@@ -597,7 +619,9 @@ function AppBubble({
           <>
             <Typography variant="caption" sx={{ fontWeight: 600, color: 'hsl(var(--foreground))', mb: 0.5, display: 'block' }}>
               {webhookTitle}
-              {!webhookEnabled && (
+              {app.isBlocked ? (
+                <Chip label="Blocked" size="small" sx={{ ml: 0.5, height: 18, fontSize: '0.65rem', bgcolor: 'hsl(var(--destructive) / 0.12)', color: 'hsl(var(--destructive))', fontWeight: 600 }} />
+              ) : !webhookEnabled && (
                 <Chip label="Not Active" size="small" sx={{ ml: 0.5, height: 18, fontSize: '0.65rem', bgcolor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }} />
               )}
             </Typography>
@@ -608,6 +632,49 @@ function AppBubble({
                   ? 'This webhook is currently stopped. Enable it to receive pushed alerts.'
                   : (isVuln ? 'Enable to create a webhook endpoint for pushing vulnerabilities.' : 'Enable to create a webhook endpoint for pushing alerts.')}
             </Typography>
+
+            {app.isBlocked && (
+              <Box sx={{
+                p: 1.25,
+                mb: 1.25,
+                borderRadius: 1,
+                bgcolor: 'hsl(var(--destructive) / 0.08)',
+                border: '1px solid hsl(var(--destructive) / 0.35)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0.75,
+              }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'hsl(var(--destructive))' }} />
+                  <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'hsl(var(--destructive))' }}>
+                    Execution Blocked
+                  </Typography>
+                </Box>
+                <Typography sx={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))', lineHeight: 1.35 }}>
+                  {app.blockReason || 'The runtime location used by this webhook is offline.'}
+                </Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  href={app.actionUrl || '/admin/runtime-locations'}
+                  sx={{
+                    fontSize: '0.7rem',
+                    py: 0.25,
+                    px: 1,
+                    alignSelf: 'flex-start',
+                    borderColor: 'hsl(var(--destructive))',
+                    color: 'hsl(var(--destructive))',
+                    textTransform: 'none',
+                    '&:hover': {
+                      borderColor: 'hsl(var(--destructive))',
+                      bgcolor: 'hsl(var(--destructive) / 0.1)',
+                    },
+                  }}
+                >
+                  Fix Runtime Location &rarr;
+                </Button>
+              </Box>
+            )}
 
             {webhookEnabled && webhookInfo?.url && (
               <Box sx={{
@@ -684,13 +751,19 @@ function AppBubble({
             {(() => {
               const isDestination = side === 'right';
               const currentLabel = usecaseLabel || 'this usecase';
-              const statusLabel = !isEnabled
+              const statusLabel = app.isBlocked
+                ? 'Blocked'
+                : !isEnabled
                 ? 'Not in use'
                 : (app.hasValidAuth ? 'Validated' : (app.isActiveOnly ? 'Active' : 'Active'));
-              const statusColor = !isEnabled
+              const statusColor = app.isBlocked
+                ? 'hsl(var(--destructive))'
+                : !isEnabled
                 ? 'hsl(var(--muted-foreground))'
                 : (app.hasValidAuth ? 'hsl(var(--severity-low))' : 'hsl(var(--severity-medium))');
-              const statusBg = !isEnabled
+              const statusBg = app.isBlocked
+                ? 'hsl(var(--destructive) / 0.12)'
+                : !isEnabled
                 ? 'hsl(var(--muted))'
                 : (app.hasValidAuth ? 'hsl(var(--severity-low) / 0.12)' : 'hsl(var(--severity-medium) / 0.12)');
 
@@ -728,6 +801,48 @@ function AppBubble({
                   <Typography variant="caption" sx={{ display: 'block', color: 'hsl(var(--muted-foreground))', fontSize: '0.7rem', mb: 1.25 }}>
                     {subtitleText}
                   </Typography>
+                  {app.isBlocked && (
+                    <Box sx={{
+                      p: 1.25,
+                      mb: 1.25,
+                      borderRadius: 1,
+                      bgcolor: 'hsl(var(--destructive) / 0.08)',
+                      border: '1px solid hsl(var(--destructive) / 0.35)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 0.75,
+                    }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'hsl(var(--destructive))' }} />
+                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'hsl(var(--destructive))' }}>
+                          Execution Blocked
+                        </Typography>
+                      </Box>
+                      <Typography sx={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))', lineHeight: 1.35 }}>
+                        {app.blockReason || 'The runtime location used by this workflow is offline.'}
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        href={app.actionUrl || '/admin/runtime-locations'}
+                        sx={{
+                          fontSize: '0.7rem',
+                          py: 0.25,
+                          px: 1,
+                          alignSelf: 'flex-start',
+                          borderColor: 'hsl(var(--destructive))',
+                          color: 'hsl(var(--destructive))',
+                          textTransform: 'none',
+                          '&:hover': {
+                            borderColor: 'hsl(var(--destructive))',
+                            bgcolor: 'hsl(var(--destructive) / 0.1)',
+                          },
+                        }}
+                      >
+                        Fix Runtime Location &rarr;
+                      </Button>
+                    </Box>
+                  )}
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                     {onToggleSync && (
                       <Button
@@ -969,6 +1084,40 @@ export default function UsecaseAlluvialDiagram({
     },
     [isVulnFlow],
   );
+
+  const { workflows: healthWorkflows, getWorkflowHealth } = useWorkflowHealth();
+  const effectiveWorkflows = (initialWorkflows && initialWorkflows.length > 0) ? initialWorkflows : healthWorkflows;
+
+  const ingestWorkflow = useMemo(() => {
+    if (isVulnFlow) {
+      return (effectiveWorkflows || []).find((w: any) => {
+        const n = (w.name || '').toLowerCase();
+        const tags = Array.isArray(w.tags) ? w.tags.map((t: any) => String(t).toLowerCase()) : [];
+        return n.includes('vulnerabilit') || tags.some((t: string) => t.includes('vulnerabilit'));
+      }) || null;
+    }
+    return findIngestTicketsWorkflow(effectiveWorkflows || []);
+  }, [effectiveWorkflows, isVulnFlow]);
+
+  const webhookWorkflow = useMemo(() => {
+    return findDiagramWebhookWorkflow(effectiveWorkflows || []);
+  }, [effectiveWorkflows, findDiagramWebhookWorkflow]);
+
+  const forwardWorkflow = useMemo(() => {
+    return findForwardTicketsWorkflow(effectiveWorkflows || []);
+  }, [effectiveWorkflows]);
+
+  const notifWorkflow = useMemo(() => {
+    return propNotificationWorkflow || (effectiveWorkflows || []).find((w: any) => {
+      const n = (w.name || '').toLowerCase();
+      return n === 'notification workflow' || n.includes('notification');
+    }) || null;
+  }, [effectiveWorkflows, propNotificationWorkflow]);
+
+  const ingestHealth = useMemo(() => ingestWorkflow ? getWorkflowHealth(ingestWorkflow) : null, [ingestWorkflow, getWorkflowHealth]);
+  const webhookHealth = useMemo(() => webhookWorkflow ? getWorkflowHealth(webhookWorkflow) : null, [webhookWorkflow, getWorkflowHealth]);
+  const forwardHealth = useMemo(() => forwardWorkflow ? getWorkflowHealth(forwardWorkflow) : null, [forwardWorkflow, getWorkflowHealth]);
+  const notifHealth = useMemo(() => notifWorkflow ? getWorkflowHealth(notifWorkflow) : null, [notifWorkflow, getWorkflowHealth]);
 
   const cached = getAlluvialCache();
   const [allApps, setAllApps] = useState<AppNode[]>(() => cached?.allApps || []);
@@ -1559,9 +1708,11 @@ export default function UsecaseAlluvialDiagram({
     isActiveOnly: false,
     isHighlighted: true,
     isEnabled: !isLoggedIn || webhookInfo.enabled || webhookInfo.exists,
-  }), [webhookInfo, isLoggedIn]);
+    isBlocked: Boolean(webhookInfo.enabled && webhookHealth?.hasProblem),
+    blockReason: webhookHealth?.primaryProblem?.description,
+    actionUrl: webhookHealth?.primaryProblem?.actionUrl,
+  }), [webhookInfo, isLoggedIn, webhookHealth]);
 
-  // Source apps:
   // Source apps:
   // If shouldOmitSource is true (e.g. Notifications), omit the left column entirely.
   // If lockSource is true, Shuffle/Cases is fixed as the only source node (cannot be changed).
@@ -1580,6 +1731,9 @@ export default function UsecaseAlluvialDiagram({
         isActiveOnly: false,
         isHighlighted: true,
         isEnabled: true,
+        isBlocked: Boolean(isForwardTicketsFlow && forwardHealth?.hasProblem),
+        blockReason: forwardHealth?.primaryProblem?.description,
+        actionUrl: forwardHealth?.primaryProblem?.actionUrl,
       };
       if (!isLoggedIn) {
         return [defaultCasesNode];
@@ -1588,7 +1742,14 @@ export default function UsecaseAlluvialDiagram({
         a => !isShuffleInternalApp(a.name) && matchesCategory(a.name, 'case_management')
       );
       if (caseApps.length > 0) {
-        return caseApps.map(a => ({ ...a, isHighlighted: true, isEnabled: true }));
+        return caseApps.map(a => ({
+          ...a,
+          isHighlighted: true,
+          isEnabled: true,
+          isBlocked: Boolean(isForwardTicketsFlow && forwardHealth?.hasProblem),
+          blockReason: forwardHealth?.primaryProblem?.description,
+          actionUrl: forwardHealth?.primaryProblem?.actionUrl,
+        }));
       }
       return [defaultCasesNode];
     }
@@ -1614,6 +1775,11 @@ export default function UsecaseAlluvialDiagram({
           .filter(a => !hiddenApps.has(a.name.toLowerCase()))
       );
     }
+
+    const isSourceBlocked = Boolean(ingestHealth?.hasProblem);
+    const sourceBlockReason = ingestHealth?.primaryProblem?.description;
+    const sourceActionUrl = ingestHealth?.primaryProblem?.actionUrl;
+
     if (highlightCategory && ingestAppNames) {
       // Only show apps that match the usecase's source category from the user's apps
       const categoryApps = allApps.filter(a =>
@@ -1626,6 +1792,9 @@ export default function UsecaseAlluvialDiagram({
           ...a,
           isHighlighted: true,
           isEnabled: true,
+          isBlocked: isSourceBlocked,
+          blockReason: sourceBlockReason,
+          actionUrl: sourceActionUrl,
         }));
 
       const disabledNodes = categoryApps
@@ -1646,9 +1815,15 @@ export default function UsecaseAlluvialDiagram({
       return prependWebhook(filtered);
     }
     return prependWebhook(
-      allApps.filter(a => matchesCategory(a.name, sourceCategory) && !hiddenApps.has(a.name.toLowerCase())).map(a => ({ ...a, isEnabled: true }))
+      allApps.filter(a => matchesCategory(a.name, sourceCategory) && !hiddenApps.has(a.name.toLowerCase())).map(a => ({
+        ...a,
+        isEnabled: true,
+        isBlocked: isSourceBlocked,
+        blockReason: sourceBlockReason,
+        actionUrl: sourceActionUrl,
+      }))
     );
-  }, [allApps, sourceCategory, highlightCategory, ingestAppNames, isLoggedIn, guestSourceNames, guestAppIcons, hiddenApps, webhookNode, lockSource, shouldOmitSource, isForwardTicketsFlow, usecaseLabel]);
+  }, [allApps, sourceCategory, highlightCategory, ingestAppNames, isLoggedIn, guestSourceNames, guestAppIcons, hiddenApps, webhookNode, lockSource, shouldOmitSource, isForwardTicketsFlow, usecaseLabel, ingestHealth, forwardHealth]);
 
   // Target/destination apps: user-selectable
   const targetApps = useMemo(() => {
@@ -1688,9 +1863,19 @@ export default function UsecaseAlluvialDiagram({
         const norm = normalizeAppName(appName);
         return Boolean(notificationAppNames && (notificationAppNames.has(norm) || notificationAppNames.has(appName.toLowerCase().trim())));
       };
+      const isNotifBlocked = Boolean(notifHealth?.hasProblem);
+      const notifBlockReason = notifHealth?.primaryProblem?.description;
+      const notifActionUrl = notifHealth?.primaryProblem?.actionUrl;
+
       const enabledApps = matched
         .filter(a => isEnabled(a.name))
-        .map(a => ({ ...a, isEnabled: true }));
+        .map(a => ({
+          ...a,
+          isEnabled: true,
+          isBlocked: isNotifBlocked,
+          blockReason: notifBlockReason,
+          actionUrl: notifActionUrl,
+        }));
       const disabledApps = matched
         .filter(a => !isEnabled(a.name))
         .map(a => ({ ...a, isEnabled: false }));
@@ -1702,9 +1887,19 @@ export default function UsecaseAlluvialDiagram({
         const norm = normalizeAppName(appName);
         return Boolean(forwardAppNames && forwardAppNames.size > 0 && (forwardAppNames.has(norm) || forwardAppNames.has(appName.toLowerCase().trim())));
       };
+      const isForwardBlocked = Boolean(forwardHealth?.hasProblem);
+      const forwardBlockReason = forwardHealth?.primaryProblem?.description;
+      const forwardActionUrl = forwardHealth?.primaryProblem?.actionUrl;
+
       const enabledApps = matched
         .filter(a => isEnabled(a.name))
-        .map(a => ({ ...a, isEnabled: true }));
+        .map(a => ({
+          ...a,
+          isEnabled: true,
+          isBlocked: isForwardBlocked,
+          blockReason: forwardBlockReason,
+          actionUrl: forwardActionUrl,
+        }));
       const disabledApps = matched
         .filter(a => !isEnabled(a.name))
         .map(a => ({ ...a, isEnabled: false }));
@@ -1712,16 +1907,26 @@ export default function UsecaseAlluvialDiagram({
     }
 
     if (forwardAppNames && forwardAppNames.size > 0) {
+      const isForwardBlocked = Boolean(forwardHealth?.hasProblem);
+      const forwardBlockReason = forwardHealth?.primaryProblem?.description;
+      const forwardActionUrl = forwardHealth?.primaryProblem?.actionUrl;
+
       const enabledApps = matched
         .filter(a => forwardAppNames.has(normalizeAppName(a.name)))
-        .map(a => ({ ...a, isEnabled: true }));
+        .map(a => ({
+          ...a,
+          isEnabled: true,
+          isBlocked: isForwardBlocked,
+          blockReason: forwardBlockReason,
+          actionUrl: forwardActionUrl,
+        }));
       const disabledApps = matched
         .filter(a => !forwardAppNames.has(normalizeAppName(a.name)))
         .map(a => ({ ...a, isEnabled: false }));
       return [...enabledApps, ...disabledApps];
     }
     return matched;
-  }, [allApps, targetCategory, forwardAppNames, notificationAppNames, notificationWfEnabled, isNotificationFlow, isForwardTicketsFlow, isLoggedIn, guestDestNames, guestAppIcons, hiddenApps, manualDestApps]);
+  }, [allApps, targetCategory, forwardAppNames, notificationAppNames, notificationWfEnabled, isNotificationFlow, isForwardTicketsFlow, isLoggedIn, guestDestNames, guestAppIcons, hiddenApps, manualDestApps, notifHealth, forwardHealth]);
 
   const sourceMeta = TOOL_CATEGORIES.find(c => c.id === sourceCategory);
   const targetMeta = TOOL_CATEGORIES.find(c => c.id === targetCategory);
@@ -1918,14 +2123,16 @@ export default function UsecaseAlluvialDiagram({
           {!shouldOmitSource && visibleSourceApps.map((app, i) => {
             if (app.isEnabled === false) return null;
             const fromY = getY(i, visibleSourceApps.length);
+            const isBlocked = Boolean(app.isBlocked);
             return (
               <path
                 key={`sl-${i}`}
                 d={makePath(leftX + nodeSize / 2 + 4, fromY, centerX - 28, centerY)}
                 fill="none"
-                stroke="url(#flow-gradient-left)"
+                stroke={isBlocked ? "hsl(var(--destructive))" : "url(#flow-gradient-left)"}
+                strokeDasharray={isBlocked ? "5 4" : undefined}
                 strokeWidth={2.5}
-                opacity={0.7}
+                opacity={isBlocked ? 0.9 : 0.7}
               />
             );
           })}
@@ -1934,21 +2141,112 @@ export default function UsecaseAlluvialDiagram({
           {visibleTargetApps.map((app, i) => {
             if (isLoggedIn && app.isEnabled === false) return null;
             const toY = getY(i, visibleTargetApps.length);
+            const isBlocked = Boolean(app.isBlocked);
             return (
               <path
                 key={`sr-${i}`}
                 d={makePath(fromX, centerY, rightX - nodeSize / 2 - 4, toY)}
                 fill="none"
-                stroke="url(#flow-gradient-right)"
+                stroke={isBlocked ? "hsl(var(--destructive))" : "url(#flow-gradient-right)"}
+                strokeDasharray={isBlocked ? "5 4" : undefined}
                 strokeWidth={2.5}
-                opacity={app.isEnabled === false ? 0.2 : 0.7}
+                opacity={app.isEnabled === false ? 0.2 : (isBlocked ? 0.9 : 0.7)}
               />
             );
           })}
 
-          {/* Animated particles — for authenticated source apps, or all apps when not logged in */}
+          {/* Inbetween error markers on blocked flow paths */}
           {!shouldOmitSource && visibleSourceApps.map((app, i) => {
-            if (app.isEnabled === false) return null;
+            if (app.isEnabled === false || !app.isBlocked) return null;
+            const fromY = getY(i, visibleSourceApps.length);
+            const startX = leftX + nodeSize / 2 + 4;
+            const endX = centerX - 28;
+            const midX = (startX + endX) / 2;
+            const yDiff = Math.abs(fromY - centerY);
+            const bulge = yDiff < 8 ? 20 : 0;
+            const midY = (fromY + centerY) / 2 - (bulge ? bulge * 0.75 : 0);
+
+            return (
+              <g
+                key={`err-l-${i}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  if (app.actionUrl) {
+                    window.location.href = app.actionUrl;
+                  }
+                }}
+              >
+                <circle
+                  cx={midX}
+                  cy={midY}
+                  r={10}
+                  fill="hsl(var(--destructive))"
+                  stroke="hsl(var(--card))"
+                  strokeWidth={2}
+                />
+                <text
+                  x={midX}
+                  y={midY + 4}
+                  textAnchor="middle"
+                  fill="#FFFFFF"
+                  fontSize="11"
+                  fontWeight="900"
+                  fontFamily="sans-serif"
+                >
+                  !
+                </text>
+                <title>{`${app.name}: ${app.blockReason || 'Workflow execution blocked by offline runtime location'}. Click to fix.`}</title>
+              </g>
+            );
+          })}
+
+          {visibleTargetApps.map((app, i) => {
+            if (app.isEnabled === false || !app.isBlocked) return null;
+            const toY = getY(i, visibleTargetApps.length);
+            const startX = fromX;
+            const endX = rightX - nodeSize / 2 - 4;
+            const midX = (startX + endX) / 2;
+            const yDiff = Math.abs(centerY - toY);
+            const bulge = yDiff < 8 ? 20 : 0;
+            const midY = (centerY + toY) / 2 - (bulge ? bulge * 0.75 : 0);
+
+            return (
+              <g
+                key={`err-r-${i}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  if (app.actionUrl) {
+                    window.location.href = app.actionUrl;
+                  }
+                }}
+              >
+                <circle
+                  cx={midX}
+                  cy={midY}
+                  r={10}
+                  fill="hsl(var(--destructive))"
+                  stroke="hsl(var(--card))"
+                  strokeWidth={2}
+                />
+                <text
+                  x={midX}
+                  y={midY + 4}
+                  textAnchor="middle"
+                  fill="#FFFFFF"
+                  fontSize="11"
+                  fontWeight="900"
+                  fontFamily="sans-serif"
+                >
+                  !
+                </text>
+                <title>{`${app.name}: ${app.blockReason || 'Workflow execution blocked by offline runtime location'}. Click to fix.`}</title>
+              </g>
+            );
+          })}
+
+          {/* Animated particles — for authenticated and non-blocked source apps */}
+          {!shouldOmitSource && visibleSourceApps.map((app, i) => {
+            if (app.isEnabled === false || app.isBlocked) return null;
             if (isLoggedIn && !app.hasValidAuth) return null;
             const fromY = getY(i, visibleSourceApps.length);
             const pathD = makePath(leftX + nodeSize / 2 + 4, fromY, centerX - 28, centerY);
@@ -1960,8 +2258,8 @@ export default function UsecaseAlluvialDiagram({
               </g>
             );
           })}
-          {(shouldOmitSource || (isLoggedIn ? visibleSourceApps.some(app => app.hasValidAuth && app.isEnabled !== false) : visibleSourceApps.length > 0)) && visibleTargetApps.map((app, i) => {
-            if (isLoggedIn && (!app.hasValidAuth || app.isEnabled === false)) return null;
+          {(shouldOmitSource || (isLoggedIn ? visibleSourceApps.some(app => app.hasValidAuth && app.isEnabled !== false && !app.isBlocked) : visibleSourceApps.length > 0)) && visibleTargetApps.map((app, i) => {
+            if (isLoggedIn && (!app.hasValidAuth || app.isEnabled === false || app.isBlocked)) return null;
             const toY = getY(i, visibleTargetApps.length);
             const pathD = makePath(fromX, centerY, rightX - nodeSize / 2 - 4, toY);
             return (

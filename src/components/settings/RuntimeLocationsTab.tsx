@@ -125,16 +125,22 @@ export const RuntimeLocationsTab = () => {
   const envParam = searchParams.get("env");
   const filterParam = searchParams.get("filter");
 
+  const offlineEnvironments = useMemo(() => {
+    return environments.filter((e) => !isRunning(e));
+  }, [environments]);
+
+  const offlineEnvNames = useMemo(() => {
+    return new Set(offlineEnvironments.map((e) => e.Name.toLowerCase()));
+  }, [offlineEnvironments]);
+
   // Determine target offline/problem environment
   const targetEnvName = useMemo(() => {
     if (envParam) return envParam;
     if (highlightParam && highlightParam !== "default") return highlightParam;
     if (highlightParam === "default" && defaultEnvironment?.Name) return defaultEnvironment.Name;
-    const stoppedWithQueue = environments.find(
-      (e) => !isRunning(e) && (Number(e.queue) || 0) > 2
-    );
-    return stoppedWithQueue?.Name || null;
-  }, [envParam, highlightParam, defaultEnvironment, environments]);
+    if (defaultEnvironment && !isRunning(defaultEnvironment)) return defaultEnvironment.Name;
+    return offlineEnvironments[0]?.Name || null;
+  }, [envParam, highlightParam, defaultEnvironment, offlineEnvironments]);
 
   const isDefaultHighlighted = useMemo(() => {
     if (!highlightParam) return false;
@@ -346,14 +352,15 @@ export const RuntimeLocationsTab = () => {
   }, [workflows, usecases, defaultEnvironment]);
 
   // Check if a workflow is affected by the offline target environment
+  // Check if a workflow is affected by any offline runtime location
   const isWorkflowAffected = useCallback(
     (item: EnrichedWorkflow): boolean => {
-      if (!targetEnvName) return false;
-      return (
-        item.environmentName.toLowerCase() === targetEnvName.toLowerCase()
-      );
+      if (item.environmentName.toLowerCase() === "cloud") return false;
+      if (offlineEnvNames.has(item.environmentName.toLowerCase())) return true;
+      if (targetEnvName && item.environmentName.toLowerCase() === targetEnvName.toLowerCase()) return true;
+      return false;
     },
-    [targetEnvName]
+    [offlineEnvNames, targetEnvName]
   );
 
   const affectedCount = useMemo(() => {
@@ -361,10 +368,14 @@ export const RuntimeLocationsTab = () => {
   }, [enrichedWorkflows, isWorkflowAffected]);
 
   useEffect(() => {
-    if (filterParam === "affected" || (highlightParam && affectedCount > 0)) {
+    if (filterParam === "affected") {
       setFilterMode("affected");
+    } else if (filterParam === "all") {
+      setFilterMode("all");
+    } else {
+      setFilterMode("relevant");
     }
-  }, [filterParam, highlightParam, affectedCount]);
+  }, [filterParam]);
 
   // Filtered workflows based on search, filterMode, and environment
   const filteredWorkflows = useMemo(() => {
@@ -435,7 +446,44 @@ export const RuntimeLocationsTab = () => {
   const isLoading = workflowsLoading || envsLoading;
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+      {/* Top warning if an offline runtime location affects workflows */}
+      {(offlineEnvironments.length > 0 || (affectedCount > 0 && targetEnvName)) && (
+        <Box
+          sx={{
+            px: 2,
+            py: 1.25,
+            borderRadius: 1.5,
+            bgcolor: "hsla(var(--destructive) / 0.08)",
+            border: "1px solid hsla(var(--destructive) / 0.35)",
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+          }}
+        >
+          <Box
+            sx={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              bgcolor: "hsl(var(--destructive))",
+              flexShrink: 0,
+            }}
+          />
+          <Typography sx={{ fontSize: "0.84rem", color: "hsl(var(--foreground))", fontWeight: 500 }}>
+            {offlineEnvironments.length <= 1 ? (
+              <>
+                Runtime location <strong>&ldquo;{offlineEnvironments[0]?.Name || targetEnvName}&rdquo;</strong> is offline. Workflows using this location cannot execute until reallocated or restarted.
+              </>
+            ) : (
+              <>
+                Runtime locations <strong>{offlineEnvironments.map((e) => `"${e.Name}"`).join(", ")}</strong> are offline. Workflows using these locations cannot execute until reallocated or restarted.
+              </>
+            )}
+          </Typography>
+        </Box>
+      )}
+
       {/* Top Section: Default Runtime Location (mirrored from Preferences tab) */}
       <Paper
         ref={defaultCardRef}
@@ -444,13 +492,7 @@ export const RuntimeLocationsTab = () => {
           bgcolor: "transparent",
           backgroundImage: "none",
           backdropFilter: "blur(12px)",
-          border: isDefaultHighlighted
-            ? "1.5px solid hsl(var(--primary))"
-            : "1px solid hsl(var(--border))",
-          boxShadow: isDefaultHighlighted
-            ? "0 0 0 3px hsla(var(--primary) / 0.15)"
-            : "none",
-          transition: "border 0.2s ease, box-shadow 0.2s ease",
+          border: "1px solid hsl(var(--border))",
           borderRadius: 2,
           display: "flex",
           flexDirection: "column",
@@ -490,61 +532,6 @@ export const RuntimeLocationsTab = () => {
             }}
           />
         </Box>
-
-        {isDefaultHighlighted && (
-          <Box
-            sx={{
-              width: "100%",
-              p: 1.5,
-              mt: 0.5,
-              borderRadius: 1.5,
-              bgcolor: "hsla(var(--primary) / 0.08)",
-              border: "1px solid hsla(var(--primary) / 0.25)",
-            }}
-          >
-            <Typography
-              sx={{
-                fontSize: "0.8125rem",
-                color: "hsl(var(--foreground))",
-                lineHeight: 1.5,
-              }}
-            >
-              <strong>Action needed:</strong> This default runtime location (<code>{defaultEnvironment?.Name || "test-env"}</code>) is offline with queued executions.
-            </Typography>
-            <Typography
-              sx={{
-                fontSize: "0.8125rem",
-                color: "hsl(var(--foreground))",
-                mt: 0.5,
-                lineHeight: 1.5,
-              }}
-            >
-              • <strong>Option 1 (One-click fix):</strong> Select <strong>Cloud</strong> in the dropdown above to immediately switch all {affectedCount > 0 ? `${affectedCount} ` : ""}workflows inheriting this default.
-              <br />
-              • <strong>Option 2:</strong> Reassign individual workflows using the highlighted dropdowns in the table below.
-            </Typography>
-            {affectedCount > 0 && (
-              <Button
-                size="small"
-                variant="text"
-                onClick={() => {
-                  workflowsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-                }}
-                sx={{
-                  mt: 0.75,
-                  p: 0,
-                  textTransform: "none",
-                  fontSize: "0.8125rem",
-                  fontWeight: 600,
-                  color: "hsl(var(--primary))",
-                  "&:hover": { bgcolor: "transparent", textDecoration: "underline" },
-                }}
-              >
-                Jump to {affectedCount} affected workflow{affectedCount === 1 ? "" : "s"} below &darr;
-              </Button>
-            )}
-          </Box>
-        )}
       </Paper>
 
       {/* Bottom Section: Relevant Workflows to Shuffle Security Usecases */}
@@ -562,45 +549,6 @@ export const RuntimeLocationsTab = () => {
           gap: 2.5,
         }}
       >
-        {/* Banner highlighting affected workflows if any */}
-        {affectedCount > 0 && (
-          <Box
-            sx={{
-              p: 1.75,
-              borderRadius: 1.5,
-              bgcolor: "hsla(var(--destructive) / 0.06)",
-              border: "1px solid hsla(var(--destructive) / 0.3)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 0.75,
-            }}
-          >
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
-              <Typography
-                component="span"
-                sx={{
-                  fontSize: "0.72rem",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                  color: "hsl(var(--destructive))",
-                  border: "1px solid hsla(var(--destructive) / 0.5)",
-                  borderRadius: 0.75,
-                  px: 0.75,
-                  py: 0.1,
-                }}
-              >
-                Action Needed
-              </Typography>
-              <Typography sx={{ fontWeight: 600, fontSize: "0.875rem", color: "hsl(var(--foreground))" }}>
-                {affectedCount} workflow{affectedCount === 1 ? "" : "s"} affected by offline runtime location &ldquo;{targetEnvName}&rdquo;
-              </Typography>
-            </Box>
-            <Typography sx={{ fontSize: "0.8125rem", color: "hsl(var(--muted-foreground))", lineHeight: 1.5 }}>
-              Executions are blocked while &ldquo;{targetEnvName}&rdquo; is offline. Use the highlighted dropdowns in the table below to assign them to <strong>Cloud</strong> or another active location, or change the <strong>Default Runtime Location</strong> above to update all unassigned workflows at once.
-            </Typography>
-          </Box>
-        )}
 
         {/* Header and Controls */}
         <Box
@@ -663,35 +611,6 @@ export const RuntimeLocationsTab = () => {
                 gap: 0.5,
               }}
             >
-              {affectedCount > 0 && (
-                <Chip
-                  label={`Affected (${affectedCount})`}
-                  size="small"
-                  onClick={() => setFilterMode("affected")}
-                  sx={{
-                    height: 24,
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    border: "none",
-                    bgcolor:
-                      filterMode === "affected"
-                        ? "hsla(var(--destructive) / 0.15)"
-                        : "transparent",
-                    color:
-                      filterMode === "affected"
-                        ? "hsl(var(--destructive))"
-                        : "hsl(var(--muted-foreground))",
-                    boxShadow:
-                      filterMode === "affected"
-                        ? "0 1px 3px rgba(0,0,0,0.1)"
-                        : "none",
-                    "&:hover": {
-                      bgcolor: "hsla(var(--destructive) / 0.2)",
-                    },
-                  }}
-                />
-              )}
               <Chip
                 label={`Relevant (${relevantCount})`}
                 size="small"
@@ -722,6 +641,35 @@ export const RuntimeLocationsTab = () => {
                   },
                 }}
               />
+              {affectedCount > 0 && (
+                <Chip
+                  label={`Affected (${affectedCount})`}
+                  size="small"
+                  onClick={() => setFilterMode("affected")}
+                  sx={{
+                    height: 24,
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    border: "none",
+                    bgcolor:
+                      filterMode === "affected"
+                        ? "hsla(var(--destructive) / 0.15)"
+                        : "transparent",
+                    color:
+                      filterMode === "affected"
+                        ? "hsl(var(--destructive))"
+                        : "hsl(var(--muted-foreground))",
+                    boxShadow:
+                      filterMode === "affected"
+                        ? "0 1px 3px rgba(0,0,0,0.1)"
+                        : "none",
+                    "&:hover": {
+                      bgcolor: "hsla(var(--destructive) / 0.2)",
+                    },
+                  }}
+                />
+              )}
               <Chip
                 label={`All Workflows (${enrichedWorkflows.length})`}
                 size="small"
@@ -1012,16 +960,16 @@ export const RuntimeLocationsTab = () => {
                       hover
                       sx={{
                         borderLeft: isAffected
-                          ? "4px solid hsl(var(--primary))"
-                          : "4px solid transparent",
+                          ? "3px solid hsl(var(--destructive))"
+                          : "3px solid transparent",
                         backgroundColor: isAffected
-                          ? "hsla(var(--primary) / 0.04)"
+                          ? "hsla(var(--destructive) / 0.03)"
                           : "transparent",
                         transition:
                           "border-left-color 0.2s ease, background-color 0.2s ease",
                         "&:hover": {
                           backgroundColor: isAffected
-                            ? "hsla(var(--primary) / 0.08) !important"
+                            ? "hsla(var(--destructive) / 0.06) !important"
                             : "rgba(255, 255, 255, 0.02) !important",
                         },
                       }}
@@ -1077,7 +1025,7 @@ export const RuntimeLocationsTab = () => {
 
                             {isAffected && (
                               <Chip
-                                label={`Affected (${targetEnvName})`}
+                                label="Offline"
                                 size="small"
                                 sx={{
                                   height: 18,
@@ -1239,13 +1187,6 @@ export const RuntimeLocationsTab = () => {
                           environments={environments}
                           defaultEnvironment={defaultEnvironment}
                           highlighted={isAffected}
-                          helperText={
-                            isAffected
-                              ? item.isExplicitEnv
-                                ? `Explicitly assigned to offline location "${targetEnvName}". Change to Cloud to resume.`
-                                : `Inherits offline default "${targetEnvName}". Change Default above or override to Cloud here.`
-                              : undefined
-                          }
                         />
                       </TableCell>
 

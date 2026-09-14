@@ -44,7 +44,6 @@ export const RuntimeQueueProblemBar = ({ className }: RuntimeQueueProblemBarProp
     const params = new URLSearchParams();
     params.set('highlight', primaryEnv.isDefault ? 'default' : primaryEnv.name);
     params.set('env', primaryEnv.name);
-    params.set('filter', 'affected');
     navigate(`/admin/runtime-locations?${params.toString()}`);
   };
 
