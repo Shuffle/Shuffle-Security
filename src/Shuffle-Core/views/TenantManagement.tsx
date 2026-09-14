@@ -57,18 +57,9 @@ export interface TenantManagementProps {
   autoOpenCreate?: boolean | number;
 }
 
-// Lightweight region flag helper. Mirrors src/lib/regionFlag so this surface
-// stays self-contained inside Shuffle-Core.
-const getRegionFlag = (regionUrl?: string): { flag: string; code: string } => {
-  if (!regionUrl) return { flag: '🇬🇧', code: 'UK' };
-  const u = regionUrl.toLowerCase();
-  if (u.includes('us.shuffler')) return { flag: '🇺🇸', code: 'US' };
-  if (u.includes('frankfurt')) return { flag: '🇩🇪', code: 'DE' };
-  if (u.includes('eu.shuffler')) return { flag: '🇪🇺', code: 'EU' };
-  if (u.includes('ca.shuffler')) return { flag: '🇨🇦', code: 'CA' };
-  if (u.includes('au.shuffler')) return { flag: '🇦🇺', code: 'AUS' };
-  return { flag: '🇬🇧', code: 'UK' };
-};
+// Region resolution is shared with every other surface (sidebar switcher,
+// /admin tenant tables, cross-region incident writes) so they cannot disagree.
+import { getRegionFlag } from '@/lib/regionFlag';
 
 interface OrgRowProps {
   org: OrgLike;
