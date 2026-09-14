@@ -14185,7 +14185,7 @@ const IncidentDetailPage = () => {
                   // just to move it.
                   let value: any = incident.rawOCSF || incident;
                   if (toAdd.length > 0 && !value) {
-                    const fresh = await getDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, sourceOrgId);
+                    const fresh = await getDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, sourceOrgId, tenantRegionOptions(sourceOrgId));
                     if (fresh?.success && fresh.item?.value) {
                       try {
                         value = typeof fresh.item.value === 'string' ? JSON.parse(fresh.item.value) : fresh.item.value;
@@ -14193,8 +14193,13 @@ const IncidentDetailPage = () => {
                     }
                   }
 
+                  // Stamp the authoritative tenant set and log the move in the
+                  // timeline before writing anywhere.
+                  const stampedValue = stampTenantMove(value, selectedList, toRemove);
+
                   // 1) Add to new tenants FIRST (safer: if writes fail we
-                  //    haven't destroyed the source copy yet).
+                  //    haven't destroyed the source copy yet). Each write is
+                  //    addressed to the tenant's own region.
                   const addedOk: string[] = [];
                   const addFailures: string[] = [];
                   for (const targetOrgId of toAdd) {
@@ -14204,17 +14209,26 @@ const IncidentDetailPage = () => {
                     console.log(`[MoveTenant] add -> ${targetOrgId}`);
                     let written = false;
                     try {
-                      const wr = await writeIncidentSafe(incident.id, value as object, targetOrgId);
+                      const wr = await writeIncidentSafe(incident.id, stampedValue as object, targetOrgId, tenantRegionOptions(targetOrgId));
                       written = !!wr.success;
                     } catch { written = false; }
                     if (written) addedOk.push(targetOrgId); else addFailures.push(targetOrgId);
+                  }
+
+                  // 1b) Re-stamp the copies that stay put, so every surviving
+                  //     copy agrees on where this incident lives.
+                  for (const stayOrgId of selectedList) {
+                    if (toAdd.includes(stayOrgId)) continue;
+                    try {
+                      await writeIncidentSafe(incident.id, stampedValue as object, stayOrgId, tenantRegionOptions(stayOrgId));
+                    } catch { /* stamp is best-effort on existing copies */ }
                   }
 
                   // 2) Verify each addition (one read per added tenant).
                   const missingTargets: string[] = [];
                   for (const targetOrgId of toAdd) {
                     try {
-                      const check = await getDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, targetOrgId);
+                      const check = await getDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, targetOrgId, tenantRegionOptions(targetOrgId));
                       if (!(check?.success && check.item?.value)) missingTargets.push(targetOrgId);
                     } catch { missingTargets.push(targetOrgId); }
                   }
