@@ -22,28 +22,40 @@ const AUTH_PATHS = new Set(['/login', '/register']);
 
 const AuthCheckingOverlay = ({ isMobile, knownLoggedOut }: AuthCheckingOverlayProps) => {
   const theme = useTheme();
-  const [tier, setTier] = useState(0); // 0=initial, 1=>4s, 2=>10s
+  const [tier, setTier] = useState(0); // 0=initial, 1=>4s, 2=>10s, 3=>15s timeout
 
   useEffect(() => {
     const t1 = window.setTimeout(() => setTier(1), 4000);
     const t2 = window.setTimeout(() => setTier(2), 10000);
+    const t3 = window.setTimeout(() => setTier(3), 15000);
     return () => {
       window.clearTimeout(t1);
       window.clearTimeout(t2);
+      window.clearTimeout(t3);
     };
   }, []);
+
+  const handleRetry = () => {
+    if (typeof window !== 'undefined') {
+      window.location.reload();
+    }
+  };
 
   const primary =
     tier === 0
       ? 'Checking login details…'
       : tier === 1
         ? 'Still checking login details…'
-        : 'This is taking longer than usual';
+        : tier === 2
+          ? 'This is taking longer than usual'
+          : 'Could not verify your session';
 
   const secondary =
-    tier === 2
-      ? 'Your connection or the server appears slow. We are still trying to reach Shuffle.'
-      : 'Contacting Shuffle to verify your session.';
+    tier === 3
+      ? 'The request timed out. Please check your connection and try again.'
+      : tier === 2
+        ? 'Your connection or the server appears slow. We are still trying to reach Shuffle.'
+        : 'Contacting Shuffle to verify your session.';
 
   return (
     <Box
@@ -61,13 +73,31 @@ const AuthCheckingOverlay = ({ isMobile, knownLoggedOut }: AuthCheckingOverlayPr
         textAlign: 'center',
       }}
     >
-      <CircularProgress size={44} thickness={4} sx={{ color: theme.palette.primary.main }} />
+      {tier < 3 && (
+        <CircularProgress size={44} thickness={4} sx={{ color: theme.palette.primary.main }} />
+      )}
       <Typography sx={{ fontSize: '0.95rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
         {primary}
       </Typography>
       <Typography sx={{ fontSize: '0.8rem', color: 'hsl(var(--muted-foreground))', maxWidth: 360, lineHeight: 1.5 }}>
         {secondary}
       </Typography>
+      {tier === 3 && (
+        <Button
+          variant="outlined"
+          onClick={handleRetry}
+          sx={{
+            mt: 1,
+            borderRadius: 2,
+            textTransform: 'none',
+            fontWeight: 600,
+            color: 'hsl(var(--foreground))',
+            borderColor: 'hsl(var(--border))',
+          }}
+        >
+          Try again
+        </Button>
+      )}
 
       <Box
         component="footer"
