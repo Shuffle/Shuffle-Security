@@ -390,12 +390,12 @@ export const ShareAccessModal: React.FC<ShareAccessModalProps> = ({
     >
       <DialogTitle
         sx={{
-          py: 2,
+          pt: 2.5,
+          pb: 1,
           px: 3,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid hsl(var(--border))',
         }}
       >
         <Typography sx={{ fontSize: '1.05rem', fontWeight: 600, color: 'hsl(var(--foreground))' }}>
@@ -413,7 +413,7 @@ export const ShareAccessModal: React.FC<ShareAccessModalProps> = ({
         </IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ px: 3, py: 2.5 }}>
+      <DialogContent sx={{ px: 3, pt: 1.5, pb: 2.5 }}>
         {saveError && (
           <Alert severity="error" sx={{ mb: 2, fontSize: '0.82rem' }}>
             {saveError}
@@ -554,7 +554,24 @@ export const ShareAccessModal: React.FC<ShareAccessModalProps> = ({
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
             {entries.map((entry) => {
-              const initialLetter = (entry.name || 'U').charAt(0).toUpperCase();
+              const matchedUser = entry.type === 'user'
+                ? tenantUsers.find((u) => u.id === entry.id || u.username === entry.id)
+                : null;
+              const displayName = matchedUser?.username || entry.name;
+              const initialLetter = (displayName || 'U').charAt(0).toUpperCase();
+
+              // Only display secondary text for roles ("Role-based access") or if
+              // a distinct email is available that isn't identical to the display name.
+              // Never display raw user IDs or UUIDs.
+              const secondaryText = (() => {
+                if (entry.type === 'role') return 'Role-based access';
+                const email = entry.email || (matchedUser as unknown as Record<string, string>)?.email || '';
+                if (email && email.includes('@') && email.toLowerCase() !== displayName.toLowerCase()) {
+                  return email;
+                }
+                return null;
+              })();
+
               return (
                 <Box
                   key={entry.id}
@@ -596,11 +613,13 @@ export const ShareAccessModal: React.FC<ShareAccessModalProps> = ({
                     </Box>
                     <Box>
                       <Typography sx={{ fontSize: '0.85rem', fontWeight: 500, color: 'hsl(var(--foreground))' }}>
-                        {entry.name} {entry.isOwner && '(you)'}
+                        {displayName} {entry.isOwner && '(you)'}
                       </Typography>
-                      <Typography sx={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))' }}>
-                        {entry.email || (entry.type === 'role' ? 'Role-based access' : entry.id)}
-                      </Typography>
+                      {secondaryText && (
+                        <Typography sx={{ fontSize: '0.75rem', color: 'hsl(var(--muted-foreground))' }}>
+                          {secondaryText}
+                        </Typography>
+                      )}
                     </Box>
                   </Box>
 

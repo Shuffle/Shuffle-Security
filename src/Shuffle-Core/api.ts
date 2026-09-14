@@ -460,6 +460,44 @@ export const isOnShuffleSecurity = (): boolean => {
   );
 };
 
+/**
+ * Checks whether the active backend is on *.shuffle.security (or shuffle.security),
+ * or if the frontend is hosted on *.shuffle.security.
+ */
+export const isShuffleSecurityBackend = (backendUrl?: string): boolean => {
+  try {
+    const backend = backendUrl || API_CONFIG.baseUrl || '';
+    if (backend) {
+      const parsed = new URL(backend.includes('://') ? backend : `https://${backend}`);
+      const host = parsed.hostname.toLowerCase();
+      if (
+        host === 'shuffle.security' ||
+        host.endsWith('.shuffle.security') ||
+        host === 'shuffler.io' ||
+        host.endsWith('.shuffler.io')
+      ) {
+        return true;
+      }
+    }
+  } catch { /* ignore */ }
+
+  if (typeof window !== 'undefined') {
+    try {
+      const windowHost = window.location.hostname.toLowerCase();
+      if (
+        windowHost === 'shuffle.security' ||
+        windowHost.endsWith('.shuffle.security') ||
+        windowHost === 'shuffler.io' ||
+        windowHost.endsWith('.shuffler.io')
+      ) {
+        return true;
+      }
+    } catch { /* ignore */ }
+  }
+
+  return false;
+};
+
 export const ensureShuffleSecurityApiUrl = (url: string): string => {
   if (!url || typeof url !== 'string') return url;
   if (!isOnShuffleSecurity()) return url;

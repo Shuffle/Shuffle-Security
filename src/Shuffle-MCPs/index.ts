@@ -196,7 +196,7 @@ export type { ResolvedApp } from '@/Shuffle-MCPs/resolveApp';
 export { IntegrationStatus, refreshAllIntegrationStatus } from '@/Shuffle-MCPs/components/IntegrationStatus';
 export { useAppAuth } from '@/Shuffle-MCPs/useAppAuth';
 export { AppDetailProvider, useAppDetail, useAppDetailOptional } from '@/Shuffle-MCPs/AppDetailContext';
-export { API_CONFIG, getApiUrl, getAuthHeader, isCloud, isOnprem, isCloudDomain, isShuffleCloudDomain, mapCloudRegionUrl, shuffleFetch, setHostBaseUrl, getHostBaseUrl, setRegionUrl, resetRegionUrl, applyRegionFromPayload } from '@/Shuffle-MCPs/api';
+export { API_CONFIG, getApiUrl, getAuthHeader, isCloud, isOnprem, isCloudDomain, isShuffleCloudDomain, isShuffleSecurityBackend, mapCloudRegionUrl, shuffleFetch, setHostBaseUrl, getHostBaseUrl, setRegionUrl, resetRegionUrl, applyRegionFromPayload } from '@/Shuffle-MCPs/api';
 export { useSyncHostBaseUrl } from '@/Shuffle-MCPs/useSyncHostBaseUrl';
 export { installFetchBreaker, registerProtectedOrigin } from '@/Shuffle-MCPs/fetchBreaker';
 export { setToastImpl, toast } from '@/Shuffle-MCPs/toast';

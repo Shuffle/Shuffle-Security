@@ -6,8 +6,22 @@
  */
 
 import { toast } from '@/lib/toast';
-import { getApiUrl, getAuthHeader, getSessionToken, isCloudDomain } from '@/Shuffle-MCPs/api';
+import {
+  getApiUrl,
+  getAuthHeader,
+  getSessionToken,
+  isCloudDomain,
+  isShuffleSecurityBackend,
+} from '@/Shuffle-MCPs/api';
 import { getShuffleCoreBaseUrl } from '@/lib/shuffleUrls';
+
+export const UK_SHUFFLE_SECURITY_BASE = 'https://uk.shuffle.security';
+export const UK_SHUFFLE_CORE_BASE = 'https://uk.shuffler.io';
+
+export const UK_AUTH_HANDOFF_ENDPOINT = `${UK_SHUFFLE_SECURITY_BASE}/api/v1/auth/handoff`;
+export const UK_AUTH_EXCHANGE_ENDPOINT = `${UK_SHUFFLE_CORE_BASE}/api/v1/auth/exchange`;
+
+export { isShuffleSecurityBackend };
 
 export interface HandoffOptions {
   /** Open in a new browser tab/window instead of navigating the current tab. */
@@ -48,8 +62,12 @@ export const resolveShuffleCoreTargetUrl = (destinationUrlOrPath: string): strin
 };
 
 /**
- * Requests an auth handoff ticket from the current backend and navigates to Shuffle Core
+ * Requests an auth handoff ticket from the backend and navigates to Shuffle Core
  * via the ticket exchange endpoint.
+ *
+ * When using *.shuffle.security as backend (e.g. ca.shuffle.security, us.shuffle.security),
+ * auth handoff ticket requests always go to UK (uk.shuffle.security), and ticket exchange requests
+ * always go to UK (uk.shuffler.io). That is where auth actually occurs and gets distributed from.
  *
  * If handoff fails, auth is missing, or the destination domain does not exist/is being set up,
  * a clear error toast is displayed and navigation is prevented.
@@ -83,10 +101,12 @@ export async function navigateToShuffleCore(
   } catch { /* ignore */ }
   const currentHost = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
 
+  const isShuffleBackend = isShuffleSecurityBackend();
+
   // On-prem / self-hosted environments share the same domain/host across frontends.
   // Because cookies are scoped to the hostname and ignore port numbers (RFC 6265),
   // the session cookie is already present in the browser and no auth handoff is needed.
-  if (!isCloudDomain() || (targetHost && currentHost && targetHost === currentHost)) {
+  if ((!isCloudDomain() && !isShuffleBackend) || (targetHost && currentHost && targetHost === currentHost)) {
     if (popupWindow) {
       popupWindow.location.href = targetUrl;
     } else if (typeof window !== 'undefined') {
@@ -96,7 +116,14 @@ export async function navigateToShuffleCore(
   }
 
   try {
-    const handoffEndpoint = getApiUrl('/api/v1/auth/handoff');
+    // When using *.shuffle.security as backend, auth handoff ticket requests must
+    // ALWAYS go to UK (uk.shuffle.security). That is where auth actually occurs
+    // and gets distributed from. Even if we are on ca.shuffle.security, it must
+    // still use uk.shuffle.security and uk.shuffler.io as auth handoff endpoints.
+    const handoffEndpoint = isShuffleBackend
+      ? UK_AUTH_HANDOFF_ENDPOINT
+      : getApiUrl('/api/v1/auth/handoff');
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...getAuthHeader(),
@@ -137,14 +164,20 @@ export async function navigateToShuffleCore(
       return false;
     }
 
-    // Determine target Core base for exchange (use specific subdomain if requested e.g. frankfurt.shuffler.io)
-    let targetCoreBase = getShuffleCoreBaseUrl();
-    try {
-      const u = new URL(targetUrl);
-      if (u.hostname === 'shuffler.io' || u.hostname.endsWith('.shuffler.io')) {
-        targetCoreBase = `https://${u.hostname}`;
-      }
-    } catch { /* ignore */ }
+    // Determine target Core base for exchange:
+    // If we're using *.shuffle.security as backend, the exchange endpoint must ALWAYS be
+    // uk.shuffler.io (https://uk.shuffler.io/api/v1/auth/exchange).
+    // For on-prem / self-hosted instances, resolve from target URL or configured core base.
+    let targetCoreBase = UK_SHUFFLE_CORE_BASE;
+    if (!isShuffleBackend) {
+      targetCoreBase = getShuffleCoreBaseUrl();
+      try {
+        const u = new URL(targetUrl);
+        if (u.hostname === 'shuffler.io' || u.hostname.endsWith('.shuffler.io')) {
+          targetCoreBase = `https://${u.hostname}`;
+        }
+      } catch { /* ignore */ }
+    }
 
     // Use an auto-submitting POST form so ticket, user_id, and redirect do not leak in URL access logs
     if (typeof document !== 'undefined') {

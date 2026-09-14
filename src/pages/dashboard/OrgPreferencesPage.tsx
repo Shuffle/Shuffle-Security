@@ -22,7 +22,6 @@ import {
 import { SIDEBAR_NAV } from '@/config/sidebarNav';
 import { TaskStatusesEditor } from '@/components/settings/TaskStatusesEditor';
 import { SlaEditor } from '@/components/settings/SlaEditor';
-import { IncidentRoutingEditor } from '@/components/settings/IncidentRoutingEditor';
 import { DefaultEnvironmentSelector } from '@/components/settings/DefaultEnvironmentSelector';
 
 import { useAuth } from '@/context/AuthContext';
@@ -176,8 +175,8 @@ const SidebarTabsSelector = () => {
 const OrgPreferencesPage = ({ embedded = false }: { embedded?: boolean }) => {
 
   usePageMeta({
-    title: 'Tenant preferences',
-    description: 'Configure terminology, sidebar visibility, SLA targets, and other tenant-wide preferences.',
+    title: 'UI preferences',
+    description: 'Configure terminology, sidebar visibility, SLA targets, and UI preferences.',
     url: '/admin/preferences',
   });
   const showAutomation = useShowAutomation();
@@ -189,10 +188,10 @@ const OrgPreferencesPage = ({ embedded = false }: { embedded?: boolean }) => {
       {!embedded && (
         <>
           <Typography variant="h4" sx={{ fontWeight: 600, mb: 1, color: 'hsl(var(--foreground))' }}>
-            Tenant Preferences
+            UI Preferences
           </Typography>
           <Typography variant="body2" sx={{ color: 'hsl(var(--muted-foreground))', mb: 3 }}>
-            Configure tenant-wide settings that apply to all users
+            Configure terminology, sidebar visibility, and UI display settings
           </Typography>
         </>
       )}
@@ -401,37 +400,6 @@ const OrgPreferencesPage = ({ embedded = false }: { embedded?: boolean }) => {
             </Typography>
           </Box>
           <SidebarTabsSelector />
-        </Paper>
-
-        {/*
-          Incident Rules — multi-tenant rule list. Rules are evaluated by
-          the user's incident automation (workflow); the UI only suggests
-          moves and provides a confirmation CTA on the incident page.
-          Component is fully standalone and can be lifted out to a dedicated
-          settings route later without changes here.
-        */}
-        <Paper
-          sx={{
-            p: 2.5,
-            bgcolor: 'transparent', backgroundImage: 'none', backdropFilter: 'blur(12px)',
-            border: '1px solid hsl(var(--border))',
-            borderRadius: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 2,
-          }}
-        >
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'hsl(var(--foreground))' }}>
-              Incident Routing Rules
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'hsl(var(--muted-foreground))' }}>
-              Define rules that suggest moving incidents between tenants. Your incident automation
-              evaluates these rules and surfaces a "Move to tenant" CTA on matching incidents — the
-              user confirms before anything moves.
-            </Typography>
-          </Box>
-          <IncidentRoutingEditor />
         </Paper>
       </Box>
       <Box sx={{ height: 200 }} />

@@ -308,7 +308,25 @@ const stepVerbLabel = (label: string, hasActor: boolean): string => {
     'Task moved': 'moved',
     'Incident created': 'created this incident',
   };
-  return map[label] || label.toLowerCase();
+  return map[label] || label;
+};
+
+/**
+ * Universal styling for timeline text items that must occupy at most 1 line
+ * by default, expanding to full wrapped text when hovered.
+ */
+const timelineClampSingleLineSx = {
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: '100%',
+  cursor: 'inherit',
+  transition: 'all 0.12s ease',
+  '&:hover, .timeline-hover-row:hover &': {
+    whiteSpace: 'pre-wrap',
+    overflow: 'visible',
+    wordBreak: 'break-word',
+  },
 };
 
 const formatDuration = (ms: number): string => {
@@ -6711,7 +6729,7 @@ const IncidentDetailPage = () => {
       return diff;
     };
 
-    const truncateValue = (val: any, maxLen = 60): string => {
+    const truncateValue = (val: any, maxLen = 140): string => {
       const str = typeof val === 'string' ? val : JSON.stringify(val);
       return str.length > maxLen ? str.slice(0, maxLen) + '…' : str;
     };
@@ -6756,10 +6774,10 @@ const IncidentDetailPage = () => {
         tlp: 'TLP',
         description: 'description',
       };
-      const attributeText = (value: any): string => {
+      const attributeText = (value: any, maxLen = 160): string => {
         const str = typeof value === 'string' ? value.trim() : (value == null ? '' : String(value));
         if (!str) return 'none';
-        return str.length > 60 ? `${str.slice(0, 60)}…` : str;
+        return str.length > maxLen ? `${str.slice(0, maxLen)}…` : str;
       };
       // The description is stored as message/desc on the raw record, so it
       // needs its own accessor rather than a plain field lookup.
@@ -7625,6 +7643,7 @@ const IncidentDetailPage = () => {
                 target.el.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }, 80);
             } : undefined}
+            className="timeline-hover-row"
             sx={{
               p: isSimple ? (isHighlighted ? 0.75 : 0.5) : 1.5,
               borderRadius: 1.5,
@@ -7660,7 +7679,7 @@ const IncidentDetailPage = () => {
                   {isSimple && rev.updated_by && (
                     <UserHoverCard username={String(rev.updated_by)} maxChars={12} />
                   )}
-                  <Typography variant="caption" sx={{ fontWeight: isSimple ? 500 : 600, fontSize: '0.73rem', color: isSimple ? 'text.secondary' : undefined }}>
+                  <Typography variant="caption" sx={{ fontWeight: isSimple ? 500 : 600, fontSize: '0.73rem', color: isSimple ? 'text.secondary' : undefined, ...timelineClampSingleLineSx }}>
                     {showAsCreation
                       ? 'Incident created'
                       : isSimple
@@ -7729,7 +7748,7 @@ const IncidentDetailPage = () => {
             {showAsCreation && (initialTitle || initialDescription) && (
               <Box sx={{ mt: 0.75, ml: isSimple ? 0 : 4, pl: isSimple ? 1.25 : 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                 {initialTitle && (
-                  <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: 'hsl(var(--foreground))', lineHeight: 1.35 }}>
+                  <Typography sx={{ fontSize: '0.78rem', fontWeight: 600, color: 'hsl(var(--foreground))', lineHeight: 1.35, ...timelineClampSingleLineSx }}>
                     {decodeHtmlEntities(String(initialTitle))}
                   </Typography>
                 )}
@@ -7738,11 +7757,7 @@ const IncidentDetailPage = () => {
                     fontSize: '0.72rem',
                     color: 'hsl(var(--muted-foreground))',
                     lineHeight: 1.5,
-                    whiteSpace: 'pre-wrap',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 6,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden',
+                    ...timelineClampSingleLineSx,
                   }}>
                     {decodeHtmlEntities(String(initialDescription).replace(/<[^>]*>/g, '').trim())}
                   </Typography>
@@ -7763,6 +7778,7 @@ const IncidentDetailPage = () => {
                         color: 'hsl(var(--destructive))', bgcolor: 'hsl(var(--destructive) / 0.08)',
                         px: 0.5, py: 0.15, borderRadius: 0.5, lineHeight: 1.4,
                         textDecoration: 'line-through', opacity: 0.8,
+                        ...timelineClampSingleLineSx,
                       }}>
                         {truncateValue(from)}
                       </Typography>
@@ -7770,6 +7786,7 @@ const IncidentDetailPage = () => {
                         fontSize: '0.6rem', fontFamily: 'JetBrains Mono, monospace',
                         color: 'hsl(var(--status-resolved))', bgcolor: 'hsl(var(--status-resolved) / 0.08)',
                         px: 0.5, py: 0.15, borderRadius: 0.5, lineHeight: 1.4,
+                        ...timelineClampSingleLineSx,
                       }}>
                         {truncateValue(to)}
                       </Typography>
@@ -7854,6 +7871,7 @@ const IncidentDetailPage = () => {
               data-timeline-dimmed={isDimmed ? 'true' : undefined}
               data-timeline-preview={item.isPreview ? 'true' : undefined}
               onClick={() => setSelectedAgentRun(run)}
+              className="timeline-hover-row"
               sx={{
                 display: 'flex',
                 alignItems: 'center',
@@ -7883,10 +7901,10 @@ const IncidentDetailPage = () => {
               <Box sx={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color: 'text.secondary' }}>
                 <AgentIcon size={13} />
               </Box>
-              <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', ...timelineClampSingleLineSx }}>
                 {actorName}
               </Typography>
-              <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary', flexShrink: 0 }}>
                 {verb}
               </Typography>
               {previewBadge}
@@ -7899,7 +7917,18 @@ const IncidentDetailPage = () => {
                 {replyButtonCompact}
               </Box>
               {detailText && (
-                <Typography sx={{ fontSize: '0.75rem', color: 'hsl(var(--foreground))', flex: '1 1 100%', order: 2, pl: 1.25, lineHeight: 1.4 }}>
+                <Typography
+                  sx={{
+                    fontSize: '0.75rem',
+                    color: 'hsl(var(--foreground))',
+                    flex: '1 1 100%',
+                    order: 2,
+                    pl: 1.25,
+                    lineHeight: 1.4,
+                    ...timelineClampSingleLineSx,
+                  }}
+                  title={detailText}
+                >
                   {detailText}
                 </Typography>
               )}
@@ -7920,6 +7949,7 @@ const IncidentDetailPage = () => {
             data-timeline-dimmed={isDimmed ? 'true' : undefined}
             data-timeline-preview={item.isPreview ? 'true' : undefined}
             onClick={() => setSelectedAgentRun(run)}
+            className="timeline-hover-row"
             sx={{
               position: 'relative',
               display: 'flex',
@@ -7986,15 +8016,12 @@ const IncidentDetailPage = () => {
                   : isQuiet
                     ? 'hsl(var(--muted-foreground))'
                     : 'hsl(var(--foreground))',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
                 flexShrink: 1,
                 minWidth: 0,
-                transition: 'color 0.15s ease',
                 '[data-timeline-quiet="true"]:hover &': {
                   color: 'hsl(var(--foreground))',
                 },
+                ...timelineClampSingleLineSx,
               }}
             >
               {title}
@@ -8075,6 +8102,7 @@ const IncidentDetailPage = () => {
               data-timeline-highlighted={isHighlighted ? 'true' : undefined}
               data-timeline-dimmed={isDimmed ? 'true' : undefined}
               data-timeline-preview={item.isPreview ? 'true' : undefined}
+              className="timeline-hover-row"
               sx={{ display: 'flex', flexDirection: 'column' }}
             >
               <Box
@@ -8111,10 +8139,10 @@ const IncidentDetailPage = () => {
                 <Box sx={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color: isFailed ? 'hsl(var(--destructive))' : isWarning ? 'hsl(var(--severity-medium))' : 'hsl(var(--muted-foreground))' }}>
                   <ZapIcon size={13} />
                 </Box>
-                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', ...timelineClampSingleLineSx }}>
                   {wfName}
                 </Typography>
-                <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary', flexShrink: 0 }}>
                   {verb}
                 </Typography>
                 {previewBadge}
@@ -8127,7 +8155,18 @@ const IncidentDetailPage = () => {
                   {replyButtonCompact}
                 </Box>
                 {detailText && (
-                  <Typography sx={{ fontSize: '0.75rem', color: 'hsl(var(--foreground))', flex: '1 1 100%', order: 2, pl: 1.25, lineHeight: 1.4 }}>
+                  <Typography
+                    sx={{
+                      fontSize: '0.75rem',
+                      color: 'hsl(var(--foreground))',
+                      flex: '1 1 100%',
+                      order: 2,
+                      pl: 1.25,
+                      lineHeight: 1.4,
+                      ...timelineClampSingleLineSx,
+                    }}
+                    title={detailText}
+                  >
                     {detailText}
                   </Typography>
                 )}
@@ -8158,6 +8197,7 @@ const IncidentDetailPage = () => {
             data-timeline-highlighted={isHighlighted ? 'true' : undefined}
             data-timeline-dimmed={isDimmed ? 'true' : undefined}
             data-timeline-preview={item.isPreview ? 'true' : undefined}
+            className="timeline-hover-row"
             sx={{ display: 'flex', flexDirection: 'column' }}
           >
           <Box
@@ -8217,7 +8257,7 @@ const IncidentDetailPage = () => {
                 ? <CircularProgress size={12} thickness={5} sx={{ color: isWarning ? 'hsl(var(--severity-medium))' : 'hsl(var(--muted-foreground))' }} />
                 : <ZapIcon size={14} color={isFailed ? 'hsl(var(--destructive))' : isWarning ? 'hsl(var(--severity-medium))' : 'hsl(var(--muted-foreground))'} />}
             </Box>
-            <Typography sx={{ fontSize: '0.8125rem', fontWeight: 500, color: isWarning ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 }}>
+            <Typography sx={{ fontSize: '0.8125rem', fontWeight: 500, color: isWarning ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))', minWidth: 0, flexShrink: 1, ...timelineClampSingleLineSx }}>
               {wfName}{shortId ? ` · ${shortId}` : ''}
             </Typography>
             {previewBadge}
@@ -8431,7 +8471,7 @@ const IncidentDetailPage = () => {
             data-timeline-preview={item.isPreview ? 'true' : undefined}
             data-tour={isIocPill ? 'timeline-ioc-pill' : undefined}
             data-ioc-pill={isIocPill ? 'true' : undefined}
-            className={isStepHighlighted ? 'incident-new-flash' : undefined}
+            className={['timeline-hover-row', isStepHighlighted ? 'incident-new-flash' : ''].filter(Boolean).join(' ')}
             onClick={pillOnClick}
             sx={{
               display: 'flex',
@@ -8473,16 +8513,16 @@ const IncidentDetailPage = () => {
                 short text marker. */}
             {item.label && item.kind !== 'observable-added' && (
               isSimple ? (
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flexShrink: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, minWidth: 0, flex: '0 1 auto', overflow: 'hidden' }}>
                   {item.actor && (
                     <UserHoverCard username={item.actor} maxChars={12} />
                   )}
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary', whiteSpace: 'nowrap' }}>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary', ...timelineClampSingleLineSx }}>
                     {stepVerbLabel(item.label, !!item.actor)}
                   </Typography>
                 </Box>
               ) : (
-                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: pillColor, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: pillColor, flexShrink: 1, minWidth: 0, ...timelineClampSingleLineSx }}>
                   {item.label}
                 </Typography>
               )
@@ -8609,13 +8649,11 @@ const IncidentDetailPage = () => {
                     sx={{
                       fontSize: '0.75rem',
                       color: isIocPill ? 'hsl(var(--destructive))' : 'hsl(var(--foreground))',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'normal',
                       lineHeight: 1.4,
                       minWidth: 0,
                       flex: 1,
                       textDecoration: tasks.find((t) => t.id === item.taskId)?.completed ? 'line-through' : 'none',
+                      ...timelineClampSingleLineSx,
                     }}
                     title={item.detail}
                   >
@@ -8627,12 +8665,10 @@ const IncidentDetailPage = () => {
                   sx={{
                     fontSize: isSimple ? '0.75rem' : '0.7rem',
                     color: isIocPill ? 'hsl(var(--destructive))' : (isSimple ? 'hsl(var(--foreground))' : 'text.secondary'),
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: isSimple ? 'normal' : 'nowrap',
                     lineHeight: 1.4,
                     minWidth: 0,
                     ...(isSimple ? { flex: '1 1 100%', order: 2, pl: 1.25 } : { flex: '1 1 auto' }),
+                    ...timelineClampSingleLineSx,
                   }}
                   title={item.detail}
                 >
@@ -8758,7 +8794,7 @@ const IncidentDetailPage = () => {
               data-timeline-highlighted={isHighlighted ? 'true' : undefined}
               data-timeline-dimmed={isDimmed ? 'true' : undefined}
               data-timeline-preview={item.isPreview ? 'true' : undefined}
-              className={!!actItem.id && newlyArrivedActivity.has(actItem.id) ? 'incident-new-flash' : undefined}
+              className={['timeline-hover-row', !!actItem.id && newlyArrivedActivity.has(actItem.id) ? 'incident-new-flash' : ''].filter(Boolean).join(' ')}
               sx={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -8813,7 +8849,7 @@ const IncidentDetailPage = () => {
                   {replyButtonCompact}
                 </Box>
               </Box>
-              <Typography sx={{ fontSize: '0.78rem', color: 'hsl(var(--foreground))', mt: 0.5, pl: 0, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+              <Typography sx={{ fontSize: '0.78rem', color: 'hsl(var(--foreground))', mt: 0.5, pl: 0, lineHeight: 1.45, ...timelineClampSingleLineSx }}>
                 {decodeHtmlEntities(actItem.content || '')}
               </Typography>
             </Box>
@@ -8830,7 +8866,7 @@ const IncidentDetailPage = () => {
             data-timeline-highlighted={isHighlighted ? 'true' : undefined}
             data-timeline-dimmed={isDimmed ? 'true' : undefined}
             data-timeline-preview={item.isPreview ? 'true' : undefined}
-            className={!!actItem.id && newlyArrivedActivity.has(actItem.id) ? 'incident-new-flash' : undefined}
+            className={['timeline-hover-row', !!actItem.id && newlyArrivedActivity.has(actItem.id) ? 'incident-new-flash' : ''].filter(Boolean).join(' ')}
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -8888,7 +8924,7 @@ const IncidentDetailPage = () => {
                   {replyButtonCompact}
                 </Box>
               </Box>
-              <Typography sx={{ fontSize: '0.78rem', color: 'hsl(var(--foreground))', mt: 0.25, whiteSpace: 'pre-wrap' }}>
+              <Typography sx={{ fontSize: '0.78rem', color: 'hsl(var(--foreground))', mt: 0.25, ...timelineClampSingleLineSx }}>
                 {decodeHtmlEntities(actItem.content || '')}
               </Typography>
             </Box>

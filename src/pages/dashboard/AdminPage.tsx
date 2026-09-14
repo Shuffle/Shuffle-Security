@@ -372,7 +372,8 @@ const AdminPage = () => {
         type TabValue = 'overview' | 'users' | 'tenants' | 'runtime-locations' | 'preferences' | 'datastore';
         const valueByIndex: TabValue[] = ['overview', 'users', 'tenants', 'runtime-locations', 'preferences', 'datastore'];
         const currentValue: TabValue = valueByIndex[activeTab] ?? 'overview';
-        const options: SegmentedItem<TabValue>[] = [
+
+        const primaryOptions: SegmentedItem<TabValue>[] = [
           { value: 'overview', label: 'Overview' },
           {
             value: 'users',
@@ -388,26 +389,50 @@ const AdminPage = () => {
             title: !isAdmin ? 'Requires admin privileges' : undefined,
           },
           {
-            value: 'preferences',
-            label: 'Preferences',
-            disabled: !isAdmin,
-            title: !isAdmin ? 'Requires admin privileges' : undefined,
-          },
-          {
             value: 'datastore',
             label: 'Datastore',
             disabled: !isAdmin,
             title: !isAdmin ? 'Requires admin privileges' : undefined,
           },
         ];
+
+        const prefOptions: SegmentedItem<TabValue>[] = [
+          {
+            value: 'preferences',
+            label: 'UI Preferences',
+            disabled: !isAdmin,
+            title: !isAdmin ? 'Requires admin privileges' : undefined,
+          },
+        ];
+
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: { xs: 2.5, sm: 4 }, maxWidth: '100%', overflowX: 'auto', pb: 0.5 }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: { xs: 1.5, sm: 2.5 },
+              mb: { xs: 2.5, sm: 4 },
+              maxWidth: '100%',
+              overflowX: 'auto',
+              pb: 0.5,
+              '& > div': { flexShrink: 0 },
+            }}
+          >
             <SegmentedControl<TabValue>
-              options={options}
+              layoutId="admin-primary-tabs"
+              options={primaryOptions}
               value={currentValue}
               onChange={(v) => handleTabChange(null, valueByIndex.indexOf(v))}
               variant="filled"
               ariaLabel="Admin sections"
+            />
+            <SegmentedControl<TabValue>
+              layoutId="admin-preferences-tabs"
+              options={prefOptions}
+              value={currentValue}
+              onChange={(v) => handleTabChange(null, valueByIndex.indexOf(v))}
+              variant="filled"
+              ariaLabel="Preferences sections"
             />
           </Box>
         );

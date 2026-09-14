@@ -137,7 +137,7 @@ const navItems: NavResult[] = [
   { type: 'nav', label: 'Agents', path: '/agents', icon: <AgentIcon size={16} />, group: 'Pages' },
   { type: 'nav', label: 'Usecases', path: '/usecases', icon: <Activity size={16} />, group: 'Pages' },
   { type: 'nav', label: 'Documentation', path: '/docs', icon: <BookOpen size={16} />, group: 'Pages' },
-  { type: 'nav', label: 'Preferences', path: '/admin/preferences', icon: <TuneIcon size={16} />, group: 'Pages', hiddenUnlessSearched: true },
+  { type: 'nav', label: 'UI Preferences', path: '/admin/preferences', icon: <TuneIcon size={16} />, group: 'Pages', hiddenUnlessSearched: true },
   { type: 'nav', label: 'Settings', path: '/settings', icon: <SettingsIcon size={16} />, group: 'Pages', hiddenUnlessSearched: true },
 
   { type: 'nav', label: 'Incidents', path: '/incidents', icon: <WarningAmberIcon size={18} />, group: 'Security' },

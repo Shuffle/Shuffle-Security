@@ -35,7 +35,7 @@ import {
   type ShuffleProduct,
 } from '@/lib/shuffleUrls';
 import { navigateToShuffleCore } from '@/lib/authHandoff';
-import { getSessionToken } from '@/Shuffle-MCPs/api';
+import { getSessionToken, hasShuffleAuth } from '@/Shuffle-MCPs/api';
 import {
   useDocContent,
   type RemoteDocMeta,
@@ -728,7 +728,7 @@ export const MarkdownRenderer = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={async (e) => {
-                    if (resolved.isCrossDomainToCore && getSessionToken()) {
+                    if (resolved.isCrossDomainToCore && (getSessionToken() || hasShuffleAuth())) {
                       const isNewTab = e.ctrlKey || e.metaKey || e.button === 1;
                       e.preventDefault();
                       await navigateToShuffleCore(resolved.url, {
