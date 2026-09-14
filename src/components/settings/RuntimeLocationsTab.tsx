@@ -49,6 +49,7 @@ import { navigateToShuffleCore } from "@/lib/authHandoff";
 import {
   DefaultEnvironmentSelector,
   EnvironmentItem,
+  isRunning,
 } from "./DefaultEnvironmentSelector";
 import { WorkflowEnvironmentSelector } from "./WorkflowEnvironmentSelector";
 
@@ -57,6 +58,7 @@ interface EnrichedWorkflow {
   matchedUsecases: Usecase[];
   isRelevant: boolean;
   environmentName: string;
+  isExplicitEnv: boolean;
 }
 
 export const RuntimeLocationsTab = () => {
@@ -75,7 +77,7 @@ export const RuntimeLocationsTab = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   // Filters
-  const [filterMode, setFilterMode] = useState<"relevant" | "all">("relevant");
+  const [filterMode, setFilterMode] = useState<"affected" | "relevant" | "all">("relevant");
   const [searchQuery, setSearchQuery] = useState("");
   const [envFilter, setEnvFilter] = useState<string>("all");
 
@@ -117,8 +119,22 @@ export const RuntimeLocationsTab = () => {
   // Route highlight handling (e.g. redirected from /incidents problem bar)
   const location = useLocation();
   const defaultCardRef = useRef<HTMLDivElement>(null);
+  const workflowsSectionRef = useRef<HTMLDivElement>(null);
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const highlightParam = searchParams.get("highlight");
+  const envParam = searchParams.get("env");
+  const filterParam = searchParams.get("filter");
+
+  // Determine target offline/problem environment
+  const targetEnvName = useMemo(() => {
+    if (envParam) return envParam;
+    if (highlightParam && highlightParam !== "default") return highlightParam;
+    if (highlightParam === "default" && defaultEnvironment?.Name) return defaultEnvironment.Name;
+    const stoppedWithQueue = environments.find(
+      (e) => !isRunning(e) && (Number(e.queue) || 0) > 2
+    );
+    return stoppedWithQueue?.Name || null;
+  }, [envParam, highlightParam, defaultEnvironment, environments]);
 
   const isDefaultHighlighted = useMemo(() => {
     if (!highlightParam) return false;
@@ -131,10 +147,14 @@ export const RuntimeLocationsTab = () => {
   useEffect(() => {
     if (isDefaultHighlighted && defaultCardRef.current) {
       defaultCardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-    } else if (highlightParam && highlightParam !== "default") {
+    } else if (
+      highlightParam &&
+      highlightParam !== "default" &&
+      highlightParam.toLowerCase() !== targetEnvName?.toLowerCase()
+    ) {
       setSearchQuery(highlightParam);
     }
-  }, [isDefaultHighlighted, highlightParam]);
+  }, [isDefaultHighlighted, highlightParam, targetEnvName]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -154,8 +174,22 @@ export const RuntimeLocationsTab = () => {
           headers: { ...getAuthHeader() },
         },
       );
+      const rawText = await res.text().catch(() => "");
+      let resJson: { reason?: string; error?: string; message?: string } | null = null;
+      try {
+        if (rawText) resJson = JSON.parse(rawText);
+      } catch {
+        // Not JSON
+      }
+
       if (!res.ok) {
-        throw new Error(`Failed to delete workflow (HTTP ${res.status})`);
+        const reason =
+          (resJson && typeof resJson.reason === "string" && resJson.reason) ||
+          (resJson && typeof resJson.error === "string" && resJson.error) ||
+          (resJson && typeof resJson.message === "string" && resJson.message) ||
+          rawText.trim() ||
+          `Failed to delete workflow (HTTP ${res.status})`;
+        throw new Error(reason);
       }
       toast.success(
         `Workflow "${workflowToDelete.name || "Workflow"}" deleted`,
@@ -257,6 +291,7 @@ export const RuntimeLocationsTab = () => {
         (t: { environment?: string }) => t?.environment,
       )?.environment;
       const explicitEnv = wf.environment || actionEnv || triggerEnv;
+      const isExplicitEnv = Boolean(explicitEnv);
       const environmentName =
         explicitEnv || defaultEnvironment?.Name || "Cloud";
 
@@ -268,15 +303,41 @@ export const RuntimeLocationsTab = () => {
         matchedUsecases,
         isRelevant,
         environmentName,
+        isExplicitEnv,
       };
     });
   }, [workflows, usecases, defaultEnvironment]);
 
+  // Check if a workflow is affected by the offline target environment
+  const isWorkflowAffected = useCallback(
+    (item: EnrichedWorkflow): boolean => {
+      if (!targetEnvName) return false;
+      return (
+        item.environmentName.toLowerCase() === targetEnvName.toLowerCase()
+      );
+    },
+    [targetEnvName]
+  );
+
+  const affectedCount = useMemo(() => {
+    return enrichedWorkflows.filter(isWorkflowAffected).length;
+  }, [enrichedWorkflows, isWorkflowAffected]);
+
+  useEffect(() => {
+    if (filterParam === "affected" || (highlightParam && affectedCount > 0)) {
+      setFilterMode("affected");
+    }
+  }, [filterParam, highlightParam, affectedCount]);
+
   // Filtered workflows based on search, filterMode, and environment
   const filteredWorkflows = useMemo(() => {
-    return enrichedWorkflows.filter((item) => {
-      // 1. Filter mode: relevant vs all
-      if (filterMode === "relevant" && !item.isRelevant) {
+    let result = enrichedWorkflows.filter((item) => {
+      // 1. Filter mode: affected vs relevant vs all
+      if (filterMode === "affected") {
+        if (!isWorkflowAffected(item)) {
+          return false;
+        }
+      } else if (filterMode === "relevant" && !item.isRelevant) {
         return false;
       }
 
@@ -310,7 +371,25 @@ export const RuntimeLocationsTab = () => {
 
       return true;
     });
-  }, [enrichedWorkflows, filterMode, envFilter, searchQuery]);
+
+    // When viewing "relevant" or "all", prioritize affected workflows by sorting them to the top
+    if (filterMode !== "affected" && targetEnvName) {
+      result = [...result].sort((a, b) => {
+        const aAff = isWorkflowAffected(a) ? 1 : 0;
+        const bAff = isWorkflowAffected(b) ? 1 : 0;
+        return bAff - aAff;
+      });
+    }
+
+    return result;
+  }, [
+    enrichedWorkflows,
+    filterMode,
+    envFilter,
+    searchQuery,
+    isWorkflowAffected,
+    targetEnvName,
+  ]);
 
   const relevantCount = useMemo(() => {
     return enrichedWorkflows.filter((w) => w.isRelevant).length;
@@ -366,7 +445,13 @@ export const RuntimeLocationsTab = () => {
               groups cannot be selected.
             </Typography>
           </Box>
-          <DefaultEnvironmentSelector />
+          <DefaultEnvironmentSelector
+            workflows={workflows}
+            onSelected={() => {
+              fetchEnvironments();
+              refetchWorkflows();
+            }}
+          />
         </Box>
 
         {isDefaultHighlighted && (
@@ -387,14 +472,47 @@ export const RuntimeLocationsTab = () => {
                 lineHeight: 1.5,
               }}
             >
-              <strong>Action needed:</strong> This default runtime location is offline with queued executions. Select an active runtime location (such as <strong>Cloud</strong>) in the dropdown above to resume workflows immediately, or start the Orborus runner container for <code>{defaultEnvironment?.Name || "this environment"}</code>.
+              <strong>Action needed:</strong> This default runtime location (<code>{defaultEnvironment?.Name || "test-env"}</code>) is offline with queued executions.
             </Typography>
+            <Typography
+              sx={{
+                fontSize: "0.8125rem",
+                color: "hsl(var(--foreground))",
+                mt: 0.5,
+                lineHeight: 1.5,
+              }}
+            >
+              • <strong>Option 1 (One-click fix):</strong> Select <strong>Cloud</strong> in the dropdown above to immediately switch all {affectedCount > 0 ? `${affectedCount} ` : ""}workflows inheriting this default.
+              <br />
+              • <strong>Option 2:</strong> Reassign individual workflows using the highlighted dropdowns in the table below.
+            </Typography>
+            {affectedCount > 0 && (
+              <Button
+                size="small"
+                variant="text"
+                onClick={() => {
+                  workflowsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+                sx={{
+                  mt: 0.75,
+                  p: 0,
+                  textTransform: "none",
+                  fontSize: "0.8125rem",
+                  fontWeight: 600,
+                  color: "hsl(var(--primary))",
+                  "&:hover": { bgcolor: "transparent", textDecoration: "underline" },
+                }}
+              >
+                Jump to {affectedCount} affected workflow{affectedCount === 1 ? "" : "s"} below &darr;
+              </Button>
+            )}
           </Box>
         )}
       </Paper>
 
       {/* Bottom Section: Relevant Workflows to Shuffle Security Usecases */}
       <Paper
+        ref={workflowsSectionRef}
         sx={{
           p: { xs: 2, sm: 2.5 },
           bgcolor: "transparent",
@@ -407,6 +525,46 @@ export const RuntimeLocationsTab = () => {
           gap: 2.5,
         }}
       >
+        {/* Banner highlighting affected workflows if any */}
+        {affectedCount > 0 && (
+          <Box
+            sx={{
+              p: 1.75,
+              borderRadius: 1.5,
+              bgcolor: "hsla(var(--destructive) / 0.06)",
+              border: "1px solid hsla(var(--destructive) / 0.3)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 0.75,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+              <Typography
+                component="span"
+                sx={{
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  color: "hsl(var(--destructive))",
+                  border: "1px solid hsla(var(--destructive) / 0.5)",
+                  borderRadius: 0.75,
+                  px: 0.75,
+                  py: 0.1,
+                }}
+              >
+                Action Needed
+              </Typography>
+              <Typography sx={{ fontWeight: 600, fontSize: "0.875rem", color: "hsl(var(--foreground))" }}>
+                {affectedCount} workflow{affectedCount === 1 ? "" : "s"} affected by offline runtime location &ldquo;{targetEnvName}&rdquo;
+              </Typography>
+            </Box>
+            <Typography sx={{ fontSize: "0.8125rem", color: "hsl(var(--muted-foreground))", lineHeight: 1.5 }}>
+              Executions are blocked while &ldquo;{targetEnvName}&rdquo; is offline. Use the highlighted dropdowns in the table below to assign them to <strong>Cloud</strong> or another active location, or change the <strong>Default Runtime Location</strong> above to update all unassigned workflows at once.
+            </Typography>
+          </Box>
+        )}
+
         {/* Header and Controls */}
         <Box
           sx={{
@@ -465,8 +623,38 @@ export const RuntimeLocationsTab = () => {
                 p: 0.5,
                 borderRadius: 1.5,
                 border: "1px solid hsl(var(--border))",
+                gap: 0.5,
               }}
             >
+              {affectedCount > 0 && (
+                <Chip
+                  label={`Affected (${affectedCount})`}
+                  size="small"
+                  onClick={() => setFilterMode("affected")}
+                  sx={{
+                    height: 24,
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    border: "none",
+                    bgcolor:
+                      filterMode === "affected"
+                        ? "hsla(var(--destructive) / 0.15)"
+                        : "transparent",
+                    color:
+                      filterMode === "affected"
+                        ? "hsl(var(--destructive))"
+                        : "hsl(var(--muted-foreground))",
+                    boxShadow:
+                      filterMode === "affected"
+                        ? "0 1px 3px rgba(0,0,0,0.1)"
+                        : "none",
+                    "&:hover": {
+                      bgcolor: "hsla(var(--destructive) / 0.2)",
+                    },
+                  }}
+                />
+              )}
               <Chip
                 label={`Relevant (${relevantCount})`}
                 size="small"
@@ -699,9 +887,11 @@ export const RuntimeLocationsTab = () => {
             >
               {searchQuery || envFilter !== "all"
                 ? "Try adjusting your search query or filters to find workflows."
-                : filterMode === "relevant"
-                  ? 'No background processing workflows or usecase-matched workflows were found. Toggle to "All Workflows" to view all available workflows in this tenant.'
-                  : "No workflows have been created in this tenant yet."}
+                : filterMode === "affected"
+                  ? `No workflows are currently affected by offline runtime location "${targetEnvName || "selected"}". All workflows are running on active locations.`
+                  : filterMode === "relevant"
+                    ? 'No background processing workflows or usecase-matched workflows were found. Toggle to "All Workflows" to view all available workflows in this tenant.'
+                    : "No workflows have been created in this tenant yet."}
             </Typography>
           </Box>
         ) : (
@@ -768,7 +958,9 @@ export const RuntimeLocationsTab = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredWorkflows.map(({ workflow, matchedUsecases }) => {
+                {filteredWorkflows.map((item) => {
+                  const { workflow, matchedUsecases } = item;
+                  const isAffected = isWorkflowAffected(item);
                   const hasBg = workflow.background_processing === true;
                   const actionsCount = Array.isArray(workflow.actions)
                     ? workflow.actions.length
@@ -782,9 +974,18 @@ export const RuntimeLocationsTab = () => {
                       key={workflow.id}
                       hover
                       sx={{
+                        borderLeft: isAffected
+                          ? "4px solid hsl(var(--primary))"
+                          : "4px solid transparent",
+                        backgroundColor: isAffected
+                          ? "hsla(var(--primary) / 0.04)"
+                          : "transparent",
+                        transition:
+                          "border-left-color 0.2s ease, background-color 0.2s ease",
                         "&:hover": {
-                          backgroundColor:
-                            "rgba(255, 255, 255, 0.02) !important",
+                          backgroundColor: isAffected
+                            ? "hsla(var(--primary) / 0.08) !important"
+                            : "rgba(255, 255, 255, 0.02) !important",
                         },
                       }}
                     >
@@ -836,6 +1037,23 @@ export const RuntimeLocationsTab = () => {
                                 }}
                               />
                             </Typography>
+
+                            {isAffected && (
+                              <Chip
+                                label={`Affected (${targetEnvName})`}
+                                size="small"
+                                sx={{
+                                  height: 18,
+                                  fontSize: "0.625rem",
+                                  fontWeight: 700,
+                                  bgcolor: "hsla(var(--destructive) / 0.15)",
+                                  color: "hsl(var(--destructive))",
+                                  border:
+                                    "1px solid hsla(var(--destructive) / 0.35)",
+                                  "& .MuiChip-label": { px: 0.75 },
+                                }}
+                              />
+                            )}
 
                             {hasBg && (
                               <Chip
@@ -983,6 +1201,14 @@ export const RuntimeLocationsTab = () => {
                           workflow={workflow}
                           environments={environments}
                           defaultEnvironment={defaultEnvironment}
+                          highlighted={isAffected}
+                          helperText={
+                            isAffected
+                              ? item.isExplicitEnv
+                                ? `Explicitly assigned to offline location "${targetEnvName}". Change to Cloud to resume.`
+                                : `Inherits offline default "${targetEnvName}". Change Default above or override to Cloud here.`
+                              : undefined
+                          }
                         />
                       </TableCell>
 

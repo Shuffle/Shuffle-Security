@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { getApiUrl, getAuthHeader } from "@/Shuffle-MCPs/api";
 import { toast } from "@/lib/toast";
 import { WorkflowSummary } from "@/hooks/useWorkflows";
+import { updateWorkflowEnvironment } from "@/services/workflowEnvironments";
 import {
   EnvironmentItem,
   isRunning,
@@ -24,6 +25,8 @@ export interface WorkflowEnvironmentSelectorProps {
   onUpdated?: (updatedWorkflow: WorkflowSummary, newEnvName: string) => void;
   disabled?: boolean;
   minWidth?: number | string;
+  highlighted?: boolean;
+  helperText?: string;
 }
 
 export const WorkflowEnvironmentSelector = ({
@@ -33,6 +36,8 @@ export const WorkflowEnvironmentSelector = ({
   onUpdated,
   disabled = false,
   minWidth = 220,
+  highlighted = false,
+  helperText,
 }: WorkflowEnvironmentSelectorProps) => {
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
@@ -74,81 +79,14 @@ export const WorkflowEnvironmentSelector = ({
   const handleSelect = async (next: EnvironmentItem | null) => {
     if (!next || next.id === selectedEnv?.id) return;
     setSaving(true);
-
     try {
-      // 1. Fetch full workflow to ensure all branches, nodes, triggers are preserved
-      let fullWorkflow: Record<string, unknown> = workflow as unknown as Record<
-        string,
-        unknown
-      >;
-      try {
-        const getRes = await fetch(
-          getApiUrl(`/api/v1/workflows/${workflow.id}`),
-          {
-            credentials: "include",
-            headers: { ...getAuthHeader() },
-          },
-        );
-        if (getRes.ok) {
-          const fetched = (await getRes.json()) as Record<string, unknown>;
-          if (fetched?.id === workflow.id) {
-            fullWorkflow = fetched;
-          }
-        }
-      } catch {
-        // Fall back to existing workflow object
-      }
-
-      // 2. Update environment at workflow level, actions level, and triggers level
-      const updatedWorkflow: Record<string, unknown> = {
-        ...fullWorkflow,
-        environment: next.Name,
-        actions: Array.isArray(fullWorkflow.actions)
-          ? fullWorkflow.actions.map((act: Record<string, unknown>) => ({
-              ...act,
-              environment: next.Name,
-            }))
-          : fullWorkflow.actions,
-        triggers: Array.isArray(fullWorkflow.triggers)
-          ? fullWorkflow.triggers.map((trig: Record<string, unknown>) => ({
-              ...trig,
-              environment:
-                next.Name.toLowerCase() === "cloud" &&
-                (trig.environment === "cloud" ||
-                  trig.trigger_type === "SCHEDULE")
-                  ? "cloud"
-                  : next.Name,
-            }))
-          : fullWorkflow.triggers,
-      };
-
-      // 3. Persist update
-      const putRes = await fetch(
-        getApiUrl(`/api/v1/workflows/${workflow.id}`),
-        {
-          method: "PUT",
-          credentials: "include",
-          headers: {
-            ...getAuthHeader(),
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify(updatedWorkflow),
-        },
+      const result = await updateWorkflowEnvironment(
+        workflow.id,
+        next.Name,
+        workflow,
       );
-
-      if (!putRes.ok) {
-        throw new Error(`Server returned HTTP ${putRes.status}`);
-      }
-
-      const resJson = (await putRes.json().catch(() => null)) as {
-        success?: boolean;
-        reason?: string;
-      } | null;
-      if (resJson && resJson.success === false) {
-        throw new Error(
-          resJson.reason || "Failed to update workflow environment",
-        );
+      if (!result.success) {
+        throw new Error(result.reason || "Failed to update workflow environment");
       }
 
       setLocalEnvName(next.Name);
@@ -158,7 +96,7 @@ export const WorkflowEnvironmentSelector = ({
 
       // Invalidate react-query cache for workflows so all views stay in sync
       queryClient.invalidateQueries({ queryKey: ["workflows"] });
-      onUpdated?.(updatedWorkflow as unknown as WorkflowSummary, next.Name);
+      onUpdated?.({ ...workflow, environment: next.Name }, next.Name);
     } catch (err: unknown) {
       toast.error(
         err instanceof Error
@@ -227,8 +165,23 @@ export const WorkflowEnvironmentSelector = ({
                 borderRadius: 1.5,
                 fontSize: "0.8125rem",
                 py: 0.25,
-                "& fieldset": { borderColor: "hsl(var(--border))" },
-                "&:hover fieldset": { borderColor: "hsl(var(--primary))" },
+                border: highlighted
+                  ? "1.5px solid hsl(var(--primary))"
+                  : "none",
+                boxShadow: highlighted
+                  ? "0 0 0 3px hsla(var(--primary) / 0.15)"
+                  : "none",
+                transition: "border 0.2s ease, box-shadow 0.2s ease",
+                "& fieldset": {
+                  borderColor: highlighted
+                    ? "transparent"
+                    : "hsl(var(--border))",
+                },
+                "&:hover fieldset": {
+                  borderColor: highlighted
+                    ? "transparent"
+                    : "hsl(var(--primary))",
+                },
                 "&.Mui-focused fieldset": {
                   borderColor: "hsl(var(--primary))",
                 },
@@ -335,7 +288,23 @@ export const WorkflowEnvironmentSelector = ({
           );
         }}
       />
-      {isInherited && (
+      {helperText ? (
+        <Typography
+          variant="caption"
+          sx={{
+            fontSize: "0.6875rem",
+            color: highlighted
+              ? "hsl(var(--primary))"
+              : "hsl(var(--muted-foreground))",
+            mt: 0.35,
+            display: "block",
+            pl: 0.5,
+            lineHeight: 1.35,
+          }}
+        >
+          {helperText}
+        </Typography>
+      ) : isInherited ? (
         <Typography
           variant="caption"
           sx={{
@@ -348,7 +317,7 @@ export const WorkflowEnvironmentSelector = ({
         >
           Inheriting tenant default ({selectedEnv?.Name || "Cloud"})
         </Typography>
-      )}
+      ) : null}
     </Box>
   );
 };

@@ -711,6 +711,8 @@ export const DEFAULT_USECASES: Usecase[] = [
     description: 'Asset context (owner, criticality, business unit, OS) helps analysts prioritize cases and understand blast radius during an incident.',
     agenticDescription: 'An agent automatically fetches asset owner, business criticality, and known vulnerabilities for every observable in a case, recalculates impact score, and suggests prioritization.',
     automationArea: 'correlation',
+    automationLabel: 'Asset context',
+    automationCategory: 'cases',
   },
   {
     id: 'case_management_incident_routing_1', phase: 'correlation', source: 'case_management', target: 'case_management',
@@ -1791,6 +1793,15 @@ function findWorkflowsForUsecase(
   }
   if (lower.includes('threat feeds') || lower.includes('ioc extraction')) {
     labels.push('enable threat feeds', 'enable threat feeds_webhook', 'realtime ioc extraction', 'threat intel');
+  }
+  if (lower.includes('notification')) {
+    labels.push('notification workflow', 'notification_workflow', 'notification', 'notifications');
+  }
+  if (lower.includes('vulnerability correlation') || lower.includes('vulnerability comparison')) {
+    labels.push('vulnerability comparison', 'vulnerability_comparison', 'vulnerability correlation', 'vulnerability_correlation');
+  }
+  if (lower.includes('asset context') || lower.includes('ingest assets')) {
+    labels.push('ingest assets', 'ingest_assets', 'asset context', 'asset_context', 'asset ingestion', 'assets');
   }
   // The "Ingestion Webhook" workflow is the canonical webhook entrypoint for
   // every automatic_ingestion usecase (SIEM/EDR/Email alerts). It is created

@@ -36,8 +36,11 @@ export const RuntimeQueueProblemBar = ({ className }: RuntimeQueueProblemBarProp
     toast.warning(
       `Runtime location "${primaryEnv.name}" is offline with ${primaryEnv.queue} queued jobs. Reassign the default runtime location or start Orborus.`
     );
-    const targetParam = primaryEnv.isDefault ? 'default' : encodeURIComponent(primaryEnv.name);
-    navigate(`/admin/runtime-locations?highlight=${targetParam}`);
+    const params = new URLSearchParams();
+    params.set('highlight', primaryEnv.isDefault ? 'default' : primaryEnv.name);
+    params.set('env', primaryEnv.name);
+    params.set('filter', 'affected');
+    navigate(`/admin/runtime-locations?${params.toString()}`);
   };
 
   const handleEditorAction = () => {

@@ -1,15 +1,61 @@
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Autocomplete,
   Box,
+  Button,
+  Checkbox,
   Chip,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
   TextField,
   Typography,
-  CircularProgress,
 } from "@mui/material";
 import { Cloud, Server, MonitorSmartphone } from "lucide-react";
 import { getApiUrl, getAuthHeader } from "@/Shuffle-MCPs/api";
 import { toast } from "@/lib/toast";
+import { useWorkflows, WorkflowSummary } from "@/hooks/useWorkflows";
+import { updateWorkflowEnvironment } from "@/services/workflowEnvironments";
+
+export interface DefaultEnvironmentSelectorProps {
+  onSelected?: (newEnv: EnvironmentItem) => void;
+  workflows?: WorkflowSummary[];
+}
+
+export interface WorkflowLocationMatch {
+  workflow: WorkflowSummary;
+  isExplicit: boolean;
+}
+
+export const getWorkflowsUsingLocation = (
+  allWorkflows: WorkflowSummary[],
+  envName: string,
+  isCurrentDefault: boolean,
+): WorkflowLocationMatch[] => {
+  const norm = envName.toLowerCase();
+  const matches: WorkflowLocationMatch[] = [];
+
+  for (const wf of allWorkflows) {
+    const actionEnv = wf.actions?.find((a) => a?.environment)?.environment;
+    const triggerEnv = wf.triggers?.find((t) => t?.environment)?.environment;
+    const explicitEnv = wf.environment || actionEnv || triggerEnv;
+    const isExplicit = Boolean(
+      explicitEnv && explicitEnv.toLowerCase() === norm,
+    );
+
+    if (isExplicit) {
+      matches.push({ workflow: wf, isExplicit: true });
+    } else if (isCurrentDefault && !explicitEnv) {
+      matches.push({ workflow: wf, isExplicit: false });
+    }
+  }
+
+  return matches;
+};
 
 export interface EnvironmentItem {
   Name: string;
@@ -55,10 +101,34 @@ export const RunningChip = ({ running }: { running: boolean }) => (
   />
 );
 
-export const DefaultEnvironmentSelector = () => {
+export const DefaultEnvironmentSelector = ({
+  onSelected,
+  workflows: workflowsProp,
+}: DefaultEnvironmentSelectorProps = {}) => {
+  const queryClient = useQueryClient();
+  const { data: fetchedWorkflows = [], refetch: refetchWorkflows } =
+    useWorkflows();
+  const workflowList = workflowsProp || fetchedWorkflows;
+
   const [environments, setEnvironments] = useState<EnvironmentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Confirmation modal state for updating affected workflows
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingSelection, setPendingSelection] =
+    useState<EnvironmentItem | null>(null);
+  const [matchingWorkflows, setMatchingWorkflows] = useState<
+    WorkflowLocationMatch[]
+  >([]);
+  const [selectedWorkflowIds, setSelectedWorkflowIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [updatingWorkflows, setUpdatingWorkflows] = useState(false);
+  const [workflowProgress, setWorkflowProgress] = useState({
+    current: 0,
+    total: 0,
+  });
 
   const fetchEnvironments = useCallback(async () => {
     try {
@@ -82,10 +152,11 @@ export const DefaultEnvironmentSelector = () => {
 
   const selected = environments.find((e) => e.default);
 
-  // The API replaces the whole list, so we send every environment back with
-  // only the `default` flag swapped over to the new selection.
-  const handleSelect = async (next: EnvironmentItem | null) => {
-    if (!next || next.id === selected?.id) return;
+  const executeDefaultChange = async (
+    next: EnvironmentItem,
+    changeWorkflows: boolean,
+    workflowsToUpdate: WorkflowLocationMatch[],
+  ) => {
     const payload = environments.map((env) => ({
       ...env,
       default: env.id === next.id,
@@ -98,15 +169,130 @@ export const DefaultEnvironmentSelector = () => {
         headers: { ...getAuthHeader(), "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed to update default runtime location");
+
+      const rawText = await res.text().catch(() => "");
+      let resData: Record<string, unknown> | unknown[] | null = null;
+      try {
+        if (rawText) resData = JSON.parse(rawText);
+      } catch {
+        // Not JSON
+      }
+
+      if (!res.ok) {
+        const reason =
+          (resData &&
+            typeof resData === "object" &&
+            !Array.isArray(resData) &&
+            typeof resData.reason === "string" &&
+            resData.reason) ||
+          (resData &&
+            typeof resData === "object" &&
+            !Array.isArray(resData) &&
+            typeof resData.error === "string" &&
+            resData.error) ||
+          (resData &&
+            typeof resData === "object" &&
+            !Array.isArray(resData) &&
+            typeof resData.message === "string" &&
+            resData.message) ||
+          rawText.trim() ||
+          `Failed to update default runtime location (HTTP ${res.status})`;
+        throw new Error(reason);
+      }
+
+      if (resData && typeof resData === "object" && !Array.isArray(resData)) {
+        if (resData.success === false || typeof resData.reason === "string") {
+          throw new Error(
+            (typeof resData.reason === "string" && resData.reason) ||
+              (typeof resData.error === "string" && resData.error) ||
+              "Failed to update default runtime location",
+          );
+        }
+      }
+
       setEnvironments(payload);
-      toast.success(`Default runtime location set to ${next.Name}`);
+
+      let updatedCount = 0;
+      const failedWorkflows: string[] = [];
+
+      if (changeWorkflows && workflowsToUpdate.length > 0) {
+        setUpdatingWorkflows(true);
+        setWorkflowProgress({ current: 0, total: workflowsToUpdate.length });
+        for (let i = 0; i < workflowsToUpdate.length; i++) {
+          const item = workflowsToUpdate[i];
+          setWorkflowProgress({
+            current: i + 1,
+            total: workflowsToUpdate.length,
+          });
+          const updateRes = await updateWorkflowEnvironment(
+            item.workflow.id,
+            next.Name,
+            item.workflow,
+          );
+          if (updateRes.success) {
+            updatedCount++;
+          } else {
+            failedWorkflows.push(
+              `${item.workflow.name || item.workflow.id} (${updateRes.reason || "Failed"})`,
+            );
+          }
+        }
+      }
+
+      if (changeWorkflows && workflowsToUpdate.length > 0) {
+        if (failedWorkflows.length === 0) {
+          toast.success(
+            `Default runtime location and ${updatedCount} workflow(s) updated to ${next.Name}`,
+          );
+        } else {
+          toast.warning(
+            `Default updated to ${next.Name}. Updated ${updatedCount} workflow(s), but ${failedWorkflows.length} failed.`,
+          );
+        }
+      } else {
+        toast.success(`Default runtime location set to ${next.Name}`);
+      }
+
+      queryClient.invalidateQueries({
+        queryKey: ["incident-runtime-health-environments"],
+      });
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+      refetchWorkflows();
+      onSelected?.(next);
+      setConfirmOpen(false);
+      setPendingSelection(null);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to update");
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Failed to update default runtime location",
+      );
       fetchEnvironments();
     } finally {
       setSaving(false);
+      setUpdatingWorkflows(false);
     }
+  };
+
+  const handleSelect = async (next: EnvironmentItem | null) => {
+    if (!next || next.id === selected?.id) return;
+
+    if (selected) {
+      const matches = getWorkflowsUsingLocation(
+        workflowList,
+        selected.Name,
+        Boolean(selected.default),
+      );
+      if (matches.length > 0) {
+        setPendingSelection(next);
+        setMatchingWorkflows(matches);
+        setSelectedWorkflowIds(new Set(matches.map((m) => m.workflow.id)));
+        setConfirmOpen(true);
+        return;
+      }
+    }
+
+    await executeDefaultChange(next, false, []);
   };
 
   return (
@@ -257,6 +443,261 @@ export const DefaultEnvironmentSelector = () => {
           );
         }}
       />
+
+      <Dialog
+        open={confirmOpen}
+        onClose={
+          saving || updatingWorkflows
+            ? undefined
+            : () => {
+                setConfirmOpen(false);
+                setPendingSelection(null);
+              }
+        }
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            border: "1px solid hsl(var(--border))",
+            bgcolor: "hsl(var(--card))",
+            color: "hsl(var(--card-foreground))",
+          },
+        }}
+      >
+        <DialogTitle sx={{ pb: 1, fontSize: "1.05rem", fontWeight: 600 }}>
+          Change Default Runtime Location
+        </DialogTitle>
+        <DialogContent sx={{ pt: 1 }}>
+          <Typography
+            variant="body2"
+            sx={{ color: "hsl(var(--muted-foreground))", mb: 2 }}
+          >
+            You are changing the tenant default runtime location from{" "}
+            <strong style={{ color: "hsl(var(--foreground))" }}>
+              {selected?.Name}
+            </strong>{" "}
+            to{" "}
+            <strong style={{ color: "hsl(var(--foreground))" }}>
+              {pendingSelection?.Name}
+            </strong>
+            .
+          </Typography>
+
+          <Box
+            sx={{
+              p: 1.5,
+              mb: 2,
+              borderRadius: 1.5,
+              bgcolor: "hsl(var(--muted) / 0.4)",
+              border: "1px solid hsl(var(--border))",
+            }}
+          >
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 500, color: "hsl(var(--foreground))" }}
+            >
+              {matchingWorkflows.length} existing workflow
+              {matchingWorkflows.length === 1 ? "" : "s"} currently use{" "}
+              {selected?.Name}.
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "hsl(var(--muted-foreground))",
+                display: "block",
+                mt: 0.5,
+              }}
+            >
+              Choose whether to update existing workflows using this location to{" "}
+              {pendingSelection?.Name}, or keep them as-is.
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              mb: 1,
+              px: 0.5,
+            }}
+          >
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={
+                    selectedWorkflowIds.size === matchingWorkflows.length &&
+                    matchingWorkflows.length > 0
+                  }
+                  indeterminate={
+                    selectedWorkflowIds.size > 0 &&
+                    selectedWorkflowIds.size < matchingWorkflows.length
+                  }
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedWorkflowIds(
+                        new Set(matchingWorkflows.map((m) => m.workflow.id)),
+                      );
+                    } else {
+                      setSelectedWorkflowIds(new Set());
+                    }
+                  }}
+                  disabled={saving || updatingWorkflows}
+                />
+              }
+              label={
+                <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                  Select all ({matchingWorkflows.length})
+                </Typography>
+              }
+            />
+            <Typography
+              variant="caption"
+              sx={{ color: "hsl(var(--muted-foreground))" }}
+            >
+              {selectedWorkflowIds.size} selected
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              maxHeight: 220,
+              overflowY: "auto",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: 1.5,
+              p: 0.5,
+              bgcolor: "hsl(var(--background))",
+            }}
+          >
+            {matchingWorkflows.map((m) => {
+              const isChecked = selectedWorkflowIds.has(m.workflow.id);
+              return (
+                <Box
+                  key={m.workflow.id}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    py: 0.75,
+                    px: 1,
+                    borderRadius: 1,
+                    "&:hover": { bgcolor: "hsl(var(--muted) / 0.5)" },
+                  }}
+                >
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={isChecked}
+                        onChange={() => {
+                          const nextSet = new Set(selectedWorkflowIds);
+                          if (isChecked) {
+                            nextSet.delete(m.workflow.id);
+                          } else {
+                            nextSet.add(m.workflow.id);
+                          }
+                          setSelectedWorkflowIds(nextSet);
+                        }}
+                        disabled={saving || updatingWorkflows}
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, fontSize: "0.8125rem" }}
+                        >
+                          {m.workflow.name || "Untitled Workflow"}
+                        </Typography>
+                        {m.workflow.description && (
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: "hsl(var(--muted-foreground))",
+                              display: "-webkit-box",
+                              WebkitLineClamp: 1,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                              fontSize: "0.6875rem",
+                            }}
+                          >
+                            {m.workflow.description}
+                          </Typography>
+                        )}
+                      </Box>
+                    }
+                    sx={{ flexGrow: 1, mr: 1 }}
+                  />
+                  <Chip
+                    label={m.isExplicit ? "Explicit" : "Inherited"}
+                    size="small"
+                    sx={{
+                      height: 18,
+                      fontSize: "0.625rem",
+                      fontWeight: 600,
+                      bgcolor: m.isExplicit
+                        ? "hsla(var(--primary) / 0.1)"
+                        : "hsl(var(--muted))",
+                      color: m.isExplicit
+                        ? "hsl(var(--primary))"
+                        : "hsl(var(--muted-foreground))",
+                      "& .MuiChip-label": { px: 0.75 },
+                    }}
+                  />
+                </Box>
+              );
+            })}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, pt: 1, gap: 1 }}>
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={() => {
+              setConfirmOpen(false);
+              setPendingSelection(null);
+            }}
+            disabled={saving || updatingWorkflows}
+            size="small"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={() => {
+              if (pendingSelection) {
+                executeDefaultChange(pendingSelection, false, []);
+              }
+            }}
+            disabled={saving || updatingWorkflows}
+            size="small"
+          >
+            No, Change Default Only
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              if (pendingSelection) {
+                const toUpdate = matchingWorkflows.filter((m) =>
+                  selectedWorkflowIds.has(m.workflow.id),
+                );
+                executeDefaultChange(pendingSelection, true, toUpdate);
+              }
+            }}
+            disabled={
+              saving || updatingWorkflows || selectedWorkflowIds.size === 0
+            }
+            size="small"
+          >
+            {updatingWorkflows
+              ? `Updating (${workflowProgress.current}/${workflowProgress.total})...`
+              : "Yes, Change Workflows & Default"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
