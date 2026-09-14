@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Autocomplete,
@@ -19,17 +19,37 @@ import { Cloud, Server, MonitorSmartphone } from "lucide-react";
 import { getApiUrl, getAuthHeader } from "@/Shuffle-MCPs/api";
 import { toast } from "@/lib/toast";
 import { useWorkflows, WorkflowSummary } from "@/hooks/useWorkflows";
+import { useUsecases } from "@/Shuffle-Core/hooks/useUsecases";
+import { DEFAULT_USECASES } from "@/Shuffle-Core/config/usecases";
 import { updateWorkflowEnvironment } from "@/services/workflowEnvironments";
 
 export interface DefaultEnvironmentSelectorProps {
   onSelected?: (newEnv: EnvironmentItem) => void;
   workflows?: WorkflowSummary[];
+  environments?: EnvironmentItem[];
+  defaultEnvironment?: EnvironmentItem | null;
 }
 
 export interface WorkflowLocationMatch {
   workflow: WorkflowSummary;
   isExplicit: boolean;
 }
+
+export const isSameEnvironment = (
+  a?: EnvironmentItem | null,
+  b?: EnvironmentItem | null,
+): boolean => {
+  if (!a || !b) return false;
+  if (a.id && b.id && a.id === b.id) return true;
+  if (
+    a.Name &&
+    b.Name &&
+    a.Name.trim().toLowerCase() === b.Name.trim().toLowerCase()
+  ) {
+    return true;
+  }
+  return false;
+};
 
 export const getWorkflowsUsingLocation = (
   allWorkflows: WorkflowSummary[],
@@ -104,15 +124,36 @@ export const RunningChip = ({ running }: { running: boolean }) => (
 export const DefaultEnvironmentSelector = ({
   onSelected,
   workflows: workflowsProp,
+  environments: environmentsProp,
+  defaultEnvironment: defaultEnvironmentProp,
 }: DefaultEnvironmentSelectorProps = {}) => {
   const queryClient = useQueryClient();
   const { data: fetchedWorkflows = [], refetch: refetchWorkflows } =
     useWorkflows();
-  const workflowList = workflowsProp || fetchedWorkflows;
+  const { usecases = DEFAULT_USECASES } = useUsecases();
 
   const [environments, setEnvironments] = useState<EnvironmentItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!environmentsProp);
   const [saving, setSaving] = useState(false);
+
+  const envList = environmentsProp || environments;
+
+  // Filter strictly to relevant workflows (workflows passed in prop, or those matching platform usecases / background processing)
+  const workflowList = useMemo(() => {
+    if (workflowsProp) return workflowsProp;
+    return fetchedWorkflows.filter((wf) => {
+      if (wf.background_processing === true) return true;
+      const wfName = (wf.name || "").toLowerCase();
+      const wfTags = (wf.tags || []).map((t) => String(t).toLowerCase());
+      return usecases.some((uc) => {
+        const ucId = (uc.id || "").toLowerCase();
+        const lbl = (uc.automationLabel || uc.label || "").toLowerCase();
+        if (lbl && (wfName.includes(lbl) || wfTags.includes(lbl))) return true;
+        if (ucId && (wfName.includes(ucId) || wfTags.includes(ucId))) return true;
+        return false;
+      });
+    });
+  }, [workflowsProp, fetchedWorkflows, usecases]);
 
   // Confirmation modal state for updating affected workflows
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -147,19 +188,26 @@ export const DefaultEnvironmentSelector = ({
   }, []);
 
   useEffect(() => {
-    fetchEnvironments();
-  }, [fetchEnvironments]);
+    if (!environmentsProp) {
+      fetchEnvironments();
+    } else {
+      setLoading(false);
+    }
+  }, [environmentsProp, fetchEnvironments]);
 
-  const selected = environments.find((e) => e.default);
+  const selected = useMemo(() => {
+    if (defaultEnvironmentProp) return defaultEnvironmentProp;
+    return envList.find((e) => e.default) || null;
+  }, [defaultEnvironmentProp, envList]);
 
   const executeDefaultChange = async (
     next: EnvironmentItem,
     changeWorkflows: boolean,
     workflowsToUpdate: WorkflowLocationMatch[],
   ) => {
-    const payload = environments.map((env) => ({
+    const payload = envList.map((env) => ({
       ...env,
-      default: env.id === next.id,
+      default: isSameEnvironment(env, next),
     }));
     setSaving(true);
     try {
@@ -242,11 +290,11 @@ export const DefaultEnvironmentSelector = ({
       if (changeWorkflows && workflowsToUpdate.length > 0) {
         if (failedWorkflows.length === 0) {
           toast.success(
-            `Default runtime location and ${updatedCount} workflow(s) updated to ${next.Name}`,
+            `Default runtime location and ${updatedCount} relevant workflow(s) updated to ${next.Name}`,
           );
         } else {
           toast.warning(
-            `Default updated to ${next.Name}. Updated ${updatedCount} workflow(s), but ${failedWorkflows.length} failed.`,
+            `Default updated to ${next.Name}. Updated ${updatedCount} relevant workflow(s), but ${failedWorkflows.length} failed.`,
           );
         }
       } else {
@@ -267,7 +315,9 @@ export const DefaultEnvironmentSelector = ({
           ? err.message
           : "Failed to update default runtime location",
       );
-      fetchEnvironments();
+      if (!environmentsProp) {
+        fetchEnvironments();
+      }
     } finally {
       setSaving(false);
       setUpdatingWorkflows(false);
@@ -275,7 +325,11 @@ export const DefaultEnvironmentSelector = ({
   };
 
   const handleSelect = async (next: EnvironmentItem | null) => {
-    if (!next || next.id === selected?.id) return;
+    if (!next) return;
+    if (isSameEnvironment(next, selected)) {
+      // Re-selecting the already active default location is a no-op
+      return;
+    }
 
     if (selected) {
       const matches = getWorkflowsUsingLocation(
@@ -298,17 +352,19 @@ export const DefaultEnvironmentSelector = ({
   return (
     <Box sx={{ minWidth: { xs: "100%", sm: 280 }, maxWidth: { sm: 340 } }}>
       <Autocomplete
-        key={selected?.id ?? "none"}
-        value={selected}
+        key={selected?.id || selected?.Name || "none"}
+        value={selected ?? undefined}
         loading={loading}
         disabled={loading || saving}
         onChange={(_, newValue) => handleSelect(newValue)}
-        options={environments}
+        options={envList}
         getOptionLabel={(option) => option?.Name || ""}
         getOptionDisabled={(option) =>
           option.archived === true || option.sensor_group === true
         }
-        isOptionEqualToValue={(option, value) => option?.id === value?.id}
+        isOptionEqualToValue={(option, value) =>
+          isSameEnvironment(option, value)
+        }
         size="small"
         disableClearable
         renderInput={(params) => (
@@ -351,26 +407,31 @@ export const DefaultEnvironmentSelector = ({
                 borderRadius: 1.5,
                 fontSize: "0.8125rem",
                 py: 0.25,
-                border: selected && !isRunning(selected)
-                  ? "1.5px solid hsl(var(--destructive))"
-                  : "none",
-                boxShadow: selected && !isRunning(selected)
-                  ? "0 0 0 2px hsla(var(--destructive) / 0.15)"
-                  : "none",
+                border:
+                  selected && !isRunning(selected)
+                    ? "1.5px solid hsl(var(--destructive))"
+                    : "none",
+                boxShadow:
+                  selected && !isRunning(selected)
+                    ? "0 0 0 2px hsla(var(--destructive) / 0.15)"
+                    : "none",
                 "& fieldset": {
-                  borderColor: selected && !isRunning(selected)
-                    ? "transparent"
-                    : "hsl(var(--border))",
+                  borderColor:
+                    selected && !isRunning(selected)
+                      ? "transparent"
+                      : "hsl(var(--border))",
                 },
                 "&:hover fieldset": {
-                  borderColor: selected && !isRunning(selected)
-                    ? "transparent"
-                    : "hsl(var(--primary))",
+                  borderColor:
+                    selected && !isRunning(selected)
+                      ? "transparent"
+                      : "hsl(var(--primary))",
                 },
                 "&.Mui-focused fieldset": {
-                  borderColor: selected && !isRunning(selected)
-                    ? "hsl(var(--destructive))"
-                    : "hsl(var(--primary))",
+                  borderColor:
+                    selected && !isRunning(selected)
+                      ? "hsl(var(--destructive))"
+                      : "hsl(var(--primary))",
                 },
               },
               "& .MuiInputBase-input": {
@@ -398,11 +459,11 @@ export const DefaultEnvironmentSelector = ({
         }}
         renderOption={(props, option) => {
           const { key, ...restProps } = props;
-          const isCurrent = option.id === selected?.id;
+          const isCurrent = isSameEnvironment(option, selected);
           return (
             <Box
               component="li"
-              key={option.id}
+              key={option.id || option.Name}
               {...restProps}
               sx={{
                 fontSize: "0.8125rem",
@@ -449,9 +510,10 @@ export const DefaultEnvironmentSelector = ({
                     sx={{
                       fontSize: "0.7rem",
                       color: "hsl(var(--muted-foreground))",
+                      flexShrink: 0,
                     }}
                   >
-                    {option.archived ? "Archived" : "Sensor group"}
+                    Unavailable
                   </Typography>
                 )}
               </Box>
@@ -461,7 +523,12 @@ export const DefaultEnvironmentSelector = ({
       />
 
       <Dialog
-        open={confirmOpen}
+        open={
+          confirmOpen &&
+          Boolean(pendingSelection) &&
+          Boolean(selected) &&
+          !isSameEnvironment(selected, pendingSelection)
+        }
         onClose={
           saving || updatingWorkflows
             ? undefined
@@ -513,7 +580,7 @@ export const DefaultEnvironmentSelector = ({
               variant="body2"
               sx={{ fontWeight: 500, color: "hsl(var(--foreground))" }}
             >
-              {matchingWorkflows.length} existing workflow
+              {matchingWorkflows.length} relevant workflow
               {matchingWorkflows.length === 1 ? "" : "s"} currently use{" "}
               {selected?.Name}.
             </Typography>
@@ -525,7 +592,7 @@ export const DefaultEnvironmentSelector = ({
                 mt: 0.5,
               }}
             >
-              Choose whether to update existing workflows using this location to{" "}
+              Choose whether to update these relevant workflows to{" "}
               {pendingSelection?.Name}, or keep them as-is.
             </Typography>
           </Box>
@@ -710,7 +777,7 @@ export const DefaultEnvironmentSelector = ({
           >
             {updatingWorkflows
               ? `Updating (${workflowProgress.current}/${workflowProgress.total})...`
-              : "Yes, Change Workflows & Default"}
+              : "Yes, Change Relevant Workflows & Default"}
           </Button>
         </DialogActions>
       </Dialog>

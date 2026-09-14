@@ -471,6 +471,12 @@ export const RuntimeLocationsTab = () => {
     return enrichedWorkflows.filter((w) => w.isRelevant).length;
   }, [enrichedWorkflows]);
 
+  const relevantWorkflows = useMemo(() => {
+    return enrichedWorkflows
+      .filter((w) => w.isRelevant)
+      .map((w) => w.workflow);
+  }, [enrichedWorkflows]);
+
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
@@ -552,7 +558,9 @@ export const RuntimeLocationsTab = () => {
             </Typography>
           </Box>
           <DefaultEnvironmentSelector
-            workflows={workflows}
+            workflows={relevantWorkflows}
+            environments={environments}
+            defaultEnvironment={defaultEnvironment}
             onSelected={() => {
               fetchEnvironments();
               refetchWorkflows();
