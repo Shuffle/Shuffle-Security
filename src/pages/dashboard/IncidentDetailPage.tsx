@@ -14256,7 +14256,7 @@ const IncidentDetailPage = () => {
                     console.log(`[MoveTenant] delete -> ${oldOrgId}`);
                     let deleted = false;
                     try {
-                      const dr = await deleteDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, oldOrgId);
+                      const dr = await deleteDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, oldOrgId, tenantRegionOptions(oldOrgId));
                       deleted = !!dr.success;
                     } catch { deleted = false; }
                     if (deleted) removedOk.push(oldOrgId); else removeFailures.push(oldOrgId);
@@ -14266,7 +14266,7 @@ const IncidentDetailPage = () => {
                   const stillPresent: string[] = [];
                   for (const oldOrgId of toRemove) {
                     try {
-                      const check = await getDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, oldOrgId);
+                      const check = await getDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, oldOrgId, tenantRegionOptions(oldOrgId));
                       if (check?.success && check.item?.value) stillPresent.push(oldOrgId);
                     } catch { /* ignore */ }
                   }
