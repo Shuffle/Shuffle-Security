@@ -79,7 +79,7 @@ export const getRegionFlag = (regionUrl?: string | null): ResolvedRegion => {
   }
 
   // Unknown region: surface the raw subdomain rather than silently claiming UK.
-  if (subdomain) return { flag: '🏳️', code: subdomain.toUpperCase(), known: false };
+  if (subdomain) return { flag: '', code: subdomain.toUpperCase(), known: false };
   return UK;
 };
 
