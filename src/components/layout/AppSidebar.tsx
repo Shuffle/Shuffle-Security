@@ -36,6 +36,7 @@ import { SidebarSearchDialog } from './SidebarSearchDialog';
 import { useEntityPreference, useSidebarTabs } from '@/hooks/useEntityLabel';
 import { SIDEBAR_NAV, SidebarChildSpec } from '@/config/sidebarNav';
 import { getRegionFlag } from '@/lib/regionFlag';
+import { useSubOrgs } from '@/hooks/useSubOrgs';
 import { resolveUserAvatar } from '@/components/incidents/UserHoverCard';
 import { useUsers } from '@/hooks/useUsers';
 
@@ -314,7 +315,26 @@ export const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
     }, hoverCollapseDelay);
   };
 
-  const organizations = userInfo?.orgs || [];
+  // The session payload does not always carry `region_url` for every tenant,
+  // which made the switcher fall back to the default region and label every
+  // tenant UK even when the tenant list said otherwise. Fill the gaps from the
+  // tenant list, which always reports each tenant's own region.
+  const { subOrgs: sidebarSubOrgs, parentOrg: sidebarParentOrg } = useSubOrgs(userInfo?.active_org?.id);
+  const regionUrlByOrgId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const o of sidebarSubOrgs) if (o.region_url) map.set(o.id, o.region_url);
+    if (sidebarParentOrg?.region_url) map.set(sidebarParentOrg.id, sidebarParentOrg.region_url);
+    if (userInfo?.active_org?.region_url) map.set(userInfo.active_org.id, userInfo.active_org.region_url);
+    return map;
+  }, [sidebarSubOrgs, sidebarParentOrg, userInfo?.active_org?.id, userInfo?.active_org?.region_url]);
+
+  const organizations = useMemo(
+    () => (userInfo?.orgs || []).map((org) => ({
+      ...org,
+      region_url: org.region_url || regionUrlByOrgId.get(org.id),
+    })),
+    [userInfo?.orgs, regionUrlByOrgId],
+  );
   const sortedOrgs = sortOrgsWithHierarchy(organizations);
   const selectedOrg = userInfo?.active_org || organizations[0];
   const [orgSelectOpen, setOrgSelectOpen] = useState(false);
