@@ -31,6 +31,9 @@ import {
 } from '@mui/material';
 import { toast } from '../toast';
 import { getApiUrl, getAuthHeader } from '../api';
+// Region resolution is shared with every other surface (sidebar switcher,
+// /admin tenant tables, cross-region incident writes) so they cannot disagree.
+import { getRegionFlag } from '@/lib/regionFlag';
 
 interface OrgLike {
   id: string;
