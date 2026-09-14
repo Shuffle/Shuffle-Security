@@ -228,8 +228,10 @@ export const RuntimeLocationsTab = () => {
 
       // Match against platform usecases
       const rawMatched = usecases.filter((uc) => {
-        if (!uc.automationLabel) return false;
-        const lbl = uc.automationLabel.toLowerCase();
+        if (!uc.automationLabel && !uc.label) return false;
+        const lbl = (uc.automationLabel || uc.label).toLowerCase();
+        const ucId = (uc.id || "").toLowerCase();
+        const ucLabel = (uc.label || "").toLowerCase();
         const isIngestion = uc.automationArea === "automatic_ingestion";
 
         // Check name or tags
@@ -255,12 +257,47 @@ export const RuntimeLocationsTab = () => {
           lbl === "forward tickets" &&
           (wfName === "forward tickets" || wfName.includes("forward tickets"));
 
+        // Notification Workflow canonical matches
+        const notificationMatches =
+          (lbl.includes("notification") ||
+            uc.automationArea === "notifications" ||
+            ucId === "case_management_communication_1" ||
+            ucLabel === "notifications") &&
+          (wfName.includes("notification") ||
+            wfTags.includes("notification") ||
+            wfTags.includes("notifications"));
+
+        // Vulnerability Comparison canonical matches
+        const vulnerabilityCorrelationMatches =
+          (ucId === "asset_management_case_management_vuln_1" ||
+            lbl.includes("vulnerability correlation") ||
+            ucLabel.includes("vulnerability correlation")) &&
+          (wfName.includes("vulnerability comparison") ||
+            (wfName.includes("vulnerability") &&
+              (wfName.includes("compar") ||
+                wfName.includes("correlat") ||
+                wfTags.includes("correlate") ||
+                wfTags.includes("correlat"))));
+
+        // Ingest Assets canonical matches
+        const assetMatches =
+          (ucId === "asset_management_case_management_1" ||
+            lbl.includes("asset context") ||
+            ucLabel === "asset context" ||
+            lbl === "ingest assets") &&
+          (wfName.includes("asset") ||
+            wfTags.includes("asset") ||
+            wfTags.includes("assets"));
+
         return (
           nameMatches ||
           tagMatches ||
           webhookMatches ||
           threatIntelMatches ||
-          forwardMatches
+          forwardMatches ||
+          notificationMatches ||
+          vulnerabilityCorrelationMatches ||
+          assetMatches
         );
       });
 

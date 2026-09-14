@@ -30,7 +30,12 @@ export const RuntimeQueueProblemBar = ({ className }: RuntimeQueueProblemBarProp
     ...primaryEnv.affectedUsecases,
     ...primaryEnv.affectedWorkflows,
   ];
-  const affectedSummary = affectedNames.length > 0 ? affectedNames.slice(0, 3).join(', ') : 'Incident automations';
+  const affectedSummary =
+    affectedNames.length > 2
+      ? `${affectedNames.slice(0, 2).join(', ')} +${affectedNames.length - 2} more`
+      : affectedNames.length > 0
+        ? affectedNames.join(', ')
+        : 'Incident automations';
 
   const handleAdminAction = () => {
     toast.warning(
@@ -55,7 +60,8 @@ export const RuntimeQueueProblemBar = ({ className }: RuntimeQueueProblemBarProp
       className={className}
       sx={{
         width: '100%',
-        p: 1.5,
+        py: 1,
+        px: 1.75,
         mb: 2.5,
         borderRadius: 1.5,
         bgcolor: 'hsla(var(--destructive) / 0.08)',
@@ -80,50 +86,32 @@ export const RuntimeQueueProblemBar = ({ className }: RuntimeQueueProblemBarProp
         />
 
         <Box sx={{ flex: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-            <Typography
-              component="span"
-              sx={{
-                fontSize: '0.72rem',
-                fontWeight: 700,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
-                color: 'hsl(var(--destructive))',
-                border: '1px solid hsla(var(--destructive) / 0.5)',
-                borderRadius: 0.75,
-                px: 0.75,
-                py: 0.1,
-              }}
-            >
-              {isAdmin ? 'Problem' : 'Warning'}
-            </Typography>
-
-            <Typography
-              sx={{
-                fontSize: '0.84rem',
-                fontWeight: 600,
-                color: 'hsl(var(--foreground))',
-              }}
-            >
-              Runtime location &ldquo;{primaryEnv.name}&rdquo; is not running ({primaryEnv.queue} queued jobs)
-            </Typography>
-          </Box>
+          <Typography
+            sx={{
+              fontSize: '0.84rem',
+              fontWeight: 600,
+              color: 'hsl(var(--foreground))',
+              lineHeight: 1.3,
+            }}
+          >
+            Runtime location &ldquo;{primaryEnv.name}&rdquo; is not running ({primaryEnv.queue} queued jobs)
+          </Typography>
 
           <Typography
             sx={{
               fontSize: '0.78rem',
               color: 'hsl(var(--muted-foreground))',
-              mt: 0.5,
-              lineHeight: 1.45,
+              mt: 0.25,
+              lineHeight: 1.35,
             }}
           >
             {isAdmin ? (
               <>
-                Incident usecases ({affectedSummary}) rely on this location. Executions cannot complete until Orborus is started or the runtime location is reassigned.
+                Incident usecases ({affectedSummary}) cannot run until Orborus is started or the location is reassigned.
               </>
             ) : (
               <>
-                Incident usecases ({affectedSummary}) are stalled because the worker is offline. Please notify a workspace admin to restart Orborus or change the runtime location.
+                Incident usecases are paused. Notify a workspace admin to restart Orborus or change the runtime location.
               </>
             )}
           </Typography>
@@ -140,6 +128,8 @@ export const RuntimeQueueProblemBar = ({ className }: RuntimeQueueProblemBarProp
               textTransform: 'none',
               fontWeight: 600,
               fontSize: '0.8125rem',
+              py: 0.5,
+              px: 1.25,
               borderColor: 'hsla(var(--destructive) / 0.5)',
               color: 'hsl(var(--foreground))',
               whiteSpace: 'nowrap',
