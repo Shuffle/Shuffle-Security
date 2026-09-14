@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useLocation } from "@/lib/router-compat";
 import {
   Box,
   Paper,
@@ -112,6 +113,28 @@ export const RuntimeLocationsTab = () => {
   const defaultEnvironment = useMemo(() => {
     return environments.find((e) => e.default) || null;
   }, [environments]);
+
+  // Route highlight handling (e.g. redirected from /incidents problem bar)
+  const location = useLocation();
+  const defaultCardRef = useRef<HTMLDivElement>(null);
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const highlightParam = searchParams.get("highlight");
+
+  const isDefaultHighlighted = useMemo(() => {
+    if (!highlightParam) return false;
+    return (
+      highlightParam === "default" ||
+      (defaultEnvironment?.Name && highlightParam.toLowerCase() === defaultEnvironment.Name.toLowerCase())
+    );
+  }, [highlightParam, defaultEnvironment]);
+
+  useEffect(() => {
+    if (isDefaultHighlighted && defaultCardRef.current) {
+      defaultCardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else if (highlightParam && highlightParam !== "default") {
+      setSearchQuery(highlightParam);
+    }
+  }, [isDefaultHighlighted, highlightParam]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -299,36 +322,75 @@ export const RuntimeLocationsTab = () => {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
       {/* Top Section: Default Runtime Location (mirrored from Preferences tab) */}
       <Paper
+        ref={defaultCardRef}
         sx={{
           p: 2.5,
           bgcolor: "transparent",
           backgroundImage: "none",
           backdropFilter: "blur(12px)",
-          border: "1px solid hsl(var(--border))",
+          border: isDefaultHighlighted
+            ? "1.5px solid hsl(var(--primary))"
+            : "1px solid hsl(var(--border))",
+          boxShadow: isDefaultHighlighted
+            ? "0 0 0 3px hsla(var(--primary) / 0.15)"
+            : "none",
+          transition: "border 0.2s ease, box-shadow 0.2s ease",
           borderRadius: 2,
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          flexWrap: "wrap",
-          gap: 2,
+          flexDirection: "column",
+          gap: 1.5,
         }}
       >
-        <Box>
-          <Typography
-            variant="subtitle2"
-            sx={{ fontWeight: 600, color: "hsl(var(--foreground))" }}
-          >
-            Default Runtime Location
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{ color: "hsl(var(--muted-foreground))" }}
-          >
-            Where workflows execute by default. Archived environments and sensor
-            groups cannot be selected.
-          </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 2,
+            width: "100%",
+          }}
+        >
+          <Box>
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 600, color: "hsl(var(--foreground))" }}
+            >
+              Default Runtime Location
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ color: "hsl(var(--muted-foreground))" }}
+            >
+              Where workflows execute by default. Archived environments and sensor
+              groups cannot be selected.
+            </Typography>
+          </Box>
+          <DefaultEnvironmentSelector />
         </Box>
-        <DefaultEnvironmentSelector />
+
+        {isDefaultHighlighted && (
+          <Box
+            sx={{
+              width: "100%",
+              p: 1.5,
+              mt: 0.5,
+              borderRadius: 1.5,
+              bgcolor: "hsla(var(--primary) / 0.08)",
+              border: "1px solid hsla(var(--primary) / 0.25)",
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: "0.8125rem",
+                color: "hsl(var(--foreground))",
+                lineHeight: 1.5,
+              }}
+            >
+              <strong>Action needed:</strong> This default runtime location is offline with queued executions. Select an active runtime location (such as <strong>Cloud</strong>) in the dropdown above to resume workflows immediately, or start the Orborus runner container for <code>{defaultEnvironment?.Name || "this environment"}</code>.
+            </Typography>
+          </Box>
+        )}
       </Paper>
 
       {/* Bottom Section: Relevant Workflows to Shuffle Security Usecases */}

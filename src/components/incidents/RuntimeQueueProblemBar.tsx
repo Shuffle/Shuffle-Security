@@ -1,0 +1,177 @@
+import React from 'react';
+import { Box, Typography, Button } from '@mui/material';
+import { useNavigate } from '@/lib/router-compat';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { useIncidentRuntimeHealth } from '@/hooks/useIncidentRuntimeHealth';
+import { toast } from '@/lib/toast';
+
+export interface RuntimeQueueProblemBarProps {
+  className?: string;
+}
+
+/**
+ * Problem bar rendered at the top of /incidents when a runtime location relied upon
+ * by incident usecases is stopped (no Orborus check-in within 300s) and has queue > 2.
+ *
+ * Adheres strictly to AGENTS.md branding: NO icons, NO emojis. Clean engineering typography.
+ */
+export const RuntimeQueueProblemBar = ({ className }: RuntimeQueueProblemBarProps) => {
+  const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
+  const { hasBlockedRuntime, blockedEnvironments } = useIncidentRuntimeHealth();
+
+  if (!hasBlockedRuntime || blockedEnvironments.length === 0) {
+    return null;
+  }
+
+  // Pick the primary blocked environment
+  const primaryEnv = blockedEnvironments[0];
+  const affectedNames = [
+    ...primaryEnv.affectedUsecases,
+    ...primaryEnv.affectedWorkflows,
+  ];
+  const affectedSummary = affectedNames.length > 0 ? affectedNames.slice(0, 3).join(', ') : 'Incident automations';
+
+  const handleAdminAction = () => {
+    toast.warning(
+      `Runtime location "${primaryEnv.name}" is offline with ${primaryEnv.queue} queued jobs. Reassign the default runtime location or start Orborus.`
+    );
+    const targetParam = primaryEnv.isDefault ? 'default' : encodeURIComponent(primaryEnv.name);
+    navigate(`/admin/runtime-locations?highlight=${targetParam}`);
+  };
+
+  const handleEditorAction = () => {
+    const text = `Shuffle Security Alert: Runtime location "${primaryEnv.name}" is offline with ${primaryEnv.queue} queued executions. Incident ingestion and automations are paused. Please visit /admin/runtime-locations to restart Orborus or reassign the default runtime location to Cloud.`;
+    navigator.clipboard.writeText(text);
+    toast.info('Copied diagnostic alert for workspace administrator to clipboard.');
+  };
+
+  return (
+    <Box
+      role="alert"
+      className={className}
+      sx={{
+        width: '100%',
+        p: 1.5,
+        mb: 2.5,
+        borderRadius: 1.5,
+        bgcolor: 'hsla(var(--destructive) / 0.08)',
+        border: '1px solid hsla(var(--destructive) / 0.35)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 2,
+        flexWrap: 'wrap',
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, minWidth: 280 }}>
+        {/* Engineering status dot — pure CSS, no icons or emojis */}
+        <Box
+          sx={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            bgcolor: 'hsl(var(--destructive))',
+            flexShrink: 0,
+          }}
+        />
+
+        <Box sx={{ flex: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography
+              component="span"
+              sx={{
+                fontSize: '0.72rem',
+                fontWeight: 700,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                color: 'hsl(var(--destructive))',
+                border: '1px solid hsla(var(--destructive) / 0.5)',
+                borderRadius: 0.75,
+                px: 0.75,
+                py: 0.1,
+              }}
+            >
+              {isAdmin ? 'Problem' : 'Warning'}
+            </Typography>
+
+            <Typography
+              sx={{
+                fontSize: '0.84rem',
+                fontWeight: 600,
+                color: 'hsl(var(--foreground))',
+              }}
+            >
+              Runtime location &ldquo;{primaryEnv.name}&rdquo; is not running ({primaryEnv.queue} queued jobs)
+            </Typography>
+          </Box>
+
+          <Typography
+            sx={{
+              fontSize: '0.78rem',
+              color: 'hsl(var(--muted-foreground))',
+              mt: 0.5,
+              lineHeight: 1.45,
+            }}
+          >
+            {isAdmin ? (
+              <>
+                Incident usecases ({affectedSummary}) rely on this location. Executions cannot complete until Orborus is started or the runtime location is reassigned.
+              </>
+            ) : (
+              <>
+                Incident usecases ({affectedSummary}) are stalled because the worker is offline. Please notify a workspace admin to restart Orborus or change the runtime location.
+              </>
+            )}
+          </Typography>
+        </Box>
+      </Box>
+
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        {isAdmin ? (
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={handleAdminAction}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.8125rem',
+              borderColor: 'hsla(var(--destructive) / 0.5)',
+              color: 'hsl(var(--foreground))',
+              whiteSpace: 'nowrap',
+              '&:hover': {
+                borderColor: 'hsl(var(--destructive))',
+                bgcolor: 'hsla(var(--destructive) / 0.08)',
+              },
+            }}
+          >
+            Change runtime location
+          </Button>
+        ) : (
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={handleEditorAction}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.8125rem',
+              borderColor: 'hsl(var(--border))',
+              color: 'hsl(var(--muted-foreground))',
+              whiteSpace: 'nowrap',
+              '&:hover': {
+                borderColor: 'hsl(var(--foreground))',
+                color: 'hsl(var(--foreground))',
+              },
+            }}
+          >
+            Copy details for admin
+          </Button>
+        )}
+      </Box>
+    </Box>
+  );
+};
+
+export default RuntimeQueueProblemBar;

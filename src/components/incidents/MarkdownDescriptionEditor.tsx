@@ -16,7 +16,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Box, CircularProgress, TextField, Tooltip } from '@mui/material';
+import { Box, CircularProgress, TextField, Tooltip, Typography } from '@mui/material';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
@@ -111,8 +111,8 @@ const barButtonSx = (activeState: boolean) => ({
   py: 0.25,
   borderRadius: 1,
   fontSize: '0.78rem',
-  fontWeight: 500,
-  color: 'hsl(var(--foreground))',
+  fontWeight: 600,
+  color: activeState ? 'hsl(var(--primary))' : 'hsl(var(--foreground))',
   '&:hover': { bgcolor: 'hsl(var(--muted))' },
 });
 
@@ -126,7 +126,7 @@ export const MarkdownDescriptionEditor = ({
 }: MarkdownDescriptionEditorProps) => {
   const [raw, setRaw] = useState(false);
   const [rawDraft, setRawDraft] = useState(value);
-  const [bar, setBar] = useState<{ top: number; left: number } | null>(null);
+  const [bar, setBar] = useState<{ top: number; left: number; placement: 'above' | 'below' } | null>(null);
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -134,11 +134,34 @@ export const MarkdownDescriptionEditor = ({
   const latest = useRef(value);
   const valueRef = useRef(value);
   valueRef.current = value;
+  const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (commitTimer.current) clearTimeout(commitTimer.current);
+  }, []);
 
   const commit = useCallback(
     (next: string) => {
+      if (commitTimer.current) {
+        clearTimeout(commitTimer.current);
+        commitTimer.current = null;
+      }
       latest.current = next;
       if (next !== valueRef.current) onCommit(next);
+    },
+    [onCommit],
+  );
+
+  const scheduleCommit = useCallback(
+    (next: string) => {
+      latest.current = next;
+      if (commitTimer.current) clearTimeout(commitTimer.current);
+      commitTimer.current = setTimeout(() => {
+        commitTimer.current = null;
+        if (latest.current !== valueRef.current) {
+          onCommit(latest.current);
+        }
+      }, 400);
     },
     [onCommit],
   );
@@ -150,18 +173,24 @@ export const MarkdownDescriptionEditor = ({
     extensions: [
       StarterKit,
       Link.configure({
-        openOnClick: false,
+        openOnClick: readOnly ? true : false,
         autolink: true,
         protocols: ['http', 'https', 'mailto'],
         validate: (href: string) => isSafeHref(href),
       }),
       Image,
-      Placeholder.configure({ placeholder }),
+      Placeholder.configure({
+        placeholder: readOnly ? '' : placeholder,
+        showOnlyWhenEditable: true,
+        emptyNodeClass: 'is-empty',
+        emptyEditorClass: 'is-editor-empty',
+      }),
       Markdown.configure({ html: false, transformPastedText: true, linkify: true, breaks: true }),
     ],
     content: value,
     onUpdate: ({ editor: instance }) => {
-      latest.current = instance.storage.markdown.getMarkdown();
+      const markdown = instance.storage.markdown.getMarkdown();
+      scheduleCommit(markdown);
     },
     onBlur: ({ editor: instance }) => {
       commit(instance.storage.markdown.getMarkdown());
@@ -174,19 +203,20 @@ export const MarkdownDescriptionEditor = ({
   });
 
   // Keep the editor in sync when the incident value changes from the outside
-  // (a reload, a merge, another user's save) without clobbering local edits.
+  // (a reload, a merge, another user's save) without clobbering active edits.
   useEffect(() => {
     if (!editor || raw) return;
     if (value === latest.current) return;
-    editor.commands.setContent(value, false);
-    latest.current = value;
+    if (editor.isFocused) return;
+    editor.commands.setContent(value || '', false);
+    latest.current = value || '';
   }, [editor, value, raw]);
 
   useEffect(() => {
     if (editor) editor.setEditable(!readOnly);
   }, [editor, readOnly]);
 
-  /** Position the format bar just above the current selection. */
+  /** Position the format bar just above or below the current selection. */
   const refreshBar = useCallback(() => {
     if (!editor || readOnly) return setBar(null);
     const { from, to, empty } = editor.state.selection;
@@ -199,11 +229,18 @@ export const MarkdownDescriptionEditor = ({
     const end = editor.view.coordsAtPos(to, -1);
     const box = containerRef.current?.getBoundingClientRect();
     if (!box) return;
+
+    // If selection is near top of container, position below to prevent clipping
+    const isAbove = start.top - box.top > 44;
+    const center = (start.left + end.right) / 2 - box.left;
+    const clampOffset = linkOpen ? 150 : 80;
+
     setBar({
-      top: start.top - box.top - 8,
-      left: Math.min(Math.max((start.left + end.right) / 2 - box.left, 24), box.width - 24),
+      top: isAbove ? start.top - box.top - 8 : end.bottom - box.top + 8,
+      left: Math.min(Math.max(center, clampOffset), Math.max(box.width - clampOffset, clampOffset)),
+      placement: isAbove ? 'above' : 'below',
     });
-  }, [editor, readOnly]);
+  }, [editor, readOnly, linkOpen]);
 
   useEffect(() => {
     if (!editor) return;
@@ -253,11 +290,12 @@ export const MarkdownDescriptionEditor = ({
           }
         }
         latest.current = editor.storage.markdown.getMarkdown();
+        commit(latest.current);
       } finally {
         setUploading(false);
       }
     },
-    [editor, readOnly],
+    [editor, readOnly, commit],
   );
 
   const imagesFromDataTransfer = (data: DataTransfer | null) =>
@@ -278,12 +316,37 @@ export const MarkdownDescriptionEditor = ({
     setRaw(false);
   }, [commit, editor, raw, rawDraft]);
 
+  if (readOnly && !value?.trim()) {
+    return (
+      <Typography sx={{ fontSize: '0.95rem', lineHeight: 1.8, color: 'hsl(var(--muted-foreground))', fontStyle: 'italic' }}>
+        No description provided.
+      </Typography>
+    );
+  }
+
   return (
-    <Box ref={containerRef} sx={{ position: 'relative' }}>
+    <Box
+      ref={containerRef}
+      onClick={(event) => {
+        if (!readOnly && editor && !editor.isFocused) {
+          const target = event.target as HTMLElement;
+          if (!target.closest('button') && !target.closest('input') && !target.closest('a')) {
+            editor.commands.focus('end');
+          }
+        }
+      }}
+      sx={{
+        position: 'relative',
+        cursor: readOnly ? 'default' : 'text',
+        minHeight: readOnly ? 'auto' : minRows * 28,
+        '&:hover .raw-toggle-btn': { opacity: 0.8 },
+      }}
+    >
       {!readOnly && (
         <Box
           component="button"
           type="button"
+          className="raw-toggle-btn"
           onMouseDown={(event) => event.preventDefault()}
           onClick={toggleRaw}
           sx={{
@@ -302,19 +365,24 @@ export const MarkdownDescriptionEditor = ({
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
             color: raw ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))',
-            '&:hover': { bgcolor: 'hsl(var(--muted))' },
+            opacity: raw ? 1 : 0.35,
+            transition: 'opacity 0.15s ease',
+            '&:hover': { bgcolor: 'hsl(var(--muted))', opacity: 1 },
           }}
         >
-          Raw
+          {raw ? 'WYSIWYG' : 'Raw'}
         </Box>
       )}
 
       {raw ? (
         <TextField
           value={rawDraft}
-          onChange={(event) => setRawDraft(event.target.value)}
+          onChange={(event) => {
+            const next = event.target.value;
+            setRawDraft(next);
+            scheduleCommit(next);
+          }}
           onBlur={() => {
-            latest.current = rawDraft;
             commit(rawDraft);
           }}
           fullWidth
@@ -330,6 +398,7 @@ export const MarkdownDescriptionEditor = ({
               fontSize: '0.9rem',
               lineHeight: 1.7,
               fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              color: 'hsl(var(--foreground))',
             },
           }}
         />
@@ -350,13 +419,15 @@ export const MarkdownDescriptionEditor = ({
             }
           }}
           sx={{
+            minHeight: readOnly ? 'auto' : minRows * 28,
             '& .markdown-wysiwyg': {
               outline: 'none',
               fontSize: '0.95rem',
               lineHeight: 1.8,
-              minHeight: minRows * 28,
+              minHeight: readOnly ? 'auto' : minRows * 28,
               color: 'hsl(var(--foreground))',
             },
+            '& .ProseMirror:focus, & .markdown-wysiwyg:focus': { outline: 'none' },
             '& .markdown-wysiwyg p': { m: 0, mb: 1.25 },
             '& .markdown-wysiwyg p:last-child': { mb: 0 },
             '& .markdown-wysiwyg h1, & .markdown-wysiwyg h2, & .markdown-wysiwyg h3': {
@@ -368,7 +439,9 @@ export const MarkdownDescriptionEditor = ({
             '& .markdown-wysiwyg h1': { fontSize: '1.25rem' },
             '& .markdown-wysiwyg h2': { fontSize: '1.1rem' },
             '& .markdown-wysiwyg h3': { fontSize: '1rem' },
-            '& .markdown-wysiwyg ul, & .markdown-wysiwyg ol': { pl: 3, mt: 0, mb: 1.25 },
+            '& .markdown-wysiwyg ul': { listStyleType: 'disc', pl: 3, mt: 0, mb: 1.25 },
+            '& .markdown-wysiwyg ol': { listStyleType: 'decimal', pl: 3, mt: 0, mb: 1.25 },
+            '& .markdown-wysiwyg li': { mb: 0.35 },
             '& .markdown-wysiwyg li p': { mb: 0.25 },
             '& .markdown-wysiwyg blockquote': {
               borderLeft: '2px solid hsl(var(--border))',
@@ -393,7 +466,7 @@ export const MarkdownDescriptionEditor = ({
             '& .markdown-wysiwyg a': { color: 'hsl(var(--primary))', textDecoration: 'underline' },
             '& .markdown-wysiwyg img': { maxWidth: '100%', borderRadius: 6 },
             '& .markdown-wysiwyg hr': { border: 0, borderTop: '1px solid hsl(var(--border))' },
-            '& .markdown-wysiwyg p.is-editor-empty:first-of-type::before': {
+            '& .markdown-wysiwyg p.is-empty::before, & .markdown-wysiwyg.is-editor-empty p:first-of-type::before': {
               content: 'attr(data-placeholder)',
               color: 'hsl(var(--muted-foreground))',
               float: 'left',
@@ -413,7 +486,7 @@ export const MarkdownDescriptionEditor = ({
             position: 'absolute',
             top: bar.top,
             left: bar.left,
-            transform: 'translate(-50%, -100%)',
+            transform: bar.placement === 'above' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
             display: 'flex',
             alignItems: 'center',
             gap: 0.25,
@@ -421,6 +494,7 @@ export const MarkdownDescriptionEditor = ({
             py: 0.25,
             borderRadius: 1.5,
             bgcolor: 'hsl(var(--background-elevated, var(--card)))',
+            border: '1px solid hsl(var(--border))',
             boxShadow: '0 6px 20px hsl(var(--foreground) / 0.18)',
             zIndex: 20,
             whiteSpace: 'nowrap',

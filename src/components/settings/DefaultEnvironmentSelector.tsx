@@ -19,6 +19,7 @@ export interface EnvironmentItem {
   archived?: boolean;
   sensor_group?: boolean;
   checkin?: number;
+  queue?: number;
   [key: string]: unknown;
 }
 

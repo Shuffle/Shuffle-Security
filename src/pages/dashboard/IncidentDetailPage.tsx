@@ -121,7 +121,6 @@ import { TaskKanbanBoard } from '@/components/incidents/TaskKanbanBoard';
 import { MentionInput } from '@/components/incidents/MentionInput';
 import { DeferredTextField, DeferredMentionInput, DebouncedMentionInput } from '@/components/incidents/DeferredTextField';
 import { MarkdownDescriptionEditor } from '@/components/incidents/MarkdownDescriptionEditor';
-import { SafeMarkdown } from '@/components/shared/SafeMarkdown';
 import { TaskDateTimePicker } from '@/components/incidents/TaskDateTimePicker';
 import { FileAttachments } from '@/components/incidents/FileAttachments';
 import { toast } from '@/lib/toast';
@@ -1381,14 +1380,40 @@ const IncidentDetailPage = () => {
     return isSupportUser ? 7 : 0;
   })();
    const [activeTab, setActiveTabState] = useState(initialTab);
+   const userInteractedTabRef = useRef(false);
+   const currentIncidentIdRef = useRef(rawId);
+   if (currentIncidentIdRef.current !== rawId) {
+     currentIncidentIdRef.current = rawId;
+     userInteractedTabRef.current = false;
+   }
+
    useEffect(() => {
      const requestedTab = searchParams.get('tab');
-     if (!requestedTab && activeTab === 0 && readPreferredViewMode() === 'simple') {
-       setActiveTabState(7);
+     if (requestedTab) {
+       const idx = TAB_NAMES.indexOf(requestedTab as any);
+       if (idx >= 0 && idx !== activeTab) {
+         setActiveTabState(idx);
+       }
+       return;
      }
-     // eslint-disable-next-line react-hooks/exhaustive-deps
+
+     // No explicit ?tab in URL:
+     // If the user manually selected a tab for this incident in this session, do not override.
+     if (userInteractedTabRef.current) return;
+
+     const preferred = readPreferredViewMode();
+     if (preferred === 'simple') {
+       if (activeTab !== 7) setActiveTabState(7);
+     } else if (preferred === 'detailed') {
+       if (activeTab !== 0) setActiveTabState(0);
+     } else if (preferred === null && isSupportUser) {
+       // First-time visit for a support user with no stored preference: default to Simple
+       if (activeTab !== 7) setActiveTabState(7);
+     }
    }, [activeTab, isSupportUser, searchParams]);
+
    const setActiveTab = (tab: number) => {
+     userInteractedTabRef.current = true;
      // Leaving the Raw OCSF tab (index 4) while previewing an older revision:
      // revert the editor back to the live incident OCSF so unsaved revision
      // previews do not persist across tab switches.
@@ -1397,20 +1422,31 @@ const IncidentDetailPage = () => {
          setRawJsonText(JSON.stringify((incident as any)?.rawOCSF || {}, null, 2));
          setSelectedRevisionIdx(null);
        }
-      // Switching tabs while scrolled to the bottom of a long tab (e.g. the
-      // simple timeline) would otherwise leave the new tab scrolled past its
-      // content. Always start the new tab at the top; any focus helper that
-      // runs after this scrolls its own target into view.
-      if (prev !== tab) {
-        try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch { /* ignore */ }
-      }
-      return tab;
+       // Switching tabs while scrolled to the bottom of a long tab (e.g. the
+       // simple timeline) would otherwise leave the new tab scrolled past its
+       // content. Always start the new tab at the top; any focus helper that
+       // runs after this scrolls its own target into view.
+       if (prev !== tab) {
+         try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch { /* ignore */ }
+       }
+       return tab;
      });
-     try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, tab === 7 ? 'simple' : 'detailed'); } catch { /* ignore */ }
-     const newParams = new URLSearchParams(searchParams);
-      if (tab === 7) { newParams.delete('tab'); } else { newParams.set('tab', TAB_NAMES[tab] || ''); }
-     const paramStr = newParams.toString();
-     window.history.replaceState(null, '', `${window.location.pathname}${paramStr ? '?' + paramStr : ''}`);
+
+     if (tab === 7 || tab === 0) {
+       try {
+         localStorage.setItem(VIEW_MODE_STORAGE_KEY, tab === 7 ? 'simple' : 'detailed');
+       } catch { /* ignore */ }
+     }
+
+     setSearchParams((prev) => {
+       const next = new URLSearchParams(prev);
+       if (tab === 7) {
+         next.delete('tab');
+       } else {
+         next.set('tab', TAB_NAMES[tab] || '');
+       }
+       return next;
+     }, { replace: true });
    };
 
    /**
@@ -10123,10 +10159,11 @@ const IncidentDetailPage = () => {
               size="small"
               onClick={() => {
                 // Remove the param so banner can be dismissed
-                const newParams = new URLSearchParams(searchParams);
-                newParams.delete('agent_action');
-                const paramStr = newParams.toString();
-                window.history.replaceState(null, '', `${window.location.pathname}${paramStr ? '?' + paramStr : ''}`);
+                setSearchParams((prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.delete('agent_action');
+                  return next;
+                }, { replace: true });
               }}
               sx={{
                 fontSize: '0.75rem',
@@ -11433,37 +11470,14 @@ const IncidentDetailPage = () => {
 
         const simpleNarrative = (
           <>
-          {simpleEmail}
-          <Box
-            onClick={() => !isPublicView && setIsEditingDescription(true)}
-            sx={{
-              minHeight: 120,
-              cursor: isPublicView ? 'default' : 'text',
-              color: 'hsl(var(--foreground))',
-              // Extend the clickable area down over the gap before Tasks
-              // without changing the visual spacing.
-              pb: { xs: 4, md: 7 },
-              mb: { xs: -4, md: -7 },
-            }}
-          >
-
-            {isEditingDescription ? (
-              <MarkdownDescriptionEditor
-                value={editedMessage}
-                onCommit={setEditedMessage}
-                placeholder="Add a description... Markdown supported, paste images directly."
-                autoFocus
-                readOnly={isPublicView}
-              />
-
-            ) : editedMessage ? (
-              <SafeMarkdown text={editedMessage} />
-            ) : (
-              <Typography sx={{ fontSize: '0.95rem', lineHeight: 1.8, color: 'hsl(var(--muted-foreground))' }}>
-                Click to add a description.
-              </Typography>
-            )}
-          </Box>
+            {simpleEmail}
+            <MarkdownDescriptionEditor
+              key={incident?.id}
+              value={editedMessage}
+              onCommit={setEditedMessage}
+              placeholder="Add a description... Markdown supported, paste images directly."
+              readOnly={isPublicView}
+            />
           </>
         );
 

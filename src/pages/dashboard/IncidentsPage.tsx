@@ -57,6 +57,7 @@ import { IncidentsEmptyState } from '@/components/incidents/IncidentsEmptyState'
 import { IngestionSourceButton } from '@/components/incidents/IngestionSourceButton';
 import { HighlightSpotlight } from '@/components/incidents/HighlightSpotlight';
 import { AutomationReadinessBanner } from '@/components/incidents/AutomationReadinessBanner';
+import { RuntimeQueueProblemBar } from '@/components/incidents/RuntimeQueueProblemBar';
 import { WebhookIngestionButton, WebhookIngestionInfo } from '@/components/incidents/WebhookIngestionButton';
 import { useWebhookStatus } from '@/hooks/useWebhookStatus';
 import { IncidentTrendChart } from '@/components/incidents/IncidentTrendChart';
@@ -2385,6 +2386,7 @@ const IncidentsPage = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
+        <RuntimeQueueProblemBar />
         {/* Header */}
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
            <Typography variant="h5" sx={{ fontWeight: 600 }}>
@@ -2737,6 +2739,7 @@ const IncidentsPage = () => {
       style={{ maxWidth: 1400, width: '100%', margin: '0 auto' }}
     >
       <HighlightSpotlight />
+      <RuntimeQueueProblemBar />
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Typography variant="h5" sx={{ fontWeight: 600, fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
