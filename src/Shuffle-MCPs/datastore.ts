@@ -1176,7 +1176,7 @@ export const deleteDatastoreItem = async (
 
   console.log(`[datastore.delete] key=${rawKey} category=${category} orgId=${orgId}${overrideOrgId ? ' (override)' : ''}`);
 
-  const response = await fetch(getApiUrl(`/api/v1/orgs/${orgId}/delete_cache`), {
+  const response = await fetch(datastoreUrl(`/api/v1/orgs/${orgId}/delete_cache`, options?.regionUrl), {
     method: 'POST',
     credentials: 'include',
     headers,
