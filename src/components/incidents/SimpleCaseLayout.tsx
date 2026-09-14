@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Box, Button, Typography } from '@mui/material';
-import { FileText, ListChecks, ScanEye, GitBranch } from 'lucide-react';
+import { FileText, ListChecks, SlidersHorizontal, Fingerprint, Network } from 'lucide-react';
 import { useNavigate } from '@/lib/router-compat';
 import type { IncidentTask } from '@/config/ocsfIncidentSchema';
 import type { LinkedIncidentSummary } from '@/hooks/useRelatedIncidents';
@@ -20,6 +20,7 @@ interface SimpleCaseLayoutProps {
   /** Configuration controls (share access, actions menu) shown above Overview. */
   contentsActions?: ReactNode;
   taskItems: IncidentTask[];
+  customFieldsCount?: number;
   observableCount: number;
   correlationCount: number;
   /** Incidents merged into this one, shown at the bottom of the Overview rail. */
@@ -32,9 +33,9 @@ type SectionKey = typeof SECTIONS[number];
 const SECTION_ICONS: Record<SectionKey, typeof FileText> = {
   narrative: FileText,
   tasks: ListChecks,
-  customFields: ListChecks,
-  observables: ScanEye,
-  correlations: GitBranch,
+  customFields: SlidersHorizontal,
+  observables: Fingerprint,
+  correlations: Network,
 };
 
 export const SimpleCaseLayout = ({
@@ -49,6 +50,7 @@ export const SimpleCaseLayout = ({
   correlations,
   contentsActions,
   taskItems,
+  customFieldsCount,
   observableCount,
   correlationCount,
   relatedIncidents,
@@ -75,18 +77,71 @@ export const SimpleCaseLayout = ({
   };
 
   useEffect(() => {
-    const elements = SECTIONS.map((key) => refs.current[key]).filter((el): el is HTMLElement => Boolean(el));
-    if (elements.length === 0) return;
-    const observer = new IntersectionObserver((entries) => {
+    let ticking = false;
+
+    const computeActiveSection = () => {
+      ticking = false;
       if (Date.now() < lockUntil.current) return;
-      const visible = entries
-        .filter((entry) => entry.isIntersecting)
-        .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      const key = visible?.target.getAttribute('data-simple-section') as SectionKey | null;
-      if (key) setActiveSection(key);
-    }, { rootMargin: '-18% 0px -68% 0px', threshold: 0 });
-    elements.forEach((element) => observer.observe(element));
-    return () => observer.disconnect();
+
+      const sections: Array<{ key: SectionKey; el: HTMLElement }> = [];
+      for (const key of SECTIONS) {
+        const el = refs.current[key];
+        if (el && el.isConnected) {
+          sections.push({ key, el });
+        }
+      }
+      if (sections.length === 0) return;
+
+      // If the document is not scrollable, maintain current selection
+      const isScrollable = document.documentElement.scrollHeight > window.innerHeight + 60;
+      if (!isScrollable) return;
+
+      // Top of document: lock to first section
+      if (window.scrollY <= 10) {
+        setActiveSection(sections[0].key);
+        return;
+      }
+
+      // Bottom of document: lock to last section
+      const scrollBottom = window.innerHeight + window.scrollY;
+      const docHeight = document.documentElement.scrollHeight;
+      if (scrollBottom >= docHeight - 30) {
+        setActiveSection(sections[sections.length - 1].key);
+        return;
+      }
+
+      // Reading trigger line: comfortably below sticky overview header
+      const triggerLine = Math.min(240, Math.max(140, window.innerHeight * 0.25));
+
+      let currentKey = sections[0].key;
+      for (let i = 0; i < sections.length; i++) {
+        const rect = sections[i].el.getBoundingClientRect();
+        if (rect.top <= triggerLine) {
+          currentKey = sections[i].key;
+        } else {
+          break;
+        }
+      }
+
+      setActiveSection((prev) => (prev === currentKey ? prev : currentKey));
+    };
+
+    const onScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(computeActiveSection);
+      }
+    };
+
+    computeActiveSection();
+
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
   }, []);
 
   const scrollTo = (key: SectionKey, taskId?: string) => {
@@ -154,7 +209,12 @@ export const SimpleCaseLayout = ({
   const sectionData: Array<{ key: SectionKey; label: string; count?: number; icon: typeof FileText }> = [
     { key: 'narrative', label: narrativeLabel, icon: SECTION_ICONS.narrative },
     { key: 'tasks', label: 'Tasks', count: openTasks.length, icon: SECTION_ICONS.tasks },
-    ...(customFields ? [{ key: 'customFields' as SectionKey, label: 'Custom Fields', icon: SECTION_ICONS.customFields }] : []),
+    ...(customFields ? [{
+      key: 'customFields' as SectionKey,
+      label: 'Custom Fields',
+      count: customFieldsCount !== undefined ? customFieldsCount : 1,
+      icon: SECTION_ICONS.customFields,
+    }] : []),
     { key: 'observables', label: 'Observables', count: observableCount, icon: SECTION_ICONS.observables },
     { key: 'correlations', label: 'Correlations', count: correlationCount, icon: SECTION_ICONS.correlations },
   ];
@@ -178,7 +238,7 @@ export const SimpleCaseLayout = ({
         </Box>
       </Box>
 
-      <Box sx={{ order: { xs: 1, md: 2 }, minWidth: 0, maxWidth: 820, width: '100%', mx: 'auto' }}>
+      <Box sx={{ order: { xs: 1, md: 2 }, minWidth: 0, maxWidth: 820, width: '100%', mx: 'auto', pb: '200px' }}>
         {/* Overview (source, title, severity/status/assignee) stays pinned to
             the top of the center column while the body scrolls. */}
         {overview && (
@@ -212,7 +272,7 @@ export const SimpleCaseLayout = ({
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Observables</Typography>
           {observables}
         </Box>
-        <Box id="simple-case-correlations" ref={(node: HTMLElement | null) => { refs.current.correlations = node; }} data-simple-section="correlations" sx={{ ...sectionSx, pb: 2 }} {...sectionActivation('correlations')}>
+        <Box id="simple-case-correlations" ref={(node: HTMLElement | null) => { refs.current.correlations = node; }} data-simple-section="correlations" sx={{ ...sectionSx, pb: 0 }} {...sectionActivation('correlations')}>
           <Typography component="h2" sx={{ fontSize: '1.15rem', fontWeight: 700, mb: 2.5 }}>Correlations</Typography>
           {correlations}
         </Box>

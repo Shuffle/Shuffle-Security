@@ -141,7 +141,7 @@ import AgentRunDiagnosisBanner from '@/components/agent/AgentRunDiagnosisBanner'
 import { getRunTitle, getRunIconColor, formatDuration as formatAgentRunDuration, getTimeAgo as getAgentTimeAgo, STATUS_CONFIG as AGENT_STATUS_CONFIG } from '@/components/agent/AgentRunHeader';
 import { getFailureInfo as getAgentFailureInfo, hasOutputWarning as hasAgentOutputWarning, diagnoseOutputWarning as diagnoseAgentOutputWarning } from '@/components/agent/AgentRunResultViewer';
 import AgentRunStatusBadge from '@/components/agent/AgentRunStatusBadge';
-import { AlertTriangle as AlertTriangleIcon, Loader2 as Loader2Icon, ArrowDown as ArrowDownwardIcon, AlertTriangle as WarningAmberIcon, ArrowUp as ArrowUpwardIcon, Fingerprint as FingerprintIcon, ArrowLeft as ArrowBackIcon, CheckCircle2 as CheckCircleIcon, Plus as AddIcon, Send as SendIcon, Reply as ReplyIcon, Paperclip as AttachFileIcon, User as PersonIcon, Pencil as EditIcon, History as HistoryIcon, Clock as AccessTimeIcon, ChevronDown as ExpandMoreIcon, ChevronUp as ExpandLessIcon, Filter as FilterListIcon, Shield as SecurityIcon, Link as LinkIcon, Users as PeopleIcon, Settings as SettingsIcon, FileText as DescriptionIcon, CheckCircle2 as TaskAltIcon, Trash2 as DeleteIcon, GripVertical as DragIndicatorIcon, ListPlus as PlaylistAddIcon, RefreshCw as RefreshIcon, TrendingUp as TrendingUpIcon, Wand2 as AutoFixHighIcon, MoreVertical as MoreVertIcon, Forward as ForwardIcon, GitMerge as CallMergeIcon, X as CloseIcon, Eye as VisibilityIcon, EyeOff as VisibilityOffIcon, ChevronRight as ChevronRightIcon, Globe as LanguageIcon, Search as SearchIcon, Square as SquareIcon, CheckSquare as CheckSquareIcon } from 'lucide-react';
+import { AlertTriangle as AlertTriangleIcon, Loader2 as Loader2Icon, ArrowDown as ArrowDownwardIcon, AlertTriangle as WarningAmberIcon, ArrowUp as ArrowUpwardIcon, Fingerprint as FingerprintIcon, ArrowLeft as ArrowBackIcon, CheckCircle2 as CheckCircleIcon, Plus as AddIcon, Send as SendIcon, Reply as ReplyIcon, Paperclip as AttachFileIcon, User as PersonIcon, Pencil as EditIcon, History as HistoryIcon, Clock as AccessTimeIcon, ChevronDown as ExpandMoreIcon, ChevronUp as ExpandLessIcon, Filter as FilterListIcon, Shield as SecurityIcon, Link as LinkIcon, Users as PeopleIcon, Settings as SettingsIcon, FileText as DescriptionIcon, CheckCircle2 as TaskAltIcon, Trash2 as DeleteIcon, GripVertical as DragIndicatorIcon, ListPlus as PlaylistAddIcon, RefreshCw as RefreshIcon, TrendingUp as TrendingUpIcon, Wand2 as AutoFixHighIcon, MoreVertical as MoreVertIcon, Forward as ForwardIcon, GitMerge as CallMergeIcon, X as CloseIcon, Eye as VisibilityIcon, EyeOff as VisibilityOffIcon, ChevronRight as ChevronRightIcon, Globe as LanguageIcon, Search as SearchIcon, Square as SquareIcon, CheckSquare as CheckSquareIcon, MessageSquare, Network, SlidersHorizontal as TuneIcon } from 'lucide-react';
 import { Zap as ZapIcon } from 'lucide-react';
 import type { AgentRun } from '@/services/agentActivity';
 import { getAgentSkipInfo } from '@/lib/agentParsers';
@@ -1092,6 +1092,7 @@ const IncidentDetailPage = () => {
   const commentInputRef = useRef<HTMLDivElement>(null);
   // Simple-view timeline feed: always parked at the newest (bottom) entry.
   const simpleFeedRef = useRef<HTMLDivElement | null>(null);
+  const defaultFeedRef = useRef<HTMLDivElement | null>(null);
   const [simpleExpandedTaskIds, setSimpleExpandedTaskIds] = useState<string[]>([]);
   const toggleSimpleTaskExpanded = (taskId: string) => {
     setSimpleExpandedTaskIds((previous) => (
@@ -1306,6 +1307,57 @@ const IncidentDetailPage = () => {
   }, [id]);
   // Anchor for the unified Timeline filters dropdown.
   const [timelineFilterAnchor, setTimelineFilterAnchor] = useState<HTMLElement | null>(null);
+  const [hoveredTimelineFilter, setHoveredTimelineFilter] = useState<TimelineFilterKey | null>(null);
+  const [timelineVisibleWindow, setTimelineVisibleWindow] = useState<{ minTs: number; maxTs: number } | null>(null);
+
+  const handleFilterHover = (key: TimelineFilterKey | null) => {
+    if (key && !activeTimelineFilters.has(key)) {
+      const container = simpleFeedRef.current || defaultFeedRef.current;
+      if (container) {
+        const cTop = container.scrollTop;
+        const cBottom = cTop + container.clientHeight;
+        const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-timeline-timestamp]'));
+        let minTs = Infinity;
+        let maxTs = -Infinity;
+        let found = 0;
+        rows.forEach((el) => {
+          const elTop = el.offsetTop;
+          const elHeight = el.offsetHeight || 30;
+          const elBottom = elTop + elHeight;
+          if (elBottom >= cTop - 60 && elTop <= cBottom + 60) {
+            const ts = Number(el.getAttribute('data-timeline-timestamp'));
+            if (ts && !isNaN(ts) && ts > 0) {
+              if (ts < minTs) minTs = ts;
+              if (ts > maxTs) maxTs = ts;
+              found++;
+            }
+          }
+        });
+        if (found > 0 && minTs !== Infinity) {
+          setTimelineVisibleWindow({ minTs, maxTs });
+        } else {
+          rows.forEach((el) => {
+            const ts = Number(el.getAttribute('data-timeline-timestamp'));
+            if (ts && !isNaN(ts) && ts > 0) {
+              if (ts < minTs) minTs = ts;
+              if (ts > maxTs) maxTs = ts;
+              found++;
+            }
+          });
+          if (found > 0 && minTs !== Infinity) {
+            setTimelineVisibleWindow({ minTs, maxTs });
+          } else {
+            setTimelineVisibleWindow(null);
+          }
+        }
+      } else {
+        setTimelineVisibleWindow(null);
+      }
+    } else {
+      setTimelineVisibleWindow(null);
+    }
+    setHoveredTimelineFilter(key);
+  };
   const [revisionDialogData, setRevisionDialogData] = useState<{ json: string; changedKeys: Set<string> } | null>(null);
   // Remember whether the user prefers the Simple or Detailed incident view so
   // opening any incident lands on the same experience as last time.
@@ -6223,10 +6275,14 @@ const IncidentDetailPage = () => {
       <Menu
         anchorEl={timelineFilterAnchor}
         open={Boolean(timelineFilterAnchor)}
-        onClose={() => setTimelineFilterAnchor(null)}
+        onClose={() => {
+          setTimelineFilterAnchor(null);
+          handleFilterHover(null);
+        }}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         PaperProps={{
+          onMouseLeave: () => handleFilterHover(null),
           sx: {
             bgcolor: 'hsl(var(--card))',
             border: '1px solid hsl(var(--border))',
@@ -6235,22 +6291,33 @@ const IncidentDetailPage = () => {
         }}
       >
         {([
-          { key: 'revisions' as const, label: 'Changes', count: visibleRevisionCount },
-          { key: 'agent' as const, label: 'Agent', count: agentRuns.length },
-          { key: 'workflows' as const, label: 'Workflow runs', count: workflowOnlyRuns.length },
-          { key: 'manual' as const, label: 'Comments', count: commentActivity.length },
-          { key: 'merges' as const, label: 'Threading', count: mergeActivity.length },
-          { key: 'tasks' as const, label: 'Tasks', count: visibleTasks.length },
-          { key: 'observables' as const, label: 'Observables', count: visibleObservablesCount },
-          { key: 'correlations' as const, label: 'Correlations', count: visibleCorrelations.length },
-        ]).map(({ key, label, count }) => {
+          { key: 'revisions' as const, label: 'Changes', count: visibleRevisionCount, icon: <EditIcon size={14} /> },
+          { key: 'agent' as const, label: 'Agent', count: agentRuns.length, icon: <AgentIcon size={14} /> },
+          { key: 'workflows' as const, label: 'Workflow runs', count: workflowOnlyRuns.length, icon: <ZapIcon size={14} /> },
+          { key: 'manual' as const, label: 'Comments', count: commentActivity.length, icon: <MessageSquare size={14} /> },
+          { key: 'merges' as const, label: 'Threading', count: mergeActivity.length, icon: <CallMergeIcon size={14} /> },
+          { key: 'tasks' as const, label: 'Tasks', count: visibleTasks.length, icon: <TaskAltIcon size={14} /> },
+          { key: 'observables' as const, label: 'Observables', count: visibleObservablesCount, icon: <FingerprintIcon size={14} /> },
+          { key: 'correlations' as const, label: 'Correlations', count: visibleCorrelations.length, icon: <Network size={14} /> },
+        ]).map(({ key, label, count, icon }) => {
           const active = isFilterActive(key);
+          const isHovered = hoveredTimelineFilter === key;
           return (
             <MenuItem
               key={key}
               dense
               onClick={() => toggleTimelineFilter(key)}
-              sx={{ fontSize: '0.8rem', gap: 1, py: 0.5 }}
+              onMouseEnter={() => handleFilterHover(key)}
+              onMouseLeave={() => setHoveredTimelineFilter((prev) => (prev === key ? null : prev))}
+              sx={{
+                fontSize: '0.8rem',
+                gap: 1,
+                py: 0.5,
+                bgcolor: isHovered ? 'hsl(var(--primary) / 0.12)' : 'transparent',
+                '&:hover': {
+                  bgcolor: 'hsl(var(--primary) / 0.18)',
+                },
+              }}
             >
               <Checkbox
                 checked={active}
@@ -6261,12 +6328,25 @@ const IncidentDetailPage = () => {
                   '&.Mui-checked': { color: 'hsl(var(--primary))' },
                 }}
               />
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 16,
+                  height: 16,
+                  color: active ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
+                  flexShrink: 0,
+                }}
+              >
+                {icon}
+              </Box>
               <Box sx={{ flex: 1 }}>{label}</Box>
               <Box
                 component="span"
                 sx={{
                   fontSize: '0.7rem',
-                  color: 'text.secondary',
+                  color: isHovered ? 'hsl(var(--primary))' : 'text.secondary',
                   fontVariantNumeric: 'tabular-nums',
                   ml: 1,
                 }}
@@ -6299,7 +6379,7 @@ const IncidentDetailPage = () => {
           {showEnrichmentInlineCTA && renderEnrichmentInlineCTA()}
           {renderTimelineInputArea(isSimple)}
           {/* Unified Timeline Feed — when inline, render with a vertical rail behind the items */}
-          <Box sx={{
+          <Box ref={defaultFeedRef} sx={{
             p: { xs: 0, sm: 1.5 },
             display: 'flex',
             flexDirection: 'column',
@@ -6378,12 +6458,30 @@ const IncidentDetailPage = () => {
   const renderTimelineFeedItems = (variant: 'sidebar' | 'inline' | 'simple' = 'sidebar') => {
     const isSimple = variant === 'simple';
     type StepKind = 'task-created' | 'task-completed' | 'task-status-changed' | 'observable-added' | 'correlation-found' | 'incident-created' | 'routing-matched' | 'attribute-changed';
-    type TimelineItem =
+    type TimelineItem = (
       | { type: 'revision'; timestamp: number; data: any; idx: number; parsedCurrent: any; parsedPrevious: any | null }
       | { type: 'agent'; timestamp: number; data: typeof agentRuns[number] }
       | { type: 'workflow-exec'; timestamp: number; data: typeof agentRuns[number] }
       | { type: 'manual'; timestamp: number; data: ActivityItem }
-      | { type: 'step'; timestamp: number; kind: StepKind; id: string; label: string; detail?: string; actor?: string; count?: number; corrCount?: number; corrObsKeys?: string[]; obsKeys?: string[]; obsType?: string; obsValue?: string; taskId?: string; taskStatusLabel?: string };
+      | { type: 'step'; timestamp: number; kind: StepKind; id: string; label: string; detail?: string; actor?: string; count?: number; corrCount?: number; corrObsKeys?: string[]; obsKeys?: string[]; obsType?: string; obsValue?: string; taskId?: string; taskStatusLabel?: string }
+    ) & { isPreview?: boolean };
+
+    const getItemFilterKey = (it: TimelineItem): TimelineFilterKey | null => {
+      if (it.type === 'revision') return 'revisions';
+      if (it.type === 'agent') return 'agent';
+      if (it.type === 'workflow-exec') return 'workflows';
+      if (it.type === 'manual') {
+        return isMergeActivityItem(it.data) ? 'merges' : 'manual';
+      }
+      if (it.type === 'step') {
+        if (it.kind === 'routing-matched') return 'agent';
+        if (it.kind === 'attribute-changed') return 'revisions';
+        if (it.kind === 'task-created' || it.kind === 'task-completed' || it.kind === 'task-status-changed') return 'tasks';
+        if (it.kind === 'observable-added') return 'observables';
+        if (it.kind === 'correlation-found') return 'correlations';
+      }
+      return null;
+    };
 
     const items: TimelineItem[] = [];
 
@@ -6392,6 +6490,30 @@ const IncidentDetailPage = () => {
         return typeof rev.value === 'string' ? JSON.parse(rev.value) : rev.value;
       } catch { return null; }
     });
+
+    const NOISE_FIELDS = new Set(['activity', 'updated_by', 'edited_time', 'updated_at', 'last_updated', 'comments']);
+
+    const computeDiff = (current: any, previous: any): { added: string[]; removed: string[]; changed: { field: string; from: any; to: any }[] } => {
+      const diff: { added: string[]; removed: string[]; changed: { field: string; from: any; to: any }[] } = { added: [], removed: [], changed: [] };
+      if (!current || !previous) return diff;
+      const allKeys = new Set([...Object.keys(current), ...Object.keys(previous)]);
+      for (const key of allKeys) {
+        if (NOISE_FIELDS.has(key)) continue;
+        const inCurrent = key in current;
+        const inPrevious = key in previous;
+        if (inCurrent && !inPrevious) diff.added.push(key);
+        else if (!inCurrent && inPrevious) diff.removed.push(key);
+        else if (inCurrent && inPrevious && JSON.stringify(current[key]) !== JSON.stringify(previous[key])) {
+          diff.changed.push({ field: key, from: previous[key], to: current[key] });
+        }
+      }
+      return diff;
+    };
+
+    const truncateValue = (val: any, maxLen = 60): string => {
+      const str = typeof val === 'string' ? val : JSON.stringify(val);
+      return str.length > maxLen ? str.slice(0, maxLen) + '…' : str;
+    };
 
     // Revisions: when the Changes filter is on, render all revisions.
     // When it's off, we still always render the OLDEST revision as the
@@ -6774,6 +6896,184 @@ const IncidentDetailPage = () => {
       }
     }
 
+    // ── On-the-fly injection for hovered inactive filters ──────────────────
+    if (hoveredTimelineFilter && !activeTimelineFilters.has(hoveredTimelineFilter)) {
+      const candidates: TimelineItem[] = [];
+
+      if (hoveredTimelineFilter === 'revisions') {
+        const existingRevisionIdxs = new Set(
+          items.filter((it) => it.type === 'revision').map((it) => (it as any).idx)
+        );
+        for (let idx = 0; idx < revisions.length; idx++) {
+          if (existingRevisionIdxs.has(idx)) continue;
+          const rev = revisions[idx];
+          const isOldest = idx === revisions.length - 1;
+          const diff = idx < revisions.length - 1 && parsedRevisions[idx] && parsedRevisions[idx + 1]
+            ? computeDiff(parsedRevisions[idx], parsedRevisions[idx + 1])
+            : null;
+          const totalChanges = diff ? diff.added.length + diff.removed.length + diff.changed.length : 0;
+          if (!isOldest && diff && totalChanges === 0) continue;
+          const ts = normalizeToMs(rev.edited ?? rev.created);
+          if (ts > 0) {
+            candidates.push({
+              type: 'revision',
+              timestamp: ts,
+              data: rev,
+              idx,
+              parsedCurrent: parsedRevisions[idx],
+              parsedPrevious: idx < revisions.length - 1 ? parsedRevisions[idx + 1] : null,
+              isPreview: true,
+            });
+          }
+        }
+      } else if (hoveredTimelineFilter === 'agent') {
+        agentRuns.forEach((run) => {
+          const ts = normalizeToMs(run.started_at);
+          if (ts > 0) {
+            candidates.push({
+              type: 'agent',
+              timestamp: ts,
+              data: run,
+              isPreview: true,
+            });
+          }
+        });
+      } else if (hoveredTimelineFilter === 'workflows') {
+        workflowOnlyRuns.forEach((run: any) => {
+          const ts = normalizeToMs(run.started_at);
+          if (ts > 0) {
+            candidates.push({
+              type: 'workflow-exec',
+              timestamp: ts,
+              data: run,
+              isPreview: true,
+            });
+          }
+        });
+      } else if (hoveredTimelineFilter === 'manual') {
+        commentActivity.forEach((act) => {
+          const ts = normalizeToMs(act.timestamp);
+          if (ts > 0) {
+            candidates.push({
+              type: 'manual',
+              timestamp: ts,
+              data: act,
+              isPreview: true,
+            });
+          }
+        });
+      } else if (hoveredTimelineFilter === 'merges') {
+        mergeActivity.forEach((act) => {
+          const ts = normalizeToMs(act.timestamp);
+          if (ts > 0) {
+            candidates.push({
+              type: 'manual',
+              timestamp: ts,
+              data: act,
+              isPreview: true,
+            });
+          }
+        });
+      } else if (hoveredTimelineFilter === 'tasks') {
+        const laneLabel = (key: string): string =>
+          taskStatuses.find((s) => s.key === key)?.label
+          || (key === 'done' ? 'Done' : key.replace(/[_-]+/g, ' '));
+        visibleTasks.forEach((t) => {
+          const currentStatusLabel = laneLabel(t.completed ? 'done' : ((t as any)._lane || 'todo'));
+          const ts = t.createdAt ? normalizeToMs(t.createdAt) : normalizeToMs(incident?.createdTs);
+          if (ts > 0) {
+            candidates.push({
+              type: 'step',
+              kind: 'task-created',
+              timestamp: ts,
+              id: `preview-task-created-${t.id}`,
+              label: 'Task created',
+              detail: t.title,
+              actor: t.createdBy || undefined,
+              taskId: String(t.id),
+              taskStatusLabel: currentStatusLabel,
+              isPreview: true,
+            });
+          }
+        });
+      } else if (hoveredTimelineFilter === 'observables') {
+        editedObservables.slice(0, 5).forEach((o) => {
+          const ts = o.first_seen ? normalizeToMs(o.first_seen) : normalizeToMs(incident?.createdTs);
+          if (ts > 0 && o.value) {
+            candidates.push({
+              type: 'step',
+              kind: 'observable-added',
+              timestamp: ts,
+              id: `preview-obs-${o.type}-${o.value}`,
+              label: 'Observable',
+              obsType: o.type,
+              obsValue: o.value,
+              isPreview: true,
+            });
+          }
+        });
+      } else if (hoveredTimelineFilter === 'correlations') {
+        if (correlationsDiscoveredAt && visibleCorrelations.length > 0) {
+          candidates.push({
+            type: 'step',
+            kind: 'correlation-found',
+            timestamp: correlationsDiscoveredAt,
+            id: `preview-corr-incident`,
+            label: `${visibleCorrelations.length} Correlation${visibleCorrelations.length === 1 ? '' : 's'}`,
+            detail: `shared attribute${visibleCorrelations.length === 1 ? '' : 's'} across other incidents`,
+            count: visibleCorrelations.length,
+            isPreview: true,
+          });
+        }
+      }
+
+      if (candidates.length > 0) {
+        let selected: TimelineItem[] = [];
+        if (timelineVisibleWindow) {
+          const { minTs, maxTs } = timelineVisibleWindow;
+          const centerTs = (minTs + maxTs) / 2;
+          const bufferMs = 5 * 60 * 1000;
+          const inWindow = candidates.filter(
+            (c) => c.timestamp >= minTs - bufferMs && c.timestamp <= maxTs + bufferMs
+          );
+          if (inWindow.length > 0) {
+            inWindow.sort((a, b) => Math.abs(a.timestamp - centerTs) - Math.abs(b.timestamp - centerTs));
+            selected = inWindow.slice(0, 3);
+          } else {
+            candidates.sort((a, b) => Math.abs(a.timestamp - centerTs) - Math.abs(b.timestamp - centerTs));
+            selected = candidates.slice(0, 2);
+          }
+        } else {
+          if (items.length > 0) {
+            const itemTimestamps = items.map((it) => it.timestamp).filter(Boolean);
+            const avgTs = itemTimestamps.reduce((a, b) => a + b, 0) / itemTimestamps.length;
+            candidates.sort((a, b) => Math.abs(a.timestamp - avgTs) - Math.abs(b.timestamp - avgTs));
+            selected = candidates.slice(0, 2);
+          } else {
+            selected = candidates.slice(0, 2);
+          }
+        }
+
+        if (hoveredTimelineFilter === 'revisions') {
+          // If previewing revisions, replace any compact attribute-change step for those revision idxs
+          const previewIdxs = new Set(
+            selected.filter((s) => s.type === 'revision').map((s) => (s as any).idx)
+          );
+          for (let i = items.length - 1; i >= 0; i--) {
+            const it = items[i];
+            if (it.type === 'step' && it.id.startsWith('step-attr-')) {
+              const match = it.id.match(/^step-attr-(\d+)-/);
+              if (match && previewIdxs.has(Number(match[1]))) {
+                items.splice(i, 1);
+              }
+            }
+          }
+        }
+
+        selected.forEach((p) => items.push(p));
+      }
+    }
+
     // Newest first. The "Incident created" marker is ALWAYS forced to the
     // bottom of the feed regardless of timestamp — creation is conceptually
     // the first event, even if upstream clock skew or trigger-vs-write gaps
@@ -6833,30 +7133,6 @@ const IncidentDetailPage = () => {
         </Box>
       );
     }
-
-    const NOISE_FIELDS = new Set(['activity', 'updated_by', 'edited_time', 'updated_at', 'last_updated', 'comments']);
-
-    const computeDiff = (current: any, previous: any): { added: string[]; removed: string[]; changed: { field: string; from: any; to: any }[] } => {
-      const diff: { added: string[]; removed: string[]; changed: { field: string; from: any; to: any }[] } = { added: [], removed: [], changed: [] };
-      if (!current || !previous) return diff;
-      const allKeys = new Set([...Object.keys(current), ...Object.keys(previous)]);
-      for (const key of allKeys) {
-        if (NOISE_FIELDS.has(key)) continue;
-        const inCurrent = key in current;
-        const inPrevious = key in previous;
-        if (inCurrent && !inPrevious) diff.added.push(key);
-        else if (!inCurrent && inPrevious) diff.removed.push(key);
-        else if (inCurrent && inPrevious && JSON.stringify(current[key]) !== JSON.stringify(previous[key])) {
-          diff.changed.push({ field: key, from: previous[key], to: current[key] });
-        }
-      }
-      return diff;
-    };
-
-    const truncateValue = (val: any, maxLen = 60): string => {
-      const str = typeof val === 'string' ? val : JSON.stringify(val);
-      return str.length > maxLen ? str.slice(0, maxLen) + '…' : str;
-    };
 
     // Revisions with an empty diff (no-op writes) are not rendered. Numbering
     // them by raw index therefore produced visible gaps ("Change #5" followed
@@ -7033,12 +7309,35 @@ const IncidentDetailPage = () => {
       const { isReply = false } = opts;
       const isSimple = variant === 'simple';
       const itemKey = getItemKey(item);
+      const itemFilterKey = getItemFilterKey(item);
+      const isHighlighted = hoveredTimelineFilter !== null && itemFilterKey === hoveredTimelineFilter;
+      const isDimmed = hoveredTimelineFilter !== null && !isHighlighted;
 
+      const previewBadge = item.isPreview ? (
+        <Chip
+          label="Preview"
+          size="small"
+          sx={{
+            height: 16,
+            fontSize: '0.55rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            bgcolor: 'rgba(255, 102, 0, 0.2)',
+            color: '#ff6600',
+            border: '1px solid rgba(255, 102, 0, 0.4)',
+            ml: 0.5,
+            flexShrink: 0,
+            '& .MuiChip-label': { px: 0.6 },
+          }}
+        />
+      ) : null;
 
       // Reply button — added to every item so users can start a thread off
       // any timeline event (revision, change step, agent run, or comment).
       // Invisible by default (opacity: 0) and revealed on row hover on the right.
       const makeReplyButton = (compact = false) => {
+        if (item.isPreview) return null;
         const isCurrentReplyTarget = replyingTo?.id === itemKey;
         return (
           <Tooltip title="Reply to this in a new comment" arrow>
@@ -7090,6 +7389,12 @@ const IncidentDetailPage = () => {
         return (
           <Box
             key={itemKey}
+            data-timeline-key={itemKey}
+            data-timeline-timestamp={item.timestamp}
+            data-timeline-filter="revisions"
+            data-timeline-highlighted={isHighlighted ? 'true' : undefined}
+            data-timeline-dimmed={isDimmed ? 'true' : undefined}
+            data-timeline-preview={item.isPreview ? 'true' : undefined}
             onClick={showAsCreation ? () => {
               // The "Incident created" entry opens the source evidence:
               // Email Thread for email-sourced incidents, otherwise the
@@ -7120,15 +7425,21 @@ const IncidentDetailPage = () => {
               }, 80);
             } : undefined}
             sx={{
-              p: isSimple ? 0.5 : 1.5,
+              p: isSimple ? (isHighlighted ? 0.75 : 0.5) : 1.5,
               borderRadius: 1.5,
-              bgcolor: 'transparent',
-              border: isSimple ? 'none' : '1px solid hsl(var(--border-subtle))',
+              bgcolor: isHighlighted
+                ? 'hsl(var(--primary) / 0.12)'
+                : 'transparent',
+              border: isHighlighted
+                ? (item.isPreview ? '1px dashed #ff6600' : '1px solid #ff6600')
+                : (isSimple ? 'none' : '1px solid hsl(var(--border-subtle))'),
+              boxShadow: isHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
+              opacity: isDimmed ? 0.35 : 1,
               mb: isSimple ? 1.5 : 0,
-              transition: 'background-color 0.15s ease, border-color 0.15s ease',
+              transition: 'opacity 0.2s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease',
               '&:hover': {
-                bgcolor: 'hsl(var(--muted) / 0.4)',
-                borderColor: 'hsl(var(--border))',
+                bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.18)' : 'hsl(var(--muted) / 0.4)',
+                borderColor: isHighlighted ? '#ff6600' : 'hsl(var(--border))',
               },
               '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
                 opacity: 1,
@@ -7157,6 +7468,7 @@ const IncidentDetailPage = () => {
                           : `made ${totalChanges || 0} change${totalChanges === 1 ? '' : 's'}`)
                         : `Change #${revisionNumber(item.idx)}`}
                   </Typography>
+                  {previewBadge}
                   {isLatest && !showAsCreation && !isSimple && (
                     <Chip label="Latest" size="small" variant="outlined" sx={{ height: 16, fontSize: '0.58rem', bgcolor: 'transparent', borderColor: 'hsl(var(--border))', color: 'text.secondary', fontWeight: 600 }} />
                   )}
@@ -7332,33 +7644,51 @@ const IncidentDetailPage = () => {
 
           return (
             <Box
-              key={`agent-${run.execution_id || run.started_at}`}
+              key={itemKey}
+              data-timeline-key={itemKey}
+              data-timeline-timestamp={item.timestamp}
+              data-timeline-filter="agent"
               data-timeline-compact="true"
+              data-timeline-highlighted={isHighlighted ? 'true' : undefined}
+              data-timeline-dimmed={isDimmed ? 'true' : undefined}
+              data-timeline-preview={item.isPreview ? 'true' : undefined}
               onClick={() => setSelectedAgentRun(run)}
               sx={{
                 display: 'flex',
                 alignItems: 'center',
                 flexWrap: 'wrap',
                 gap: 0.5,
-                px: 0,
+                px: isHighlighted ? 0.75 : 0,
                 py: 0.25,
-                borderRadius: 0,
-                bgcolor: 'transparent',
-                border: 'none',
+                borderRadius: isHighlighted ? 1 : 0,
+                bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.12)' : 'transparent',
+                border: isHighlighted
+                  ? (item.isPreview ? '1px dashed #ff6600' : '1px solid #ff6600')
+                  : 'none',
+                boxShadow: isHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
+                opacity: isDimmed ? 0.35 : 1,
+                transition: 'opacity 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
                 mb: 1.375,
                 cursor: 'pointer',
+                '&:hover': {
+                  bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.18)' : 'hsl(var(--muted) / 0.25)',
+                },
                 '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
                   opacity: 1,
                   pointerEvents: 'auto',
                 },
               }}
             >
+              <Box sx={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color: 'text.secondary' }}>
+                <AgentIcon size={13} />
+              </Box>
               <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap' }}>
                 {actorName}
               </Typography>
               <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary', whiteSpace: 'nowrap' }}>
                 {verb}
               </Typography>
+              {previewBadge}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexShrink: 0 }}>
                 {timeText && (
                   <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', whiteSpace: 'nowrap' }}>
@@ -7378,10 +7708,16 @@ const IncidentDetailPage = () => {
 
         return (
           <Box
-            key={`agent-${run.execution_id}`}
+            key={itemKey}
+            data-timeline-key={itemKey}
+            data-timeline-timestamp={item.timestamp}
+            data-timeline-filter="agent"
             data-timeline-compact="true"
             data-timeline-quiet={isQuiet ? 'true' : undefined}
             data-status-hover="true"
+            data-timeline-highlighted={isHighlighted ? 'true' : undefined}
+            data-timeline-dimmed={isDimmed ? 'true' : undefined}
+            data-timeline-preview={item.isPreview ? 'true' : undefined}
             onClick={() => setSelectedAgentRun(run)}
             sx={{
               position: 'relative',
@@ -7391,23 +7727,28 @@ const IncidentDetailPage = () => {
               px: 1.25,
               py: 0.75,
               borderRadius: 1.5,
-              border: skip.skipped
-                ? '1px dashed hsl(var(--border))'
-                : isQuiet
-                  ? '1px solid transparent'
-                  : '1px solid hsl(var(--border))',
-              bgcolor: skip.skipped
-                ? 'hsl(var(--muted) / 0.2)'
-                : isQuiet
-                  ? 'transparent'
-                  : 'hsl(var(--card))',
+              border: isHighlighted
+                ? (item.isPreview ? '1px dashed #ff6600' : '1px solid #ff6600')
+                : (skip.skipped
+                  ? '1px dashed hsl(var(--border))'
+                  : isQuiet
+                    ? '1px solid transparent'
+                    : '1px solid hsl(var(--border))'),
+              bgcolor: isHighlighted
+                ? 'hsl(var(--primary) / 0.12)'
+                : (skip.skipped
+                  ? 'hsl(var(--muted) / 0.2)'
+                  : isQuiet
+                    ? 'transparent'
+                    : 'hsl(var(--card))'),
+              boxShadow: isHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
               mb: 0,
-              opacity: skip.skipped ? 0.85 : 1,
+              opacity: isDimmed ? 0.35 : (skip.skipped ? 0.85 : 1),
               cursor: 'pointer',
-              transition: 'border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease',
+              transition: 'opacity 0.2s ease, border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.2s ease',
               '&:hover': {
-                borderColor: 'hsl(var(--muted-foreground) / 0.4)',
-                bgcolor: 'hsl(var(--muted) / 0.3)',
+                borderColor: isHighlighted ? '#ff6600' : 'hsl(var(--muted-foreground) / 0.4)',
+                bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.18)' : 'hsl(var(--muted) / 0.3)',
               },
               '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
                 opacity: 1,
@@ -7458,6 +7799,7 @@ const IncidentDetailPage = () => {
               {title}
             </Typography>
             <AgentRunStatusBadge run={run} skip={skip} statusCfg={statusCfg} compact maxWidth={160} />
+            {previewBadge}
             {duration && (
               <Typography sx={{ fontSize: '0.7rem', color: 'hsl(var(--muted-foreground))', flexShrink: 0 }}>
                 · {duration}
@@ -7524,8 +7866,14 @@ const IncidentDetailPage = () => {
 
           return (
             <Box
-              key={`wfexec-${run.execution_id}`}
+              key={itemKey}
+              data-timeline-key={itemKey}
+              data-timeline-timestamp={item.timestamp}
+              data-timeline-filter="workflows"
               data-timeline-compact="true"
+              data-timeline-highlighted={isHighlighted ? 'true' : undefined}
+              data-timeline-dimmed={isDimmed ? 'true' : undefined}
+              data-timeline-preview={item.isPreview ? 'true' : undefined}
               sx={{ display: 'flex', flexDirection: 'column' }}
             >
               <Box
@@ -7538,25 +7886,37 @@ const IncidentDetailPage = () => {
                   alignItems: 'center',
                   flexWrap: 'wrap',
                   gap: 0.5,
-                  px: 0,
+                  px: isHighlighted ? 0.75 : 0,
                   py: 0.25,
-                  borderRadius: 0,
-                  bgcolor: 'transparent',
-                  border: 'none',
+                  borderRadius: isHighlighted ? 1 : 0,
+                  bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.12)' : 'transparent',
+                  border: isHighlighted
+                    ? (item.isPreview ? '1px dashed #ff6600' : '1px solid #ff6600')
+                    : 'none',
+                  boxShadow: isHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
+                  opacity: isDimmed ? 0.35 : 1,
+                  transition: 'opacity 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease',
                   mb: 1.375,
                   cursor: (run.execution_id || execUrl) ? 'pointer' : 'default',
+                  '&:hover': {
+                    bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.18)' : 'hsl(var(--muted) / 0.25)',
+                  },
                   '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
                     opacity: 1,
                     pointerEvents: 'auto',
                   },
                 }}
               >
+                <Box sx={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color: isFailed ? 'hsl(var(--destructive))' : isWarning ? 'hsl(var(--severity-medium))' : 'hsl(var(--muted-foreground))' }}>
+                  <ZapIcon size={13} />
+                </Box>
                 <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary', whiteSpace: 'nowrap' }}>
                   {wfName}
                 </Typography>
                 <Typography sx={{ fontSize: '0.7rem', fontWeight: 500, color: 'text.secondary', whiteSpace: 'nowrap' }}>
                   {verb}
                 </Typography>
+                {previewBadge}
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 'auto', flexShrink: 0 }}>
                   {timeText && (
                     <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', whiteSpace: 'nowrap' }}>
@@ -7584,13 +7944,19 @@ const IncidentDetailPage = () => {
 
         return (
           <Box
-            key={`wfexec-${run.execution_id}`}
+            key={itemKey}
+            data-timeline-key={itemKey}
+            data-timeline-timestamp={item.timestamp}
+            data-timeline-filter="workflows"
             // The rail dot is drawn on the DIRECT child of the timeline
             // container, so the compact/quiet markers must live on this
             // wrapper — not on the inner row — otherwise the dot falls back
             // to the tall-card offset and stays accent-orange.
             data-timeline-compact="true"
             data-timeline-quiet={!isFailed && !isRunning && !isWarning ? 'true' : undefined}
+            data-timeline-highlighted={isHighlighted ? 'true' : undefined}
+            data-timeline-dimmed={isDimmed ? 'true' : undefined}
+            data-timeline-preview={item.isPreview ? 'true' : undefined}
             sx={{ display: 'flex', flexDirection: 'column' }}
           >
           <Box
@@ -7610,18 +7976,24 @@ const IncidentDetailPage = () => {
               boxSizing: 'border-box',
               lineHeight: 1,
               borderRadius: 1.5,
-              border: isFailed
-                ? '1px solid hsl(var(--destructive) / 0.5)'
-                : isWarning
-                  ? '1px solid hsl(var(--severity-medium) / 0.6)'
-                  : '1px solid transparent',
+              border: isHighlighted
+                ? (item.isPreview ? '1px dashed #ff6600' : '1px solid #ff6600')
+                : (isFailed
+                  ? '1px solid hsl(var(--destructive) / 0.5)'
+                  : isWarning
+                    ? '1px solid hsl(var(--severity-medium) / 0.6)'
+                    : '1px solid transparent'),
               mb: 0,
-              bgcolor: isWarning ? 'hsl(var(--severity-medium) / 0.08)' : 'transparent',
+              bgcolor: isHighlighted
+                ? 'hsl(var(--primary) / 0.12)'
+                : (isWarning ? 'hsl(var(--severity-medium) / 0.08)' : 'transparent'),
+              boxShadow: isHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
+              opacity: isDimmed ? 0.35 : 1,
               cursor: execUrl ? 'pointer' : 'default',
-              transition: 'border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease',
+              transition: 'opacity 0.2s ease, border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.2s ease',
               '&:hover': {
-                borderColor: isWarning ? 'hsl(var(--severity-medium))' : 'hsl(var(--muted-foreground) / 0.4)',
-                bgcolor: isWarning ? 'hsl(var(--severity-medium) / 0.14)' : 'hsl(var(--muted) / 0.3)',
+                borderColor: isHighlighted ? '#ff6600' : (isWarning ? 'hsl(var(--severity-medium))' : 'hsl(var(--muted-foreground) / 0.4)'),
+                bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.18)' : (isWarning ? 'hsl(var(--severity-medium) / 0.14)' : 'hsl(var(--muted) / 0.3)'),
                 ...(isFailed || isRunning || isWarning ? {} : {
                   '& .wf-status-icon svg': { color: 'hsl(var(--severity-low))' },
                   '& .wf-status-icon svg *': { stroke: 'hsl(var(--severity-low))' },
@@ -7647,6 +8019,7 @@ const IncidentDetailPage = () => {
             <Typography sx={{ fontSize: '0.8125rem', fontWeight: 500, color: isWarning ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0, flexShrink: 1 }}>
               {wfName}{shortId ? ` · ${shortId}` : ''}
             </Typography>
+            {previewBadge}
             {status && (
               <Typography className="wf-status-text" sx={{ fontSize: '0.7rem', color: isFailed ? 'hsl(var(--destructive))' : isWarning ? 'hsl(var(--severity-medium))' : 'hsl(var(--muted-foreground))', flexShrink: 0, textTransform: 'lowercase', transition: 'color 0.15s ease' }}>
                 · {status.toLowerCase()}
@@ -7697,8 +8070,8 @@ const IncidentDetailPage = () => {
           'task-created':         { icon: <TaskAltIcon size={12} /> },
           'task-completed':       { icon: <CheckCircleIcon size={12} /> },
           'task-status-changed':  { icon: <ForwardIcon size={12} /> },
-          'observable-added':     { icon: <VisibilityIcon size={12} /> },
-          'correlation-found':    { icon: <LinkIcon size={12} /> },
+          'observable-added':     { icon: <FingerprintIcon size={12} /> },
+          'correlation-found':    { icon: <Network size={12} /> },
           'incident-created':     { icon: <HistoryIcon size={12} /> },
           'routing-matched':      { icon: <CallSplitIcon size={12} /> },
           'attribute-changed':    { icon: <EditIcon size={12} /> },
@@ -7849,6 +8222,12 @@ const IncidentDetailPage = () => {
           <Box
             key={item.id}
             data-timeline-compact="true"
+            data-timeline-key={itemKey}
+            data-timeline-timestamp={item.timestamp}
+            data-timeline-filter={itemFilterKey || ''}
+            data-timeline-highlighted={isHighlighted ? 'true' : undefined}
+            data-timeline-dimmed={isDimmed ? 'true' : undefined}
+            data-timeline-preview={item.isPreview ? 'true' : undefined}
             data-tour={isIocPill ? 'timeline-ioc-pill' : undefined}
             data-ioc-pill={isIocPill ? 'true' : undefined}
             className={isStepHighlighted ? 'incident-new-flash' : undefined}
@@ -7858,28 +8237,30 @@ const IncidentDetailPage = () => {
               alignItems: 'center',
               flexWrap: isSimple ? 'wrap' : 'nowrap',
               gap: isSimple ? 0.5 : 1,
-              px: isSimple ? 0 : 1.25,
+              px: isHighlighted ? 0.75 : (isSimple ? 0 : 1.25),
               py: isSimple ? 0.25 : 0.5,
               ml: isSimple ? 0 : 0.5,
               borderRadius: isSimple ? 1 : 999,
-              bgcolor: pillBg,
-              border: isSimple ? 'none' : `1px solid ${pillBorder}`,
+              bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.12)' : pillBg,
+              border: isHighlighted
+                ? (item.isPreview ? '1px dashed #ff6600' : '1px solid #ff6600')
+                : (isSimple ? 'none' : `1px solid ${pillBorder}`),
+              boxShadow: isHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
+              opacity: isDimmed ? 0.35 : 1,
               mb: isSimple ? 1.375 : 0,
               maxWidth: '100%',
               minWidth: 0,
               overflow: 'hidden',
               cursor: isClickable ? 'pointer' : 'default',
-              transition: 'background-color 0.15s ease, border-color 0.15s ease',
+              transition: 'opacity 0.2s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease',
+              '&:hover': {
+                bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.18)' : (isClickable ? pillBgHover : undefined),
+                borderColor: isHighlighted ? '#ff6600' : (isClickable ? pillBorderHover : undefined),
+              },
               '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
                 opacity: 1,
                 pointerEvents: 'auto',
               },
-              ...(isClickable && {
-                '&:hover': {
-                  bgcolor: pillBgHover,
-                  borderColor: pillBorderHover,
-                },
-              }),
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', color: pillColor, flexShrink: 0 }}>
@@ -7905,6 +8286,7 @@ const IncidentDetailPage = () => {
                 </Typography>
               )
             )}
+            {previewBadge}
             {isIocPill && (
               <Typography
                 sx={{
@@ -8167,19 +8549,34 @@ const IncidentDetailPage = () => {
         if (isSimple) {
           return (
             <Box
-              key={actItem.id}
+              key={itemKey}
               id={actItem.id ? `activity-item-${actItem.id}` : undefined}
+              data-timeline-key={itemKey}
+              data-timeline-timestamp={item.timestamp}
+              data-timeline-filter="manual"
+              data-timeline-highlighted={isHighlighted ? 'true' : undefined}
+              data-timeline-dimmed={isDimmed ? 'true' : undefined}
+              data-timeline-preview={item.isPreview ? 'true' : undefined}
               className={!!actItem.id && newlyArrivedActivity.has(actItem.id) ? 'incident-new-flash' : undefined}
               sx={{
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 0.5,
-                px: 0,
+                px: isHighlighted ? 0.75 : 0,
                 py: 1,
                 mt: 3,
                 mb: 3,
-                bgcolor: 'transparent',
-                border: 'none',
+                borderRadius: isHighlighted ? 1.5 : 0,
+                bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.12)' : 'transparent',
+                border: isHighlighted
+                  ? (item.isPreview ? '1px dashed #ff6600' : '1px solid #ff6600')
+                  : 'none',
+                boxShadow: isHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
+                opacity: isDimmed ? 0.35 : 1,
+                transition: 'opacity 0.2s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease',
+                '&:hover': {
+                  bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.18)' : 'transparent',
+                },
                 '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
                   opacity: 1,
                   pointerEvents: 'auto',
@@ -8191,6 +8588,7 @@ const IncidentDetailPage = () => {
                 <Typography sx={{ fontSize: '0.73rem', fontWeight: 600, color: 'hsl(var(--foreground))', letterSpacing: 0.3, textTransform: 'uppercase' }}>
                   Incident resolution
                 </Typography>
+                {previewBadge}
                 <Chip
                   label="System event"
                   size="small"
@@ -8223,8 +8621,14 @@ const IncidentDetailPage = () => {
 
         return (
           <Box
-            key={actItem.id}
+            key={itemKey}
             id={actItem.id ? `activity-item-${actItem.id}` : undefined}
+            data-timeline-key={itemKey}
+            data-timeline-timestamp={item.timestamp}
+            data-timeline-filter="manual"
+            data-timeline-highlighted={isHighlighted ? 'true' : undefined}
+            data-timeline-dimmed={isDimmed ? 'true' : undefined}
+            data-timeline-preview={item.isPreview ? 'true' : undefined}
             className={!!actItem.id && newlyArrivedActivity.has(actItem.id) ? 'incident-new-flash' : undefined}
             sx={{
               display: 'flex',
@@ -8233,13 +8637,17 @@ const IncidentDetailPage = () => {
               px: 1.5,
               py: 1,
               borderRadius: 1.5,
-              bgcolor: 'transparent',
-              border: '1px solid hsl(var(--border-subtle))',
+              bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.12)' : 'transparent',
+              border: isHighlighted
+                ? (item.isPreview ? '1px dashed #ff6600' : '1px solid #ff6600')
+                : '1px solid hsl(var(--border-subtle))',
+              boxShadow: isHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
+              opacity: isDimmed ? 0.35 : 1,
               mb: 0,
-              transition: 'background-color 0.15s ease, border-color 0.15s ease',
+              transition: 'opacity 0.2s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease',
               '&:hover': {
-                bgcolor: 'hsl(var(--muted) / 0.4)',
-                borderColor: 'hsl(var(--border))',
+                bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.18)' : 'hsl(var(--muted) / 0.4)',
+                borderColor: isHighlighted ? '#ff6600' : 'hsl(var(--border))',
               },
               '&:hover .timeline-reply-btn, &:focus-within .timeline-reply-btn': {
                 opacity: 1,
@@ -8255,6 +8663,7 @@ const IncidentDetailPage = () => {
                 <Typography sx={{ fontSize: '0.73rem', fontWeight: 600, color: 'hsl(var(--foreground))', letterSpacing: 0.3, textTransform: 'uppercase' }}>
                   Incident resolution
                 </Typography>
+                {previewBadge}
                 <Chip
                   label="System event"
                   size="small"
@@ -8324,37 +8733,50 @@ const IncidentDetailPage = () => {
 
       return (
         <Box
-          key={actItem.id}
+          key={itemKey}
           id={actItem.id ? `activity-item-${actItem.id}` : undefined}
+          data-timeline-key={itemKey}
+          data-timeline-timestamp={item.timestamp}
+          data-timeline-filter={itemFilterKey || ''}
+          data-timeline-highlighted={isHighlighted ? 'true' : undefined}
+          data-timeline-dimmed={isDimmed ? 'true' : undefined}
+          data-timeline-preview={item.isPreview ? 'true' : undefined}
           className={isActHighlighted ? 'incident-new-flash' : undefined}
           onClick={isMergeItem ? () => focusRelatedIncident(mergeSourceIdFromId) : undefined}
           sx={{
             display: 'flex',
             flexDirection: isSimple ? 'column' : 'row',
             gap: isSimple ? 0.5 : 1.5,
-            px: isSimple ? 0.5 : 1.5,
+            px: isSimple ? (isHighlighted ? 0.75 : 0.5) : 1.5,
             py: isSimple ? 0.75 : 1.75,
             borderRadius: 1.5,
-            bgcolor: isDeleted
-              ? 'hsl(var(--muted) / 0.3)'
-              : isSimple
+            bgcolor: isHighlighted
+              ? 'hsl(var(--primary) / 0.12)'
+              : (isDeleted
+                ? 'hsl(var(--muted) / 0.3)'
+                : isSimple
+                  ? 'transparent'
+                  : actItem.type === 'comment' ? 'rgba(255, 102, 0, 0.05)' : 'hsl(var(--muted) / 0.5)'),
+            border: isHighlighted
+              ? (item.isPreview ? '1px dashed #ff6600' : '1px solid #ff6600')
+              : (isSimple ? 'none' : '1px solid'),
+            borderColor: isHighlighted
+              ? '#ff6600'
+              : (isSimple
                 ? 'transparent'
-                : actItem.type === 'comment' ? 'rgba(255, 102, 0, 0.05)' : 'hsl(var(--muted) / 0.5)',
-            border: isSimple ? 'none' : '1px solid',
-            borderColor: isSimple
-              ? 'transparent'
-              : isDeleted
-                ? 'hsl(var(--border-subtle))'
-                : actItem.type === 'comment' ? 'rgba(255, 102, 0, 0.1)' : 'hsl(var(--border-subtle))',
+                : isDeleted
+                  ? 'hsl(var(--border-subtle))'
+                  : actItem.type === 'comment' ? 'rgba(255, 102, 0, 0.1)' : 'hsl(var(--border-subtle))'),
+            boxShadow: isHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
             mb: isSimple ? 1.5 : 0,
             position: 'relative',
-            opacity: isDeleted ? 0.7 : 1,
+            opacity: isDimmed ? 0.35 : (isDeleted ? 0.7 : 1),
             cursor: isMergeItem ? 'pointer' : 'default',
-            transition: 'background-color 0.15s ease, border-color 0.15s ease',
+            transition: 'opacity 0.2s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease',
             ...(isMergeItem && {
               '&:hover': {
-                bgcolor: 'hsl(var(--muted) / 0.75)',
-                borderColor: 'hsl(var(--primary) / 0.4)',
+                bgcolor: isHighlighted ? 'hsl(var(--primary) / 0.18)' : 'hsl(var(--muted) / 0.75)',
+                borderColor: isHighlighted ? '#ff6600' : 'hsl(var(--primary) / 0.4)',
               },
             }),
             '&:hover .delete-btn': { opacity: 1 },
@@ -8373,6 +8795,7 @@ const IncidentDetailPage = () => {
               <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: isSimple ? '0.6rem' : '0.65rem' }}>
                 {isSimple ? formatCompactTime(actItem.timestamp) : formatRelativeTime(actItem.timestamp)}
               </Typography>
+              {previewBadge}
               {isReply && actItem.replyToLabel && (
                 <Chip
                   icon={<ReplyIcon size={11} />}
@@ -8602,21 +9025,35 @@ const IncidentDetailPage = () => {
       rerunCount: number = 0,
       lastActionTs: number = 0,
     ) => {
+      const isAgentHighlighted = hoveredTimelineFilter === 'agent';
+      const isAgentDimmed = hoveredTimelineFilter !== null && !isAgentHighlighted;
+
       if (isSimple) {
         return (
           <Box
             key={`ai-processing-${key}`}
+            data-timeline-filter="agent"
+            data-timeline-highlighted={isAgentHighlighted ? 'true' : undefined}
+            data-timeline-dimmed={isAgentDimmed ? 'true' : undefined}
             sx={{
               display: 'flex',
               flexDirection: 'column',
               gap: 0.25,
+              px: isAgentHighlighted ? 0.75 : 0,
               py: 0.25,
+              borderRadius: isAgentHighlighted ? 1 : 0,
+              bgcolor: isAgentHighlighted ? 'hsl(var(--primary) / 0.12)' : 'transparent',
+              border: isAgentHighlighted ? '1px solid #ff6600' : 'none',
+              boxShadow: isAgentHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
+              opacity: isAgentDimmed ? 0.35 : 1,
+              transition: 'opacity 0.2s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease',
               mb: 1.375,
-              bgcolor: 'transparent',
-              border: 'none',
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              <Box sx={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color: 'text.secondary' }}>
+                <AgentIcon size={13} />
+              </Box>
               <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary' }}>
                 AI Agent
               </Typography>
@@ -8759,6 +9196,9 @@ const IncidentDetailPage = () => {
       return (
         <Box
           key={`ai-processing-${key}`}
+          data-timeline-filter="agent"
+          data-timeline-highlighted={isAgentHighlighted ? 'true' : undefined}
+          data-timeline-dimmed={isAgentDimmed ? 'true' : undefined}
           sx={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -8769,9 +9209,16 @@ const IncidentDetailPage = () => {
             py: 0.4,
             borderRadius: 999,
             fontSize: '0.7rem',
-            background: timedOut ? 'hsl(var(--muted) / 0.4)' : 'var(--agent-gradient-subtle)',
+            background: isAgentHighlighted
+              ? 'hsl(var(--primary) / 0.12)'
+              : (timedOut ? 'hsl(var(--muted) / 0.4)' : 'var(--agent-gradient-subtle)'),
             border: '1px solid',
-            borderColor: timedOut ? 'hsl(var(--border))' : 'rgba(156, 90, 242, 0.35)',
+            borderColor: isAgentHighlighted
+              ? '#ff6600'
+              : (timedOut ? 'hsl(var(--border))' : 'rgba(156, 90, 242, 0.35)'),
+            boxShadow: isAgentHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
+            opacity: isAgentDimmed ? 0.35 : 1,
+            transition: 'opacity 0.2s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease',
             color: timedOut ? 'text.secondary' : 'text.primary',
             maxWidth: '100%',
           }}
@@ -9263,21 +9710,35 @@ const IncidentDetailPage = () => {
       && incidentAgeMs < AGENT_PREDICTION_WINDOW_MS
       && !hasAgentActivity;
 
+    const isAgentPredHighlighted = hoveredTimelineFilter === 'agent';
+    const isAgentPredDimmed = hoveredTimelineFilter !== null && !isAgentPredHighlighted;
+
     const agentPredictionNode = showAgentPrediction ? (
       isSimple ? (
         <Box
           key="ai-prediction-fresh"
+          data-timeline-filter="agent"
+          data-timeline-highlighted={isAgentPredHighlighted ? 'true' : undefined}
+          data-timeline-dimmed={isAgentPredDimmed ? 'true' : undefined}
           sx={{
             display: 'flex',
             flexDirection: 'column',
             gap: 0.25,
+            px: isAgentPredHighlighted ? 0.75 : 0,
             py: 0.25,
+            borderRadius: isAgentPredHighlighted ? 1 : 0,
+            bgcolor: isAgentPredHighlighted ? 'hsl(var(--primary) / 0.12)' : 'transparent',
+            border: isAgentPredHighlighted ? '1px solid #ff6600' : 'none',
+            boxShadow: isAgentPredHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
+            opacity: isAgentPredDimmed ? 0.35 : 1,
+            transition: 'opacity 0.2s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease',
             mb: 1.375,
-            bgcolor: 'transparent',
-            border: 'none',
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, color: 'text.secondary' }}>
+              <AgentIcon size={13} />
+            </Box>
             <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.secondary' }}>
               AI Agent
             </Typography>
@@ -9292,6 +9753,9 @@ const IncidentDetailPage = () => {
       ) : (
         <Box
           key="ai-prediction-fresh"
+          data-timeline-filter="agent"
+          data-timeline-highlighted={isAgentPredHighlighted ? 'true' : undefined}
+          data-timeline-dimmed={isAgentPredDimmed ? 'true' : undefined}
           sx={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -9302,8 +9766,12 @@ const IncidentDetailPage = () => {
             py: 0.4,
             borderRadius: 999,
             fontSize: '0.7rem',
-            background: 'var(--agent-gradient-subtle)',
-            border: '1px solid rgba(156, 90, 242, 0.35)',
+            background: isAgentPredHighlighted ? 'hsl(var(--primary) / 0.12)' : 'var(--agent-gradient-subtle)',
+            border: '1px solid',
+            borderColor: isAgentPredHighlighted ? '#ff6600' : 'rgba(156, 90, 242, 0.35)',
+            boxShadow: isAgentPredHighlighted ? '0 0 12px rgba(255, 102, 0, 0.25)' : 'none',
+            opacity: isAgentPredDimmed ? 0.35 : 1,
+            transition: 'opacity 0.2s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease',
             color: 'text.primary',
             maxWidth: '100%',
           }}
@@ -11294,6 +11762,7 @@ const IncidentDetailPage = () => {
               timelineActions={renderTimelineActionsChip(true)}
               tasks={simpleTasks}
               customFields={simpleCustomFields}
+              customFieldsCount={simpleCustomFieldDefs.length}
               observables={simpleObservables}
               correlations={simpleCorrelations}
               contentsActions={simpleContentsActions}
@@ -11790,7 +12259,7 @@ const IncidentDetailPage = () => {
             const allFields = [...customFields, ...dynamicFields];
 
             return allFields.length > 0 || Object.keys(editedCustomFields).length > 0 ? (
-              <Section title="Custom Fields" icon={SettingsIcon} defaultOpen={Object.keys(editedCustomFields).length > 0}>
+              <Section title="Custom Fields" icon={TuneIcon} defaultOpen={Object.keys(editedCustomFields).length > 0}>
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, columnGap: 2.5, rowGap: 2.5, pt: 1, pb: 0.5 }}>
                   {allFields.map((field) => renderCustomField(field))}
                 </Box>
