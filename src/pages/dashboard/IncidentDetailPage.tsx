@@ -5108,35 +5108,115 @@ const IncidentDetailPage = () => {
     }, 7000);
   };
 
+  /**
+   * Human name for a tenant id, using every tenant list we already hold.
+   */
+  const tenantDisplayName = useCallback((orgId: string): string => (
+    subOrgs.find((o) => o.id === orgId)?.name
+    || (parentOrg?.id === orgId ? (parentOrg.name || orgId) : undefined)
+    || (userInfo?.active_org?.id === orgId ? (userInfo.active_org.name || orgId) : undefined)
+    || sharedOrgs.find((o) => o.id === orgId)?.name
+    || orgId.slice(0, 8)
+  ), [subOrgs, parentOrg, userInfo?.active_org?.id, userInfo?.active_org?.name, sharedOrgs]);
+
+  /**
+   * Datastore options that address a tenant in its OWN region. A tenant in
+   * another region (ca./us./eu2.) is not reachable through the region this
+   * session is logged into — the Org-Id header does not cross regions — so
+   * every read/write/delete for it must be sent to that region's host.
+   * Returns undefined when the tenant lives in the current region.
+   */
+  const tenantRegionOptions = useCallback((orgId: string): { regionUrl: string } | undefined => {
+    if (!orgId || isDevEnvironment()) return undefined;
+    const raw = subOrgs.find((o) => o.id === orgId)?.region_url
+      || (parentOrg?.id === orgId ? parentOrg.region_url : undefined);
+    if (!raw) return undefined;
+    const mapped = mapCloudRegionUrl(raw);
+    if (!mapped) return undefined;
+    const normalized = mapped.replace(/\/+$/, '');
+    const current = (API_CONFIG.baseUrl || '').replace(/\/+$/, '');
+    if (!normalized || normalized === current) return undefined;
+    return { regionUrl: normalized };
+  }, [subOrgs, parentOrg]);
+
+  /**
+   * Stamp the authoritative tenant set onto the payload we are about to write
+   * and log the move in the incident timeline. The stamp is what lets the
+   * incident list hide ghost copies the datastore backend auto-recovers in
+   * tenants the incident was explicitly moved out of.
+   */
+  const stampTenantMove = useCallback((value: any, tenants: string[], removed: string[]): any => {
+    if (!value || typeof value !== 'object') return value;
+    const nextTenants = Array.from(new Set(tenants.filter(Boolean)));
+    const prevRemoved: string[] = Array.isArray(value?.metadata?.extensions?.custom_attributes?._tenants_removed)
+      ? value.metadata.extensions.custom_attributes._tenants_removed.filter((t: unknown) => typeof t === 'string')
+      : [];
+    const nextRemoved = Array.from(new Set([...prevRemoved, ...removed.filter(Boolean)]))
+      .filter((t) => !nextTenants.includes(t));
+
+    const entries: any[] = [];
+    if (removed.length > 0 || nextTenants.length > 0) {
+      const from = removed.map(tenantDisplayName).join(', ');
+      const to = nextTenants.map(tenantDisplayName).join(', ');
+      entries.push({
+        id: `tenant-move-${Date.now()}`,
+        type: 'change',
+        user: currentUsername,
+        timestamp: Date.now(),
+        content: removed.length > 0
+          ? `Moved this incident from ${from} to ${to}`
+          : `Added this incident to ${to}`,
+        details: { field: 'tenants', from: removed, to: nextTenants },
+      });
+    }
+
+    return {
+      ...value,
+      activity: [...(Array.isArray(value.activity) ? value.activity : []), ...entries],
+      metadata: {
+        ...value.metadata,
+        extensions: {
+          ...value.metadata?.extensions,
+          custom_attributes: {
+            ...value.metadata?.extensions?.custom_attributes,
+            _tenants: nextTenants,
+            _tenants_removed: nextRemoved,
+            _tenants_updated_at: Date.now(),
+          },
+        },
+      },
+    };
+  }, [tenantDisplayName, currentUsername]);
+
   const moveIncidentToTenant = async (targetOrgId: string, updatedValue?: any) => {
     if (!incident?.id) throw new Error('No incident loaded');
     const sourceOrgId = crossOrgId || userInfo?.active_org?.id;
     if (!sourceOrgId) throw new Error('Could not determine source tenant');
-    const targetName = subOrgs.find((o) => o.id === targetOrgId)?.name
-      || (parentOrg?.id === targetOrgId ? parentOrg.name : undefined)
-      || (userInfo?.active_org?.id === targetOrgId ? userInfo.active_org.name : undefined)
-      || targetOrgId.slice(0, 8);
+    const targetName = tenantDisplayName(targetOrgId);
 
     const presentOrgIds = new Set<string>([sourceOrgId, ...sharedOrgs.map((o) => o.id)]);
     let value = updatedValue || incident.rawOCSF || incident;
     if (!value) {
-      const fresh = await getDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, sourceOrgId);
+      const fresh = await getDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, sourceOrgId, tenantRegionOptions(sourceOrgId));
       if (fresh?.success && fresh.item?.value) {
         value = typeof fresh.item.value === 'string' ? JSON.parse(fresh.item.value) : fresh.item.value;
       }
     }
 
     if (targetOrgId !== sourceOrgId) {
-      const write = await writeIncidentSafe(incident.id, value as object, targetOrgId);
+      const removedTenants = Array.from(presentOrgIds).filter((o) => o !== targetOrgId);
+      const stamped = stampTenantMove(value, [targetOrgId], removedTenants);
+      const targetRegion = tenantRegionOptions(targetOrgId);
+      const write = await writeIncidentSafe(incident.id, stamped as object, targetOrgId, targetRegion);
       if (!write.success) throw new Error(`Could not write incident to ${targetName}`);
-      const check = await getDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, targetOrgId);
+      const check = await getDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, targetOrgId, targetRegion);
       if (!(check?.success && check.item?.value)) throw new Error(`Could not verify incident in ${targetName}`);
     }
 
     const deleteFailures: string[] = [];
     for (const oldOrgId of presentOrgIds) {
       if (oldOrgId === targetOrgId) continue;
-      const deleted = await deleteDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, oldOrgId);
+      const deleted = await deleteDatastoreItem(incident.id, DATASTORE_CATEGORIES.INCIDENTS, oldOrgId, tenantRegionOptions(oldOrgId));
       if (!deleted.success) deleteFailures.push(oldOrgId);
     }
     if (deleteFailures.length > 0) {
