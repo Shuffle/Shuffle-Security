@@ -61,7 +61,7 @@ import type { DatastoreItem, RBACConfig } from '@/Shuffle-MCPs/datastore';
 import { ShareAccessModal } from '@/components/common/ShareAccessModal';
 import IncidentReportDialog from '@/components/incidents/IncidentReportDialog';
 import type { GenerateReportInput } from '@/services/incidentReports';
-import { API_CONFIG, getApiUrl, getAuthHeader, getShuffleCoreUrl, getShuffleCoreWorkflowUrl } from '@/Shuffle-MCPs/api';
+import { API_CONFIG, getApiUrl, getAuthHeader, getShuffleCoreUrl, getShuffleCoreWorkflowUrl, mapCloudRegionUrl, isDevEnvironment } from '@/Shuffle-MCPs/api';
 import { navigateToShuffleCore } from '@/lib/authHandoff';
 import { resyncState, getResyncBlockedReason, extractResyncFailureReason } from '@/lib/resyncState';
 import { autoCorrectTranslatedString, repairCorruptedOcsfFields, type FieldRepair } from '@/lib/translationFallback';
