@@ -330,13 +330,24 @@ const isUnchangedWrite = (keysExisted?: DatastoreKeyExisted[]) =>
 
 
 /**
+ * Build a datastore endpoint URL. When `regionUrl` is provided (an absolute
+ * region base such as https://ca.shuffle.security) the request is addressed
+ * directly to that region instead of the region the session is logged into.
+ * Cross-region tenants are only reachable this way — an Org-Id header alone
+ * does not cross regions.
+ */
+const datastoreUrl = (path: string, regionUrl?: string): string =>
+  regionUrl ? `${regionUrl.replace(/\/+$/, '')}${path}` : getApiUrl(path);
+
+/**
  * Set a single item in the datastore
  */
 export const setDatastoreItem = async (
   key: string,
   value: string | object,
   category: string,
-  overrideOrgId?: string
+  overrideOrgId?: string,
+  options?: { regionUrl?: string }
 ): Promise<DatastoreResponse> => {
   const orgId = overrideOrgId || (await waitForOrgId());
   if (!orgId) {
@@ -383,7 +394,7 @@ export const setDatastoreItem = async (
 
   console.log(`[datastore.set] key=${rawKey} category=${category} orgId=${orgId} bytes=${byteLength(serialized)}${overrideOrgId ? ' (override)' : ''}`);
 
-  const send = (v: string) => fetch(getApiUrl('/api/v2/datastore'), {
+  const send = (v: string) => fetch(datastoreUrl('/api/v2/datastore', options?.regionUrl), {
     method: 'POST',
     credentials: 'include',
     headers,
@@ -545,7 +556,7 @@ export const getDatastoreItem = async (
   key: string,
   category: string,
   overrideOrgId?: string,
-  options?: { priority?: boolean }
+  options?: { priority?: boolean; regionUrl?: string }
 ): Promise<DatastoreResponse & { item?: DatastoreItem }> => {
   const orgId = overrideOrgId || (await waitForOrgId());
   if (!orgId) {
@@ -564,8 +575,8 @@ export const getDatastoreItem = async (
 
   const isVulnsCategory = category === 'shuffle-security_vulns' || category === 'shuffle-security_vulnerabilities' || category === 'vulns';
   const requestUrl = isVulnsCategory
-    ? getApiUrl(`/api/v2/vulns/${encodeURIComponent(rawKey)}`)
-    : getApiUrl(`/api/v1/orgs/${orgId}/get_cache`);
+    ? datastoreUrl(`/api/v2/vulns/${encodeURIComponent(rawKey)}`, options?.regionUrl)
+    : datastoreUrl(`/api/v1/orgs/${orgId}/get_cache`, options?.regionUrl);
   const baseDiagnostics: DatastoreDiagnostics = {
     operation: 'get',
     category,
@@ -1136,7 +1147,8 @@ export const getDatastoreByCategory = async (
 export const deleteDatastoreItem = async (
   key: string,
   category: string,
-  overrideOrgId?: string
+  overrideOrgId?: string,
+  options?: { regionUrl?: string }
 ): Promise<DatastoreResponse> => {
   const orgId = overrideOrgId || (await waitForOrgId());
   if (!orgId) {
@@ -1164,7 +1176,7 @@ export const deleteDatastoreItem = async (
 
   console.log(`[datastore.delete] key=${rawKey} category=${category} orgId=${orgId}${overrideOrgId ? ' (override)' : ''}`);
 
-  const response = await fetch(getApiUrl(`/api/v1/orgs/${orgId}/delete_cache`), {
+  const response = await fetch(datastoreUrl(`/api/v1/orgs/${orgId}/delete_cache`, options?.regionUrl), {
     method: 'POST',
     credentials: 'include',
     headers,

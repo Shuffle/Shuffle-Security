@@ -1329,6 +1329,7 @@ export const writeIncidentSafe = async (
   id: string,
   nextRaw: any,
   orgId?: string,
+  options?: { regionUrl?: string },
 ): Promise<{ success: boolean; error?: string }> => {
   let nextObj: any = nextRaw;
   if (typeof nextRaw === 'string') {
@@ -1336,7 +1337,7 @@ export const writeIncidentSafe = async (
   }
   let existing: any = null;
   try {
-    const res = await getDatastoreItem(id, DATASTORE_CATEGORIES.INCIDENTS, orgId);
+    const res = await getDatastoreItem(id, DATASTORE_CATEGORIES.INCIDENTS, orgId, options?.regionUrl ? { regionUrl: options.regionUrl } : undefined);
     if (res.success && res.item?.value) {
       existing = JSON.parse(res.item.value);
     }
@@ -1348,6 +1349,7 @@ export const writeIncidentSafe = async (
     JSON.stringify(hardened),
     DATASTORE_CATEGORIES.INCIDENTS,
     orgId,
+    options?.regionUrl ? { regionUrl: options.regionUrl } : undefined,
   );
 };
 
