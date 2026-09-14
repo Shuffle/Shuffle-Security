@@ -131,6 +131,16 @@ export async function fetchEnvironmentsCached(
 let _workflowsCache: any[] | null = null;
 let _workflowsCacheTs = 0;
 
+export function invalidateWorkflowsCache() {
+  _workflowsCache = null;
+  _workflowsCacheTs = 0;
+  for (const key of _jsonCache.keys()) {
+    if (key.includes('/api/v1/workflows')) {
+      _jsonCache.delete(key);
+    }
+  }
+}
+
 export function getCachedWorkflows(): any[] | null {
   if (_workflowsCache && Date.now() - _workflowsCacheTs < WORKFLOWS_TTL_MS) {
     return _workflowsCache;
@@ -149,6 +159,9 @@ export async function fetchWorkflowsCached(
   force = false,
 ): Promise<any[]> {
   try {
+    if (force) {
+      invalidateWorkflowsCache();
+    }
     const data = await fetchJsonCached(url, init, WORKFLOWS_TTL_MS, force);
     const list = Array.isArray(data) ? data : (data?.workflows || []);
     _workflowsCache = list;

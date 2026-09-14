@@ -145,7 +145,7 @@ import { Zap as ZapIcon } from 'lucide-react';
 import type { AgentRun } from '@/services/agentActivity';
 import { getAgentSkipInfo } from '@/lib/agentParsers';
 import HighlightedFileEditor from '@/components/incidents/HighlightedFileEditor';
-import EmailThreadPanel, { isEmailContent } from '@/components/incidents/EmailThreadPanel';
+import EmailThreadPanel, { isEmailContent, getEmailMessageCount } from '@/components/incidents/EmailThreadPanel';
 import SimpleCaseLayout from '@/components/incidents/SimpleCaseLayout';
 import { isDraftOnlyIncident, resolveEmailThread } from '@/lib/emailThreadAdapters';
 
@@ -691,6 +691,91 @@ const parseIncidentFromDatastore = (item: { key: string; value: string; created?
 // Canonical collapsible panel — see src/components/incidents/IncidentSection.tsx.
 // Aliased as `Section` so existing call sites keep working.
 const Section = IncidentSection;
+
+interface SimpleIncidentTitleProps {
+  title: string;
+  onCommit: (val: string) => void;
+  readOnly?: boolean;
+}
+
+/**
+ * Title header for the Simple Case View.
+ * Clamped to 1 line with ellipsis by default so long email subjects/alert titles
+ * do not take up 3-4 lines and dominate the screen. Expands smoothly on hover
+ * to reveal full text, and switches to an editable input on click.
+ */
+const SimpleIncidentTitle = ({ title, onCommit, readOnly = false }: SimpleIncidentTitleProps) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  if (isEditing && !readOnly) {
+    return (
+      <DeferredTextField
+        autoFocus
+        value={title}
+        onCommit={(next) => {
+          onCommit(next);
+          setIsEditing(false);
+        }}
+        onBlur={() => setIsEditing(false)}
+        variant="standard"
+        placeholder="Untitled incident"
+        multiline
+        fullWidth
+        slotProps={{ input: { disableUnderline: true } }}
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          '& textarea, & input': {
+            fontSize: '1.6rem',
+            fontWeight: 700,
+            lineHeight: 1.25,
+            color: 'hsl(var(--foreground))',
+            p: 0,
+          },
+        }}
+      />
+    );
+  }
+
+  return (
+    <Box
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={() => {
+        if (!readOnly) setIsEditing(true);
+      }}
+      title={!isHovered ? title || 'Untitled incident' : undefined}
+      sx={{
+        flex: 1,
+        minWidth: 0,
+        fontSize: '1.6rem',
+        fontWeight: 700,
+        lineHeight: 1.25,
+        color: title ? 'hsl(var(--foreground))' : 'hsl(var(--muted-foreground))',
+        cursor: readOnly ? 'default' : 'text',
+        borderRadius: 1,
+        transition: 'background-color 0.15s ease',
+        '&:hover': {
+          bgcolor: readOnly ? 'transparent' : 'rgba(255, 255, 255, 0.04)',
+        },
+        ...(isHovered
+          ? {
+              whiteSpace: 'pre-wrap',
+              overflow: 'visible',
+              wordBreak: 'break-word',
+            }
+          : {
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }),
+      }}
+    >
+      {title || 'Untitled incident'}
+    </Box>
+  );
+};
 
 const IncidentDetailPage = () => {
   const { id: rawId } = useParams<{ id: string }>();
@@ -11513,52 +11598,28 @@ const IncidentDetailPage = () => {
           {/* Tab Content */}
       <Box sx={isPublicView ? { pointerEvents: 'none', '& input, & textarea, & select, & button:not([data-public-ok])': { opacity: 0.7 } } : {}}>
       {activeTab === 7 && (() => {
-        const simpleHasEmail = !!incident && isEmailContent(editedMessage || '', rawDescriptionHtml || '', incident.rawOCSF);
-        // When the case came in as an email we show the email renderer above the
-        // description, collapsed by default, so the description stays available
-        // for the analyst to write their own details.
-        const simpleEmail = simpleHasEmail ? (
-          <Box sx={{ mb: 3 }}>
-            <Box
-              onClick={() => setSimpleEmailOpen((v) => !v)}
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                cursor: 'pointer',
-                userSelect: 'none',
-                mb: simpleEmailOpen ? 1.5 : 0,
-              }}
-            >
-              <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'hsl(var(--muted-foreground))' }}>
-                Email
-              </Typography>
-              <Typography sx={{ fontSize: '0.72rem', color: 'hsl(var(--muted-foreground))' }}>
-                {simpleEmailOpen ? 'Hide' : 'Show'}
-              </Typography>
-            </Box>
-            {simpleEmailOpen && (
-              <EmailThreadPanel
-                descriptionHtml={rawDescriptionHtml || ''}
-                descriptionText={editedMessage || ''}
-                rawOCSF={incident?.rawOCSF}
-                borderless
-              />
-            )}
-          </Box>
+        const simpleHasEmail = !!incident && isEmailContent(editedMessage || '', rawDescriptionHtml || '', incident.rawOCSF, incident);
+        const simpleEmailThread = simpleHasEmail ? (
+          <EmailThreadPanel
+            descriptionHtml={rawDescriptionHtml || ''}
+            descriptionText={editedMessage || ''}
+            rawOCSF={incident?.rawOCSF}
+            defaultCollapsed={true}
+            onReply={(to, subject, body) => {
+              setShowForwardDialog(true);
+            }}
+            onForward={() => setShowForwardDialog(true)}
+          />
         ) : null;
 
         const simpleNarrative = (
-          <>
-            {simpleEmail}
-            <MarkdownDescriptionEditor
-              key={incident?.id}
-              value={editedMessage}
-              onCommit={setEditedMessage}
-              placeholder="Add a description... Markdown supported, paste images directly."
-              readOnly={isPublicView}
-            />
-          </>
+          <MarkdownDescriptionEditor
+            key={incident?.id}
+            value={editedMessage}
+            onCommit={setEditedMessage}
+            placeholder="Add a description... Markdown supported, paste images directly."
+            readOnly={isPublicView}
+          />
         );
 
         // Overview block at the top of the center column: source icon + title,
@@ -11574,18 +11635,11 @@ const IncidentDetailPage = () => {
                   <TaskAltIcon size={24} style={{ color: severityColors[editedSeverity] }} />
                 )}
               </Box>
-              <DeferredTextField
-                value={editedTitle}
+              <SimpleIncidentTitle
+                title={editedTitle}
                 onCommit={(next) => { if (!isPublicView) setEditedTitle(next); }}
-                variant="standard"
-                placeholder="Untitled incident"
-                multiline
-                fullWidth
-                inputProps={{ readOnly: isPublicView }}
-                slotProps={{ input: { disableUnderline: true } }}
-                sx={{ '& textarea, & input': { fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.25, color: 'hsl(var(--foreground))' } }}
+                readOnly={isPublicView}
               />
-
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5, flexWrap: 'wrap', ...(isPublicView && { pointerEvents: 'none' }) }}>
               <FormControl size="small" variant="standard">
@@ -11851,6 +11905,8 @@ const IncidentDetailPage = () => {
             <SimpleCaseLayout
               narrativeLabel="Description"
               overview={simpleOverview}
+              emailThread={simpleEmailThread}
+              emailThreadCount={simpleHasEmail ? getEmailMessageCount(editedMessage || '', rawDescriptionHtml || '', incident.rawOCSF, incident) : undefined}
               narrative={simpleNarrative}
               timeline={renderTimelinePanel('simple')}
               timelineActions={renderTimelineActionsChip(true)}
@@ -11895,7 +11951,7 @@ const IncidentDetailPage = () => {
           description view mode) survives a tab switch. */}
       <Box sx={{ display: activeTab === 0 ? 'block' : 'none' }}>
       {(() => {
-        const hasEmail = !!incident && isEmailContent(editedMessage || '', rawDescriptionHtml || '', incident.rawOCSF);
+        const hasEmail = !!incident && isEmailContent(editedMessage || '', rawDescriptionHtml || '', incident.rawOCSF, incident);
         const descriptionBody = (
           <>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -12050,19 +12106,9 @@ const IncidentDetailPage = () => {
               the right column (collapsed by default) so the parsed thread
               becomes the primary narrative on the left. */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-          {/* Description Section — only render here when there is NO email
-              thread. Otherwise it lives on the right column collapsed. */}
-          {!hasEmail && (
-          <Box data-tour="incident-description">
-            <Section title="Description" icon={DescriptionIcon} defaultOpen={false} storageKey="shuffle-incident-description-open">
-              {descriptionBody}
-            </Section>
-          </Box>
-          )}
-
-          {/* Email Thread Panel — shown below Description when email content is detected */}
+          {/* Email Thread Panel — shown when email content is detected */}
           {hasEmail && (
-            <Box data-tour="incident-description">
+            <Box data-tour="incident-email-thread">
               <EmailThreadPanel
                 descriptionHtml={rawDescriptionHtml || ''}
                 descriptionText={editedMessage || ''}
@@ -12092,6 +12138,13 @@ const IncidentDetailPage = () => {
               />
             </Box>
           )}
+
+          {/* Description Section — always rendered so analysts have both Description and Email */}
+          <Box data-tour="incident-description">
+            <Section title="Description" icon={DescriptionIcon} defaultOpen={!hasEmail} storageKey="shuffle-incident-description-open">
+              {descriptionBody}
+            </Section>
+          </Box>
 
           {/* Inline Timeline — the heart of the Details tab. Renders the same
               comment input + unified feed as the right sidebar, but styled

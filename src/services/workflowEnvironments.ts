@@ -1,5 +1,6 @@
-import { getApiUrl, getAuthHeader } from "@/Shuffle-MCPs/api";
+import { getApiUrl, shuffleFetch } from "@/Shuffle-MCPs/api";
 import { WorkflowSummary } from "@/hooks/useWorkflows";
+import { invalidateWorkflowsCache } from "@/Shuffle-Core/views/appsFetchCache";
 
 export interface UpdateWorkflowEnvResult {
   success: boolean;
@@ -23,54 +24,84 @@ export const updateWorkflowEnvironment = async (
     >) || { id: workflowId };
 
     try {
-      const getRes = await fetch(
+      const getRes = await shuffleFetch(
         getApiUrl(`/api/v1/workflows/${workflowId}`),
-        {
-          credentials: "include",
-          headers: { ...getAuthHeader() },
-        },
       );
       if (getRes.ok) {
         const fetched = (await getRes.json()) as Record<string, unknown>;
-        if (fetched?.id === workflowId) {
-          fullWorkflow = fetched;
+        if (fetched && typeof fetched === "object") {
+          const wfObj =
+            fetched.id === workflowId
+              ? fetched
+              : (fetched.workflow as Record<string, unknown> | undefined)?.id === workflowId
+              ? (fetched.workflow as Record<string, unknown>)
+              : (fetched.data as Record<string, unknown> | undefined)?.id === workflowId
+              ? (fetched.data as Record<string, unknown>)
+              : fetched;
+          if (wfObj) {
+            fullWorkflow = { ...fullWorkflow, ...wfObj };
+          }
         }
       }
     } catch {
       // Fall back to provided object
     }
 
+    // Determine actions from fullWorkflow or fallbackWorkflow
+    const existingActions =
+      Array.isArray(fullWorkflow.actions) && fullWorkflow.actions.length > 0
+        ? (fullWorkflow.actions as Record<string, unknown>[])
+        : Array.isArray((fallbackWorkflow as Record<string, unknown>)?.actions) &&
+          ((fallbackWorkflow as Record<string, unknown>).actions as unknown[]).length > 0
+        ? ((fallbackWorkflow as Record<string, unknown>).actions as Record<string, unknown>[])
+        : [];
+
+    const updatedActions = existingActions.map((act: Record<string, unknown>) => ({
+      ...act,
+      environment: newEnvName,
+      execution_environment: newEnvName,
+    }));
+
+    // Determine triggers from fullWorkflow or fallbackWorkflow
+    const existingTriggers =
+      Array.isArray(fullWorkflow.triggers) && fullWorkflow.triggers.length > 0
+        ? (fullWorkflow.triggers as Record<string, unknown>[])
+        : Array.isArray((fallbackWorkflow as Record<string, unknown>)?.triggers) &&
+          ((fallbackWorkflow as Record<string, unknown>).triggers as unknown[]).length > 0
+        ? ((fallbackWorkflow as Record<string, unknown>).triggers as Record<string, unknown>[])
+        : [];
+
+    const updatedTriggers = existingTriggers.map((trig: Record<string, unknown>) => ({
+      ...trig,
+      environment:
+        newEnvName.toLowerCase() === "cloud" &&
+        (trig.environment === "cloud" ||
+          trig.trigger_type === "SCHEDULE")
+          ? "cloud"
+          : newEnvName,
+      execution_environment:
+        newEnvName.toLowerCase() === "cloud" &&
+        (trig.environment === "cloud" ||
+          trig.trigger_type === "SCHEDULE")
+          ? "cloud"
+          : newEnvName,
+    }));
+
     // 2. Update environment at workflow level, actions level, and triggers level
     const updatedWorkflow: Record<string, unknown> = {
       ...fullWorkflow,
       environment: newEnvName,
-      actions: Array.isArray(fullWorkflow.actions)
-        ? fullWorkflow.actions.map((act: Record<string, unknown>) => ({
-            ...act,
-            environment: newEnvName,
-          }))
-        : fullWorkflow.actions,
-      triggers: Array.isArray(fullWorkflow.triggers)
-        ? fullWorkflow.triggers.map((trig: Record<string, unknown>) => ({
-            ...trig,
-            environment:
-              newEnvName.toLowerCase() === "cloud" &&
-              (trig.environment === "cloud" ||
-                trig.trigger_type === "SCHEDULE")
-                ? "cloud"
-                : newEnvName,
-          }))
-        : fullWorkflow.triggers,
+      execution_environment: newEnvName,
+      actions: updatedActions,
+      triggers: updatedTriggers,
     };
 
     // 3. Persist update
-    const putRes = await fetch(
+    const putRes = await shuffleFetch(
       getApiUrl(`/api/v1/workflows/${workflowId}`),
       {
         method: "PUT",
-        credentials: "include",
         headers: {
-          ...getAuthHeader(),
           "Content-Type": "application/json",
           Accept: "application/json",
         },
@@ -103,7 +134,7 @@ export const updateWorkflowEnvironment = async (
 
     if (
       resJson &&
-      (resJson.success === false || typeof resJson.reason === "string")
+      resJson.success === false
     ) {
       const reason =
         (typeof resJson.reason === "string" && resJson.reason) ||
@@ -111,6 +142,9 @@ export const updateWorkflowEnvironment = async (
         "Failed to update workflow environment";
       return { success: false, reason };
     }
+
+    // Invalidate local in-memory cache so subsequent fetches hit the network
+    invalidateWorkflowsCache();
 
     return { success: true };
   } catch (err) {

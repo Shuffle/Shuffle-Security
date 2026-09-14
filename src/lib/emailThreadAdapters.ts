@@ -285,31 +285,31 @@ const outlookToEmailThread = (raw: any, forceDraft?: boolean): EmailMessage[] =>
 
 const isGenericEmailEnvelope = (raw: any): boolean => {
   if (!raw || typeof raw !== 'object') return false;
-  const hasFrom = !!(raw.from || raw.sender || raw.From);
-  const hasBody = !!(raw.body || raw.text || raw.html || raw.Body || raw.HtmlBody || raw.TextBody);
-  const hasSubjectish = !!(raw.subject || raw.Subject);
-  return hasFrom && hasBody && hasSubjectish;
+  const hasFrom = !!(raw.from || raw.sender || raw.From || raw.Sender || raw.fromEmail || raw.from_email);
+  const hasBody = !!(raw.body || raw.text || raw.html || raw.Body || raw.HtmlBody || raw.TextBody || raw.content || raw.message);
+  const hasSubjectish = !!(raw.subject || raw.Subject || raw.title || raw.Title);
+  return (hasFrom && (hasBody || hasSubjectish)) || (hasSubjectish && hasBody);
 };
 
 const genericToEmailThread = (raw: any, forceDraft?: boolean): EmailMessage[] => {
-  const fromRaw = raw.from || raw.sender || raw.From || '';
+  const fromRaw = raw.from || raw.sender || raw.From || raw.Sender || raw.fromEmail || raw.from_email || '';
   const fromStr = typeof fromRaw === 'string' ? fromRaw : (fromRaw?.address || fromRaw?.email || JSON.stringify(fromRaw));
   const fromMatch = fromStr.match(/^(.*?)\s*<([^>]+)>\s*$/);
   const html = raw.html || raw.HtmlBody || (raw.body?.html) || '';
-  const text = raw.text || raw.TextBody || raw.body || (typeof raw.Body === 'string' ? raw.Body : '') || htmlToText(html);
+  const text = raw.text || raw.TextBody || raw.body || (typeof raw.Body === 'string' ? raw.Body : '') || raw.content || raw.message || htmlToText(html);
   const isDraft = forceDraft
     || raw.isDraft === true
     || raw.is_draft === true
     || (typeof raw.status === 'string' && raw.status.toLowerCase() === 'draft')
     || raw.draft === true;
   return [{
-    id: raw.id || raw.messageId || raw['Message-ID'] || 'generic-0',
+    id: raw.id || raw.messageId || raw['Message-ID'] || raw.message_id || 'generic-0',
     from: fromMatch ? (fromMatch[1].trim() || fromMatch[2]) : (fromStr || 'Sender'),
     fromEmail: fromMatch ? fromMatch[2] : (fromStr.includes('@') ? fromStr : undefined),
-    to: raw.to || raw.To || undefined,
-    cc: raw.cc || raw.Cc || undefined,
-    subject: raw.subject || raw.Subject || undefined,
-    date: raw.date || raw.Date || raw.receivedDateTime || undefined,
+    to: raw.to || raw.To || raw.recipient || raw.toRecipients || undefined,
+    cc: raw.cc || raw.Cc || raw.ccRecipients || undefined,
+    subject: raw.subject || raw.Subject || raw.title || raw.Title || undefined,
+    date: raw.date || raw.Date || raw.receivedDateTime || raw.timestamp || raw.sentDateTime || undefined,
     body: typeof text === 'string' ? text : '',
     bodyHtml: typeof html === 'string' && html ? html : undefined,
     isLatest: true,
@@ -334,14 +334,25 @@ const unwrapDraftCandidates = (
 ): Array<{ payload: any; forceDraft: boolean }> => {
   const out: Array<{ payload: any; forceDraft: boolean }> = [];
   const push = (p: any, forceDraft: boolean) => {
-    if (p && typeof p === 'object') out.push({ payload: p, forceDraft });
+    if (!p) return;
+    if (typeof p === 'string') {
+      try {
+        const parsed = JSON.parse(p);
+        if (parsed && typeof parsed === 'object') out.push({ payload: parsed, forceDraft });
+      } catch { /* ignore */ }
+      return;
+    }
+    if (typeof p === 'object') out.push({ payload: p, forceDraft });
   };
   // Non-draft candidates
   push(unmapped, false);
   push(unmapped.message, false);
   push(unmapped.email, false);
+  push(unmapped.emails, false);
   push(unmapped.data, false);
   push(unmapped.payload, false);
+  push(unmapped.raw, false);
+  push(unmapped.original, false);
   // Explicit draft wrappers: force isDraft on the resulting messages.
   if (unmapped.draft) {
     push(unmapped.draft, true);
@@ -362,7 +373,25 @@ const unwrapDraftCandidates = (
  * legacy description-text regex parser inside EmailThreadPanel.
  */
 export const resolveEmailThread = (rawOCSF: any): ResolvedEmailThread | null => {
-  const unmapped = rawOCSF?.unmapped_original;
+  if (!rawOCSF) return null;
+  let unmapped =
+    rawOCSF?.unmapped_original ??
+    rawOCSF?.unmapped ??
+    rawOCSF?.raw ??
+    rawOCSF?.original ??
+    rawOCSF?.data ??
+    rawOCSF?.payload ??
+    rawOCSF?.email ??
+    rawOCSF;
+
+  if (typeof unmapped === 'string') {
+    try {
+      unmapped = JSON.parse(unmapped);
+    } catch {
+      // not json
+    }
+  }
+
   if (!unmapped || typeof unmapped !== 'object') return null;
 
   const candidates = unwrapDraftCandidates(unmapped);

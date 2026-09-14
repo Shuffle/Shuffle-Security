@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Autocomplete,
   Box,
@@ -11,6 +11,7 @@ import { getApiUrl, getAuthHeader } from "@/Shuffle-MCPs/api";
 import { toast } from "@/lib/toast";
 import { WorkflowSummary } from "@/hooks/useWorkflows";
 import { updateWorkflowEnvironment } from "@/services/workflowEnvironments";
+import { invalidateWorkflowsCache } from "@/Shuffle-Core/views/appsFetchCache";
 import {
   EnvironmentItem,
   isRunning,
@@ -42,6 +43,11 @@ export const WorkflowEnvironmentSelector = ({
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [localEnvName, setLocalEnvName] = useState<string | null>(null);
+
+  // Sync localEnvName whenever workflow prop updates from outside (e.g. background batch updates)
+  useEffect(() => {
+    setLocalEnvName(null);
+  }, [workflow.environment, workflow.execution_environment, workflow.actions, workflow.triggers]);
 
   // Discover explicit environment on the workflow object, actions, or triggers
   const explicitEnvName = useMemo(() => {
@@ -94,9 +100,41 @@ export const WorkflowEnvironmentSelector = ({
         `Runtime location for "${workflow.name || "Workflow"}" updated to ${next.Name}`,
       );
 
-      // Invalidate react-query cache for workflows so all views stay in sync
+      // Optimistically update React Query workflows cache so parent and other views update immediately
+      queryClient.setQueriesData<WorkflowSummary[]>(
+        { queryKey: ["workflows"] },
+        (oldWorkflows) => {
+          if (!Array.isArray(oldWorkflows)) return oldWorkflows;
+          return oldWorkflows.map((w) =>
+            w.id === workflow.id
+              ? {
+                  ...w,
+                  environment: next.Name,
+                  execution_environment: next.Name,
+                  actions: Array.isArray(w.actions)
+                    ? w.actions.map((a: any) => ({
+                        ...a,
+                        environment: next.Name,
+                        execution_environment: next.Name,
+                      }))
+                    : [{ environment: next.Name, execution_environment: next.Name }],
+                  triggers: Array.isArray(w.triggers)
+                    ? w.triggers.map((t: any) => ({
+                        ...t,
+                        environment: next.Name,
+                        execution_environment: next.Name,
+                      }))
+                    : w.triggers,
+                }
+              : w,
+          );
+        },
+      );
+
+      // Invalidate react-query cache and in-memory workflows cache so all views stay in sync
+      invalidateWorkflowsCache();
       queryClient.invalidateQueries({ queryKey: ["workflows"] });
-      onUpdated?.({ ...workflow, environment: next.Name }, next.Name);
+      onUpdated?.({ ...workflow, environment: next.Name, execution_environment: next.Name }, next.Name);
     } catch (err: unknown) {
       toast.error(
         err instanceof Error

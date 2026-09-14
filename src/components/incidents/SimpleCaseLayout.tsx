@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Box, Button, Typography } from '@mui/material';
-import { FileText, ListChecks, SlidersHorizontal, Fingerprint, Network } from 'lucide-react';
+import { FileText, ListChecks, SlidersHorizontal, Fingerprint, Network, Mail } from 'lucide-react';
 import { useNavigate } from '@/lib/router-compat';
 import type { IncidentTask } from '@/config/ocsfIncidentSchema';
 import type { LinkedIncidentSummary } from '@/hooks/useRelatedIncidents';
@@ -8,6 +8,8 @@ import type { LinkedIncidentSummary } from '@/hooks/useRelatedIncidents';
 interface SimpleCaseLayoutProps {
   narrativeLabel: string;
   overview?: ReactNode;
+  emailThread?: ReactNode;
+  emailThreadCount?: number;
   narrative: ReactNode;
   timeline: ReactNode;
   /** Filter/count control rendered on the same line as the Timeline title. */
@@ -27,10 +29,11 @@ interface SimpleCaseLayoutProps {
   relatedIncidents?: LinkedIncidentSummary[];
 }
 
-const SECTIONS = ['narrative', 'tasks', 'customFields', 'observables', 'correlations'] as const;
+const SECTIONS = ['emailThread', 'narrative', 'tasks', 'customFields', 'observables', 'correlations'] as const;
 type SectionKey = typeof SECTIONS[number];
 
 const SECTION_ICONS: Record<SectionKey, typeof FileText> = {
+  emailThread: Mail,
   narrative: FileText,
   tasks: ListChecks,
   customFields: SlidersHorizontal,
@@ -41,6 +44,8 @@ const SECTION_ICONS: Record<SectionKey, typeof FileText> = {
 export const SimpleCaseLayout = ({
   narrativeLabel,
   overview,
+  emailThread,
+  emailThreadCount,
   narrative,
   timeline,
   timelineActions,
@@ -58,6 +63,7 @@ export const SimpleCaseLayout = ({
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<SectionKey>('narrative');
   const refs = useRef<Record<SectionKey, HTMLElement | null>>({
+    emailThread: null,
     narrative: null,
     tasks: null,
     customFields: null,
@@ -207,6 +213,12 @@ export const SimpleCaseLayout = ({
 
   const openTasks = taskItems.filter((task) => !task.completed && !task.disabled);
   const sectionData: Array<{ key: SectionKey; label: string; count?: number; icon: typeof FileText }> = [
+    ...(emailThread ? [{
+      key: 'emailThread' as SectionKey,
+      label: 'Email Thread',
+      count: emailThreadCount,
+      icon: SECTION_ICONS.emailThread,
+    }] : []),
     { key: 'narrative', label: narrativeLabel, icon: SECTION_ICONS.narrative },
     { key: 'tasks', label: 'Tasks', count: openTasks.length, icon: SECTION_ICONS.tasks },
     ...(customFields ? [{
@@ -252,6 +264,17 @@ export const SimpleCaseLayout = ({
             }}
           >
             {overview}
+          </Box>
+        )}
+        {emailThread && (
+          <Box
+            id="simple-case-email-thread"
+            ref={(node: HTMLElement | null) => { refs.current.emailThread = node; }}
+            data-simple-section="emailThread"
+            sx={sectionSx}
+            {...sectionActivation('emailThread')}
+          >
+            {emailThread}
           </Box>
         )}
         <Box id="simple-case-narrative" ref={(node: HTMLElement | null) => { refs.current.narrative = node; }} data-simple-section="narrative" sx={sectionSx} {...sectionActivation('narrative')}>

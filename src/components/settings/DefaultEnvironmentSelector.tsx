@@ -16,12 +16,13 @@ import {
   Typography,
 } from "@mui/material";
 import { Cloud, Server, MonitorSmartphone } from "lucide-react";
-import { getApiUrl, getAuthHeader } from "@/Shuffle-MCPs/api";
+import { getApiUrl, getAuthHeader, shuffleFetch } from "@/Shuffle-MCPs/api";
 import { toast } from "@/lib/toast";
 import { useWorkflows, WorkflowSummary } from "@/hooks/useWorkflows";
 import { useUsecases } from "@/Shuffle-Core/hooks/useUsecases";
 import { DEFAULT_USECASES } from "@/Shuffle-Core/config/usecases";
 import { updateWorkflowEnvironment } from "@/services/workflowEnvironments";
+import { invalidateAppsCache, invalidateWorkflowsCache } from "@/Shuffle-Core/views/appsFetchCache";
 
 export interface DefaultEnvironmentSelectorProps {
   onSelected?: (newEnv: EnvironmentItem) => void;
@@ -211,10 +212,9 @@ export const DefaultEnvironmentSelector = ({
     }));
     setSaving(true);
     try {
-      const res = await fetch(getApiUrl("/api/v1/setenvironments"), {
+      const res = await shuffleFetch(getApiUrl("/api/v1/setenvironments"), {
         method: "PUT",
-        credentials: "include",
-        headers: { ...getAuthHeader(), "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -249,7 +249,7 @@ export const DefaultEnvironmentSelector = ({
       }
 
       if (resData && typeof resData === "object" && !Array.isArray(resData)) {
-        if (resData.success === false || typeof resData.reason === "string") {
+        if (resData.success === false) {
           throw new Error(
             (typeof resData.reason === "string" && resData.reason) ||
               (typeof resData.error === "string" && resData.error) ||
@@ -259,6 +259,10 @@ export const DefaultEnvironmentSelector = ({
       }
 
       setEnvironments(payload);
+      queryClient.setQueriesData<EnvironmentItem[]>(
+        { queryKey: ["incident-runtime-health-environments"] },
+        () => payload,
+      );
 
       let updatedCount = 0;
       const failedWorkflows: string[] = [];
@@ -279,6 +283,36 @@ export const DefaultEnvironmentSelector = ({
           );
           if (updateRes.success) {
             updatedCount++;
+            // LIVE BACKGROUND UI UPDATE: Optimistically update React Query workflows cache
+            // so the background table rows update immediately as each workflow completes
+            queryClient.setQueriesData<WorkflowSummary[]>(
+              { queryKey: ["workflows"] },
+              (oldWorkflows) => {
+                if (!Array.isArray(oldWorkflows)) return oldWorkflows;
+                return oldWorkflows.map((w) => {
+                  if (w.id !== item.workflow.id) return w;
+                  return {
+                    ...w,
+                    environment: next.Name,
+                    execution_environment: next.Name,
+                    actions: Array.isArray(w.actions)
+                      ? w.actions.map((act: any) => ({
+                          ...act,
+                          environment: next.Name,
+                          execution_environment: next.Name,
+                        }))
+                      : [{ environment: next.Name, execution_environment: next.Name }],
+                    triggers: Array.isArray(w.triggers)
+                      ? w.triggers.map((trig: any) => ({
+                          ...trig,
+                          environment: next.Name,
+                          execution_environment: next.Name,
+                        }))
+                      : w.triggers,
+                  };
+                });
+              },
+            );
           } else {
             failedWorkflows.push(
               `${item.workflow.name || item.workflow.id} (${updateRes.reason || "Failed"})`,
@@ -301,6 +335,9 @@ export const DefaultEnvironmentSelector = ({
         toast.success(`Default runtime location set to ${next.Name}`);
       }
 
+      // Invalidate both in-memory cache and React Query caches so any subsequent fetch hits network
+      invalidateWorkflowsCache();
+      invalidateAppsCache();
       queryClient.invalidateQueries({
         queryKey: ["incident-runtime-health-environments"],
       });

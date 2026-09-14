@@ -38,6 +38,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useWorkflows, WorkflowSummary } from "@/hooks/useWorkflows";
 import { useUsecases } from "@/Shuffle-Core/hooks/useUsecases";
+import { invalidateAppsCache, invalidateWorkflowsCache } from "@/Shuffle-Core/views/appsFetchCache";
 import { DEFAULT_USECASES, Usecase } from "@/Shuffle-Core/config/usecases";
 import { getApiUrl, getAuthHeader } from "@/Shuffle-MCPs/api";
 import { API_CONFIG, UsecaseDrawer } from "@/Shuffle-Core";
@@ -165,6 +166,8 @@ export const RuntimeLocationsTab = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    invalidateWorkflowsCache();
+    invalidateAppsCache();
     await Promise.allSettled([refetchWorkflows(), fetchEnvironments()]);
     setRefreshing(false);
   };
@@ -202,6 +205,8 @@ export const RuntimeLocationsTab = () => {
         `Workflow "${workflowToDelete.name || "Workflow"}" deleted`,
       );
       setWorkflowToDelete(null);
+      invalidateWorkflowsCache();
+      invalidateAppsCache();
       queryClient.invalidateQueries({ queryKey: ["workflows"] });
       refetchWorkflows();
     } catch (err: unknown) {

@@ -51,6 +51,8 @@ interface EmailThreadPanelProps {
   onForward?: () => void;
   /** Removes the outer section chrome for document-style layouts. */
   borderless?: boolean;
+  /** Initial collapsed state. When true, panel starts contracted. */
+  defaultCollapsed?: boolean;
 }
 
 /** Extract email address from "Name <email>" format */
@@ -64,7 +66,6 @@ const extractEmail = (s: string): { name: string; email?: string } => {
   const name = named?.[1]?.trim() || (addr ? cleaned.split('<')[0].trim() || addr[1] : cleaned);
   return { name: name || cleaned, email: addr?.[1] };
 };
-
 
 /** Get initials for avatar */
 const getInitials = (name: string): string => {
@@ -81,43 +82,6 @@ const hashColor = (s: string): string => {
   return colors[Math.abs(h) % colors.length];
 };
 
-/**
- * Detect whether content is email-like by looking for common patterns.
- */
-export const isEmailContent = (text: string, html: string, rawOCSF?: any): boolean => {
-  // Strongest signal: rawOCSF.unmapped_original parses cleanly as a known
-  // email provider payload (Gmail / Outlook / generic envelope).
-  if (rawOCSF && resolveEmailThread(rawOCSF)) return true;
-
-  // Check OCSF fields for email indicators
-  if (rawOCSF) {
-    const src = rawOCSF.metadata?.product?.name?.toLowerCase() || '';
-    if (['gmail', 'outlook', 'microsoft 365', 'exchange', 'email', 'imap', 'smtp'].some(k => src.includes(k))) return true;
-    // Check if labels/types include email
-    const types = rawOCSF.types || rawOCSF.finding_info?.types || [];
-    if (types.some((t: string) => /email|mail|phish/i.test(t))) return true;
-  }
-
-  const combined = (text + ' ' + html).substring(0, 3000); // only scan first part
-  // Header patterns
-  const headerPatterns = [
-    /^From:\s*.+/mi,
-    /^To:\s*.+/mi,
-    /^Subject:\s*.+/mi,
-    /^Date:\s*.+/mi,
-    /^Sent:\s*.+/mi,
-  ];
-  const headerHits = headerPatterns.filter(p => p.test(combined)).length;
-  if (headerHits >= 2) return true;
-
-  // Forwarded / reply markers
-  if (/-----\s*Original Message\s*-----/i.test(combined)) return true;
-  if (/-----\s*Forwarded message\s*-----/i.test(combined)) return true;
-  if (/On\s.+wrote:/i.test(combined)) return true;
-
-  return false;
-};
-
 /** Minimal HTML -> text conversion used when a provider only sent HTML. */
 const htmlToPlainText = (html: string): string =>
   (html || '')
@@ -132,8 +96,81 @@ const htmlToPlainText = (html: string): string =>
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+    .replace(/\n{3,}/g, '\n\n');
+
+/**
+ * Detect whether content is email-like by looking for common patterns,
+ * structured payloads, provider names, tags, and email headers.
+ */
+export const isEmailContent = (text: string, html: string, rawOCSF?: any, incident?: any): boolean => {
+  // 1. Structured payload check via resolveEmailThread
+  if (rawOCSF && resolveEmailThread(rawOCSF)) return true;
+  if (incident?.rawOCSF && resolveEmailThread(incident.rawOCSF)) return true;
+  if (incident && resolveEmailThread(incident)) return true;
+
+  // 2. Incident or OCSF source & product check
+  const sourceCandidates = [
+    incident?.source,
+    rawOCSF?.metadata?.product?.name,
+    rawOCSF?.metadata?.product?.vendor_name,
+    rawOCSF?.source,
+    rawOCSF?.finding_info?.product_name,
+  ].filter(Boolean).map(s => String(s).toLowerCase());
+
+  const emailKeywords = ['gmail', 'outlook', 'microsoft 365', 'office 365', 'exchange', 'email', 'mail', 'imap', 'smtp', 'phish', 'phishing', 'abuse mailbox', 'security mailbox'];
+  if (sourceCandidates.some(src => emailKeywords.some(k => src.includes(k)))) return true;
+
+  // 3. Category, type, tags, labels check
+  const tagCandidates = [
+    ...(Array.isArray(incident?.tags) ? incident.tags : []),
+    ...(Array.isArray(incident?.labels) ? incident.labels : []),
+    ...(Array.isArray(rawOCSF?.tags) ? rawOCSF.tags : []),
+    ...(Array.isArray(rawOCSF?.types) ? rawOCSF.types : []),
+    ...(Array.isArray(rawOCSF?.finding_info?.types) ? rawOCSF.finding_info.types : []),
+    incident?.category,
+    incident?.type,
+    rawOCSF?.category_name,
+    rawOCSF?.class_name,
+  ].filter(Boolean).map(s => String(s).toLowerCase());
+
+  if (tagCandidates.some(t => /email|mail|phish/i.test(t))) return true;
+
+  // 4. OCSF Email Activity class (UID 4001) or explicit email containers
+  if (rawOCSF?.class_uid === 4001) return true;
+  if (rawOCSF?.email || rawOCSF?.emails || rawOCSF?.email_details || incident?.email) return true;
+
+  // 5. Header patterns & markers across text, decoded HTML, and plain text
+  const plainHtml = htmlToPlainText(html);
+  const combined = `${text}\n${plainHtml}`.substring(0, 8000);
+  const cleaned = combined.replace(/[*_#`]/g, ''); // strip markdown emphasis like **From:** or _To:_
+
+  const headerPatterns = [
+    /^\s*From:\s*.+/mi,
+    /^\s*To:\s*.+/mi,
+    /^\s*Subject:\s*.+/mi,
+    /^\s*Date:\s*.+/mi,
+    /^\s*Sent:\s*.+/mi,
+    /^\s*Cc:\s*.+/mi,
+    /^\s*Reply-To:\s*.+/mi,
+    /^\s*Sender:\s*.+/mi,
+  ];
+  const headerHits = headerPatterns.filter(p => p.test(cleaned)).length;
+  if (headerHits >= 2) return true;
+
+  // Forwarded / reply markers
+  if (/-----\s*Original Message\s*-----/i.test(cleaned)) return true;
+  if (/-----\s*Forwarded message\s*-----/i.test(cleaned)) return true;
+  if (/On\s.+wrote:/i.test(cleaned)) return true;
+  if (/Begin forwarded message/i.test(cleaned)) return true;
+  if (/Original Appointment/i.test(cleaned)) return true;
+
+  // MIME / message headers
+  if (/Content-Type:\s*multipart\//i.test(cleaned)) return true;
+  if (/MIME-Version:\s*1\./i.test(cleaned)) return true;
+  if (/Message-ID:\s*<[^>]+>/i.test(cleaned)) return true;
+
+  return false;
+};
 
 /**
 
@@ -449,6 +486,14 @@ const parseEmailThread = (text: string, html: string): EmailMessage[] => {
   return messages;
 };
 
+/** Count messages in email thread from structured data or raw text/html */
+export const getEmailMessageCount = (text: string, html: string, rawOCSF?: any, incident?: any): number => {
+  const structured = resolveEmailThread(rawOCSF || incident?.rawOCSF || incident);
+  if (structured && structured.messages.length > 0) return structured.messages.length;
+  if (!text && !html) return 0;
+  return parseEmailThread(text, html).length;
+};
+
 /** Inline header-style row for To/Cc/Bcc inputs in the reply box. */
 const RecipientRow = ({
   label,
@@ -490,7 +535,15 @@ const RecipientRow = ({
   </Box>
 );
 
-const EmailThreadPanel = ({ descriptionHtml, descriptionText, rawOCSF, onReply, onForward, borderless = false }: EmailThreadPanelProps) => {
+const EmailThreadPanel = ({
+  descriptionHtml,
+  descriptionText,
+  rawOCSF,
+  onReply,
+  onForward,
+  borderless = false,
+  defaultCollapsed = false,
+}: EmailThreadPanelProps) => {
   const theme = useTheme();
   const primaryColor = theme.palette.primary.main;
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -524,17 +577,16 @@ const EmailThreadPanel = ({ descriptionHtml, descriptionText, rawOCSF, onReply, 
   };
 
 
-  // Email incidents ALWAYS start with the thread visible on desktop — the email
-  // is the primary narrative. On mobile the Email Thread is collapsed by default
-  // and the Timeline is expanded. We persist the user's toggle so the per-open
-  // guarantee in the parent can coordinate with it.
+  // Email incidents ALWAYS start with the thread visible on desktop unless
+  // defaultCollapsed is explicitly requested (e.g. in Simple view near the top).
+  // On mobile the Email Thread is collapsed by default and the Timeline is expanded.
   const EMAIL_THREAD_OPEN_KEY = 'shuffle-incident-email-thread-open';
-  const [threadCollapsed, setThreadCollapsed] = useState<boolean>(false);
+  const [threadCollapsed, setThreadCollapsed] = useState<boolean>(defaultCollapsed);
 
   const persistThreadOpen = useCallback((open: boolean) => {
     setThreadCollapsed(!open);
     // Only mobile persists this choice — on desktop the email thread must
-    // always start visible on the next incident.
+    // always start visible on the next incident unless defaultCollapsed.
     if (typeof window !== 'undefined' && window.innerWidth < 600) {
       try { localStorage.setItem(EMAIL_THREAD_OPEN_KEY, open ? '1' : '0'); } catch { /* ignore */ }
     }
@@ -557,8 +609,11 @@ const EmailThreadPanel = ({ descriptionHtml, descriptionText, rawOCSF, onReply, 
       }
 
       if (!mobileViewport) {
-        // Desktop always starts expanded.
-        setThreadCollapsed(false);
+        if (defaultCollapsed) {
+          setThreadCollapsed(true);
+        } else {
+          setThreadCollapsed(false);
+        }
         return;
       }
 
