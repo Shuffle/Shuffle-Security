@@ -2380,12 +2380,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
                                     border: 'none',
                                     background: 'transparent',
                                     cursor: 'pointer',
-                                    fontSize: '11px',
+                                    fontSize: '10px',
                                     lineHeight: 1,
-                                    color: '#FF6600',
-                                    fontWeight: 500,
+                                    color: 'hsl(var(--muted-foreground))',
+                                    fontWeight: 400,
                                     fontFamily: 'inherit',
                                     '&:hover': {
+                                      color: 'hsl(var(--foreground))',
                                       textDecoration: 'underline',
                                     },
                                   }}
