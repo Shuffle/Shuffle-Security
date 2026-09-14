@@ -60,10 +60,6 @@ export interface TenantManagementProps {
   autoOpenCreate?: boolean | number;
 }
 
-// Region resolution is shared with every other surface (sidebar switcher,
-// /admin tenant tables, cross-region incident writes) so they cannot disagree.
-import { getRegionFlag } from '@/lib/regionFlag';
-
 interface OrgRowProps {
   org: OrgLike;
   currentOrgId?: string;
