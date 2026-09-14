@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { useLocation } from "@/lib/router-compat";
+import { useLocation, useNavigate } from "@/lib/router-compat";
 import {
   Box,
   Paper,
@@ -116,8 +116,9 @@ export const RuntimeLocationsTab = () => {
     return environments.find((e) => e.default) || null;
   }, [environments]);
 
-  // Route highlight handling (e.g. redirected from /incidents problem bar)
   const location = useLocation();
+  const navigate = useNavigate();
+  const isLoading = workflowsLoading || envsLoading;
   const defaultCardRef = useRef<HTMLDivElement>(null);
   const workflowsSectionRef = useRef<HTMLDivElement>(null);
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
@@ -368,14 +369,41 @@ export const RuntimeLocationsTab = () => {
   }, [enrichedWorkflows, isWorkflowAffected]);
 
   useEffect(() => {
-    if (filterParam === "affected") {
-      setFilterMode("affected");
-    } else if (filterParam === "all") {
+    if (filterParam === "all") {
       setFilterMode("all");
+    } else if (filterParam === "affected") {
+      if (!isLoading && affectedCount === 0) {
+        setFilterMode("relevant");
+      } else {
+        setFilterMode("affected");
+      }
     } else {
       setFilterMode("relevant");
     }
-  }, [filterParam]);
+  }, [filterParam, isLoading, affectedCount]);
+
+  // When all affected workflows are resolved, automatically transition from "affected" to "relevant"
+  useEffect(() => {
+    if (!isLoading && filterMode === "affected" && affectedCount === 0) {
+      setFilterMode("relevant");
+      if (searchParams.get("filter") === "affected") {
+        const nextParams = new URLSearchParams(location.search);
+        nextParams.delete("filter");
+        const nextSearch = nextParams.toString();
+        navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`, {
+          replace: true,
+        });
+      }
+    }
+  }, [
+    isLoading,
+    filterMode,
+    affectedCount,
+    searchParams,
+    location.search,
+    location.pathname,
+    navigate,
+  ]);
 
   // Filtered workflows based on search, filterMode, and environment
   const filteredWorkflows = useMemo(() => {
@@ -443,7 +471,6 @@ export const RuntimeLocationsTab = () => {
     return enrichedWorkflows.filter((w) => w.isRelevant).length;
   }, [enrichedWorkflows]);
 
-  const isLoading = workflowsLoading || envsLoading;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
