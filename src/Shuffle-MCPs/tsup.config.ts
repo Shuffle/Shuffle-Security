@@ -55,6 +55,9 @@ export default defineConfig({
     // source-only alias path. Keep both router packages external.
     'react-router-dom',
     'react-router',
+    'react-toastify',
+    /^@tanstack\//,
+    /^@shuffleio\//,
   ],
   esbuildPlugins: [
     // Redirect the host-specific router shim to react-router-dom and keep it

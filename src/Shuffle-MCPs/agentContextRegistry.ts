@@ -10,7 +10,7 @@
 
 import { getCachedConnectedTools, mergeConnectedTools, MAX_AUTO_ASSIGNED_TOOLS } from './connectedSourcesService';
 import { composeDocPromptInput, isDocsRoute } from '@/lib/docsPromptContext';
-import { getDocGroup } from '@/components/docs/docGroups';
+import { getDocGroup } from '@/lib/docGroups';
 
 export interface AgentContextApp {
   name: string;

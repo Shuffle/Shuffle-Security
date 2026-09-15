@@ -49,7 +49,7 @@ import {
 import { setHostBaseUrl as setMcpHostBaseUrl } from '@/Shuffle-MCPs/api';
 import { ShuffleCompanyLogo, ShuffleSecurityLogo } from '@/components/common/ShuffleLogo';
 import { sanitizeInternalDestination } from '@/lib/safeRedirect';
-import { SegmentedControl } from '@/components/ui/segmented-control';
+import { SegmentedControl } from '../components/ui/segmented-control';
 const isCapacitorNative = () => {
   if (typeof window === 'undefined') return false;
   const cap = (window as any)?.Capacitor;

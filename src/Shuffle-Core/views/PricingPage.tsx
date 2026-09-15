@@ -894,7 +894,6 @@ const PricingPage = ({
                     backgroundColor: "rgba(255, 255, 255, 0.2)",
                     color: "#ffffff",
                     borderColor: "rgba(255, 255, 255, 0.2)",
-                    color: "white",
                   },
                 }}
                 onClick={() => {
@@ -943,7 +942,6 @@ const PricingPage = ({
                   fontFamily: theme.typography.fontFamily,
                   position: "relative",
                   isolation: "isolate",
-                  color: "white",
                   "&::before": {
                     content: '""',
                     position: "absolute",
@@ -3013,7 +3011,6 @@ const PricingPage = ({
                 </Box>
                 <Box
                   sx={{
-                    width: "100%",
                     display: "flex",
                     flexDirection: "row",
                     justifyContent: "space-between",
@@ -3171,7 +3168,6 @@ const PricingPage = ({
                       </Box>
                       <Box
                         sx={{
-                          width: "100%",
                           display: "flex",
                           flexDirection: "row",
                           justifyContent: "space-between",

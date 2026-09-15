@@ -6,7 +6,7 @@
  * cookies are established on the destination domain.
  */
 
-import { toast } from "./toast";
+import { toast } from "../toast";
 import {
   getApiUrl,
   getAuthHeader,

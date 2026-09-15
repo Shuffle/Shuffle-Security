@@ -23,5 +23,5 @@
     }
   },
   "include": ["index.ts", "ShuffleMCP.tsx", "AppDetailDrawer.tsx", "shuffle-mcp.helpers.ts", "assets.d.ts", "**/*.tsx", "**/*.ts"],
-  "exclude": ["dist", "node_modules"]
+  "exclude": ["dist", "node_modules", "tsup.config.ts"]
 }

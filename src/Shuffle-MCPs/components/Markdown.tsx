@@ -25,7 +25,6 @@ import 'react18-json-view/src/dark.css';
 import { defaultCollapsed } from '@/lib/jsonView';
 import { VideoEmbed, resolveVideoUrl } from './VideoEmbed';
 import { resolveProductLink } from '@/lib/shuffleUrls';
-import { DocCurlViewer } from '@/components/docs/DocCurlViewer';
 
 /** Parse a string into an object/array, or return null when it is not JSON. */
 const tryParseJson = (raw: string): object | null => {
@@ -171,14 +170,10 @@ const defaultComponents: MarkdownComponentOverrides = {
     );
   },
   pre: ({ children, ...props }: any) => {
+    // Render fenced code blocks containing JSON with the standard JSON tree viewer.
     const child: any = Array.isArray(children) ? children[0] : children;
     const raw = child?.props?.children;
     const text = Array.isArray(raw) ? raw.join('') : typeof raw === 'string' ? raw : '';
-    const clean = text.replace(/^(?:#[^\r\n]*\r?\n\s*)+/, '').trim();
-    if (/^(?:\$\s*)?curl(?:\s+|$)/i.test(clean)) {
-      return <DocCurlViewer rawCurl={text} />;
-    }
-    // Render fenced code blocks containing JSON with the standard JSON tree viewer.
     const parsed = tryParseJson(text);
     if (parsed) return <MarkdownJsonBlock src={parsed} />;
     return <pre {...props}>{children}</pre>;

@@ -10,7 +10,7 @@ import {
   normalizeAppName,
   findIngestTicketsWorkflow,
   extractWorkflowAppNames,
-} from './ingestionDetection.ts';
+} from './ingestionDetection';
 
 export interface ConnectedToolApp {
   name: string;

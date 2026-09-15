@@ -1044,7 +1044,7 @@ export const WorkflowRunDebugger: React.FC<WorkflowRunDebuggerProps> = ({
             if (!option?.name) return 'No Workflow Selected';
             return (
               option.name.charAt(0).toUpperCase() + option.name.substring(1)
-            ).replaceAll('_', ' ');
+            ).replace(/_/g, ' ');
           }}
           options={[
             { name: 'Agent Runs', id: 'AGENT' },

@@ -273,7 +273,7 @@ export const DatastoreValueCell: React.FC<DatastoreValueCellProps> = ({
 
 export const getCategoryDisplayLabel = (data: string): string => {
   if (!data) return '';
-  return data.charAt(0).toUpperCase() + data.slice(1).replaceAll('_', ' ');
+  return data.charAt(0).toUpperCase() + data.slice(1).replace(/_/g, ' ');
 };
 
 
@@ -1115,7 +1115,7 @@ const DatastoreCategories: React.FC<DatastoreCategoriesProps> = ({
                   }}
                   getOptionLabel={(data) => {
                     if (!data) return '';
-                    return data.charAt(0).toUpperCase() + data.slice(1).replaceAll('_', ' ');
+                    return data.charAt(0).toUpperCase() + data.slice(1).replace(/_/g, ' ');
                   }}
                   sx={{
                     minWidth: 220,
@@ -1158,7 +1158,7 @@ const DatastoreCategories: React.FC<DatastoreCategoriesProps> = ({
                   }}
                   renderOption={(props, data) => {
                     const { key, ...restProps } = props;
-                    const fixedname = data ? data.charAt(0).toUpperCase() + data.slice(1).replaceAll('_', ' ') : '';
+                    const fixedname = data ? data.charAt(0).toUpperCase() + data.slice(1).replace(/_/g, ' ') : '';
                     return (
                       <MenuItem
                         key={key || data}

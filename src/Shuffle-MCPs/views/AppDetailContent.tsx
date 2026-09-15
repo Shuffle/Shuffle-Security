@@ -18,7 +18,7 @@ import {
   Lock as LockOutlinedIcon,
   ArrowRight as ArrowForwardIcon,
 } from 'lucide-react';
-import { Link } from '@tanstack/react-router';
+import { Link } from '@/lib/router-compat';
 import { getDatastoreByCategory, DATASTORE_CATEGORIES } from '@/Shuffle-MCPs/datastore';
 import {
   Box,

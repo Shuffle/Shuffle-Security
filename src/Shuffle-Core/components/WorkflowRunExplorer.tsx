@@ -56,7 +56,6 @@ import singulAgentIcon from '@/assets/singul-agent-icon.png';
 const isAiAgentName = (name?: string) =>
   !!name && name.trim().toLowerCase().replace(/[_-]+/g, ' ') === 'ai agent';
 import JsonView from 'react18-json-view';
-import type { JsonViewProps } from 'react18-json-view';
 import 'react18-json-view/src/style.css';
 import 'react18-json-view/src/dark.css';
 import { defaultCollapsed } from '@/lib/jsonView';
@@ -1033,7 +1032,7 @@ const safeBaseName = (name?: string | null): string => {
   return normalized || 'workflow';
 };
 
-type JsonViewWithReferenceProps = JsonViewProps & { baseName?: string };
+type JsonViewWithReferenceProps = React.ComponentProps<typeof JsonView> & { baseName?: string };
 
 const JsonViewWithReference: React.FC<JsonViewWithReferenceProps> = ({ baseName, ...props }) => {
   const copyModeRef = useRef<'value' | 'reference'>('value');

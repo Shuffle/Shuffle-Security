@@ -4,7 +4,8 @@
  */
 
 import { stripInContentToc } from '../components/docs/tocUtils';
-import { getCachedGroupDocs, getDocGroup } from '../components/docs/docGroups';
+import { getCachedGroupDocs } from '../components/docs/docGroups';
+import { getDocGroup } from './docGroups';
 
 export interface GroupDocSnippet {
   slug: string;

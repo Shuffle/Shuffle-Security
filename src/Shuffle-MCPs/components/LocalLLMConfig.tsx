@@ -602,11 +602,12 @@ const LocalLLMConfig = ({ compact, globalUrl, userdata, isLoaded, isLoggedIn, se
     // If this provider already has a saved authentication, make it the
     // primary one (active: true) and deactivate the others.
     const existing = openaiEntries.find((e: any) => e?.id && providerOfEntry(e) === label);
-    if (existing?.id) {
+    const existingId = existing?.id;
+    if (existingId) {
       setOptimisticActiveProvider(label);
       void (async () => {
         try {
-          await switchActiveLLM(existing.id);
+          await switchActiveLLM(existingId);
           await refreshAuth();
         } catch (err) {
           console.error('[LocalLLMConfig] Failed to switch active LLM provider:', err);
@@ -781,6 +782,7 @@ const LocalLLMConfig = ({ compact, globalUrl, userdata, isLoaded, isLoggedIn, se
           onChange={(_e, val) => val && handlePresetChange(val)}
           isOptionEqualToValue={(opt, val) => opt === val}
           renderOption={(props, option) => {
+            const preset = ENDPOINT_PRESETS.find((p) => p.label === option);
             const activeProvider = optimisticActiveProvider ?? (activeEntryRaw ? providerOfEntry(activeEntryRaw) : SHUFFLE_AI_PRESET);
             const isSelected = option === activeProvider;
             const isValidated = option !== SHUFFLE_AI_PRESET && validatedProviderLabels.has(option);

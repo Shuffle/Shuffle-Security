@@ -95,6 +95,8 @@ import safeHandler from '@/Shuffle-MCPs/safeHandler';
 import AgentPresets, { AGENT_PRESETS, filterAgentPresets, isRequiredPresetApp, isSupportUser, type AgentPreset } from '@/Shuffle-MCPs/components/AgentPresets';
 
 import { useAgentPromptPrefix } from '@/Shuffle-MCPs/useAgentPromptPrefix';
+import { runAgent, resolveAgentNodeId } from '@/Shuffle-MCPs/agentRun';
+import { toast } from '@/Shuffle-MCPs/toast';
 
 // Normalize agent answer text so react-markdown renders it correctly:
 // - Decode literal escape sequences ("\n", "\t", "\r") that come back
