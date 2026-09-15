@@ -52,8 +52,7 @@
     "@emotion/react": ">=11",
     "@emotion/styled": ">=11",
     "lucide-react": ">=0.300.0",
-    "react-router-dom": ">=6",
-    "rehype-sanitize": "^6.0.0"
+    "react-router-dom": ">=6"
   },
   "dependencies": {
     "algoliasearch": "^5.0.0",
