@@ -3,21 +3,24 @@ import { useEffect } from "react";
 import { ArrowRight } from "lucide-react";
 import AgentIcon from "@/Shuffle-MCPs/components/AgentIcon";
 import shuffleInfraLogo from "@/assets/shuffle-infrastructure-logo.png";
-import { usePageMeta } from '@/hooks/usePageMeta';
-import { getShuffleCoreUrl } from '@/lib/shuffleUrls';
-import { navigateToShuffleCore } from '@/lib/authHandoff';
+import { usePageMeta } from "@/hooks/usePageMeta";
+import { getShuffleCoreUrl } from "@/lib/shuffleUrls";
+import { navigateToShuffleCore } from "@/lib/authHandoff";
 
 const NotFound = () => {
-
   usePageMeta({
-    title: 'Page not found',
-    description: 'The page you are looking for does not exist on Shuffle Security.',
-    url: '/404',
+    title: "Page not found",
+    description:
+      "The page you are looking for does not exist on Shuffle Security.",
+    url: "/404",
   });
   const location = useLocation();
 
   useEffect(() => {
-    console.error("404 Error: User attempted to access non-existent route:", location.pathname);
+    console.error(
+      "404 Error: User attempted to access non-existent route:",
+      location.pathname,
+    );
   }, [location.pathname]);
 
   return (
@@ -51,7 +54,8 @@ const NotFound = () => {
               Return to Shuffle Security
             </h2>
             <p className="mb-4 flex-1 text-sm text-muted-foreground">
-              Head back to your incidents, detections, and security operations workspace.
+              Head back to your incidents, detections, and security operations
+              workspace.
             </p>
             <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
               Open Shuffle Security
@@ -64,21 +68,30 @@ const NotFound = () => {
             onClick={async (e) => {
               e.preventDefault();
               const isNewTab = e.ctrlKey || e.metaKey || e.button === 1;
-              await navigateToShuffleCore(getShuffleCoreUrl(), { newTab: isNewTab });
+              await navigateToShuffleCore(getShuffleCoreUrl(), {
+                newTab: isNewTab,
+              });
             }}
             className="group flex flex-col rounded-xl border border-border bg-card p-6 transition-colors hover:border-primary hover:bg-card/80"
           >
             <div className="mb-4 flex h-10 w-10 items-center justify-center">
-              <img src={shuffleInfraLogo} alt="Shuffle Core" width={40} height={40} style={{ borderRadius: 6 }} />
+              <img
+                src={shuffleInfraLogo}
+                alt="Shuffle Automation"
+                width={40}
+                height={40}
+                style={{ borderRadius: 6 }}
+              />
             </div>
             <h2 className="mb-1 text-lg font-semibold text-foreground">
-              Return to Shuffle Core
+              Return to Shuffle Automation
             </h2>
             <p className="mb-4 flex-1 text-sm text-muted-foreground">
-              Go to the Shuffle Core automation platform to manage workflows and apps.
+              Go to the Shuffle Automation platform to manage workflows and
+              apps.
             </p>
             <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
-              Open Shuffle Core
+              Open Shuffle Automation
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </span>
           </a>

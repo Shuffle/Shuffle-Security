@@ -11,25 +11,36 @@
  * ensuring unified theming and token styles matching Shuffle Security.
  */
 
-import './shuffle-core.css';
-import React from 'react';
-import { ShuffleCoreThemeProvider, type ShuffleColorMode } from './components/ShuffleCoreThemeProvider';
-import { QueryClient, QueryClientProvider, QueryClientContext } from '@tanstack/react-query';
+import "./shuffle-core.css";
+import React from "react";
+import {
+  ShuffleCoreThemeProvider,
+  type ShuffleColorMode,
+} from "./components/ShuffleCoreThemeProvider";
+import {
+  QueryClient,
+  QueryClientProvider,
+  QueryClientContext,
+} from "@tanstack/react-query";
 
-import UsecasesRaw, { UsecaseDrawer as UsecaseDrawerRaw, type UsecaseDrawerProps, type UsecasesPageProps } from './views/Usecases';
-import UsecaseAlluvialDiagramRaw from './views/UsecaseAlluvialDiagram';
-import FormInputRaw from './views/FormInput';
-import EditWorkflowRaw from './components/EditWorkflow';
-import RecentWorkflowRaw from './components/RecentWorkflow';
-import AutomationDashboardRaw from './components/dashboard/AutomationDashboard';
-import DashboardOverviewRaw from './components/dashboard/DashboardOverview';
-import AgentsDashboardRaw from './components/dashboard/AgentsDashboard';
-import VulnerabilitiesDashboardRaw from './components/dashboard/VulnerabilitiesDashboard';
-import CombinedDashboardRaw from './components/dashboard/CombinedDashboard';
-import BillingRaw from './views/Billing';
-import TenantManagementRaw from './views/TenantManagement';
-import LoginPageRaw, { type LoginPageProps } from './views/LoginPage';
-import AdminSetupRaw, { type AdminSetupProps } from './views/AdminSetup';
+import UsecasesRaw, {
+  UsecaseDrawer as UsecaseDrawerRaw,
+  type UsecaseDrawerProps,
+  type UsecasesPageProps,
+} from "./views/Usecases";
+import UsecaseAlluvialDiagramRaw from "./views/UsecaseAlluvialDiagram";
+import FormInputRaw from "./views/FormInput";
+import EditWorkflowRaw from "./components/EditWorkflow";
+import RecentWorkflowRaw from "./components/RecentWorkflow";
+import AutomationDashboardRaw from "./components/dashboard/AutomationDashboard";
+import DashboardOverviewRaw from "./components/dashboard/DashboardOverview";
+import AgentsDashboardRaw from "./components/dashboard/AgentsDashboard";
+import VulnerabilitiesDashboardRaw from "./components/dashboard/VulnerabilitiesDashboard";
+import CombinedDashboardRaw from "./components/dashboard/CombinedDashboard";
+import BillingRaw from "./views/Billing";
+import TenantManagementRaw from "./views/TenantManagement";
+import LoginPageRaw, { type LoginPageProps } from "./views/LoginPage";
+import AdminSetupRaw, { type AdminSetupProps } from "./views/AdminSetup";
 
 /**
  * Wrap a Shuffle-Core surface in the theme provider. Every exported
@@ -44,14 +55,17 @@ import AdminSetupRaw, { type AdminSetupProps } from './views/AdminSetup';
  * the name `mode` so we don't collide with component-specific props
  * (e.g. AutomationDashboard's `mode: 'apps' | 'workflows'`).
  */
-export type ShuffleTheme = 'light' | 'dark' | 'system';
+export type ShuffleTheme = "light" | "dark" | "system";
 type WithTheme<P> = P & { theme?: ShuffleTheme; colorMode?: ShuffleColorMode };
 
-const resolveMode = (theme?: ShuffleTheme, colorMode?: ShuffleColorMode): ShuffleColorMode => {
-  if (theme === 'light' || theme === 'dark') return theme;
-  if (theme === 'system') return 'auto';
+const resolveMode = (
+  theme?: ShuffleTheme,
+  colorMode?: ShuffleColorMode,
+): ShuffleColorMode => {
+  if (theme === "light" || theme === "dark") return theme;
+  if (theme === "system") return "auto";
   if (colorMode) return colorMode;
-  return 'auto';
+  return "auto";
 };
 
 /**
@@ -70,15 +84,24 @@ const getFallbackQueryClient = (): QueryClient => {
   return fallbackQueryClient;
 };
 
-const EnsureQueryClient: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const EnsureQueryClient: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   // If a host QueryClientProvider already exists, reuse it; otherwise install
   // our own fallback so hooks like useQuery don't blow up.
   const hostClient = React.useContext(QueryClientContext);
   if (hostClient) return <>{children}</>;
-  return <QueryClientProvider client={getFallbackQueryClient()}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={getFallbackQueryClient()}>
+      {children}
+    </QueryClientProvider>
+  );
 };
 
-const withTheme = <P extends object>(Inner: React.ComponentType<P>, displayName: string) => {
+const withTheme = <P extends object>(
+  Inner: React.ComponentType<P>,
+  displayName: string,
+) => {
   const Wrapped: React.FC<WithTheme<P>> = ({ theme, colorMode, ...rest }) => (
     <EnsureQueryClient>
       <ShuffleCoreThemeProvider mode={resolveMode(theme, colorMode)}>
@@ -95,107 +118,171 @@ const withTheme = <P extends object>(Inner: React.ComponentType<P>, displayName:
   return Wrapped;
 };
 
-export const Usecases = withTheme<UsecasesPageProps>(UsecasesRaw, 'Usecases');
-export const UsecaseDrawer = withTheme(UsecaseDrawerRaw, 'UsecaseDrawer');
+export const Usecases = withTheme<UsecasesPageProps>(UsecasesRaw, "Usecases");
+export const UsecaseDrawer = withTheme(UsecaseDrawerRaw, "UsecaseDrawer");
 export type { UsecaseDrawerProps };
-export const UsecaseAlluvialDiagram = withTheme(UsecaseAlluvialDiagramRaw, 'UsecaseAlluvialDiagram');
-export const FormInput = withTheme(FormInputRaw, 'FormInput');
-export const EditWorkflow = withTheme(EditWorkflowRaw, 'EditWorkflow');
-export const RecentWorkflow = withTheme(RecentWorkflowRaw, 'RecentWorkflow');
-export const AutomationDashboard = withTheme(AutomationDashboardRaw, 'AutomationDashboard');
-export const DashboardOverview = withTheme(DashboardOverviewRaw, 'DashboardOverview');
-export const AgentsDashboard = withTheme(AgentsDashboardRaw, 'AgentsDashboard');
-export const VulnerabilitiesDashboard = withTheme(VulnerabilitiesDashboardRaw, 'VulnerabilitiesDashboard');
-export const CombinedDashboard = withTheme(CombinedDashboardRaw, 'CombinedDashboard');
-export const Billing = withTheme(BillingRaw as any, 'Billing');
-export const TenantManagement = withTheme(TenantManagementRaw as any, 'TenantManagement');
-export const LoginPage = withTheme<LoginPageProps>(LoginPageRaw, 'LoginPage');
-export const AdminSetup = withTheme<AdminSetupProps>(AdminSetupRaw, 'AdminSetup');
+export const UsecaseAlluvialDiagram = withTheme(
+  UsecaseAlluvialDiagramRaw,
+  "UsecaseAlluvialDiagram",
+);
+export const FormInput = withTheme(FormInputRaw, "FormInput");
+export const EditWorkflow = withTheme(EditWorkflowRaw, "EditWorkflow");
+export const RecentWorkflow = withTheme(RecentWorkflowRaw, "RecentWorkflow");
+export const AutomationDashboard = withTheme(
+  AutomationDashboardRaw,
+  "AutomationDashboard",
+);
+export const DashboardOverview = withTheme(
+  DashboardOverviewRaw,
+  "DashboardOverview",
+);
+export const AgentsDashboard = withTheme(AgentsDashboardRaw, "AgentsDashboard");
+export const VulnerabilitiesDashboard = withTheme(
+  VulnerabilitiesDashboardRaw,
+  "VulnerabilitiesDashboard",
+);
+export const CombinedDashboard = withTheme(
+  CombinedDashboardRaw,
+  "CombinedDashboard",
+);
+export const Billing = withTheme(BillingRaw as any, "Billing");
+export const TenantManagement = withTheme(
+  TenantManagementRaw as any,
+  "TenantManagement",
+);
+export const LoginPage = withTheme<LoginPageProps>(LoginPageRaw, "LoginPage");
+export const AdminSetup = withTheme<AdminSetupProps>(
+  AdminSetupRaw,
+  "AdminSetup",
+);
 export type { LoginPageProps, AdminSetupProps };
-export type { TenantManagementProps } from './views/TenantManagement';
-export type { AutomationDashboardProps } from './components/dashboard/AutomationDashboard';
-export type { AgentsDashboardProps } from './components/dashboard/AgentsDashboard';
-export type { VulnerabilitiesDashboardProps } from './components/dashboard/VulnerabilitiesDashboard';
-export type { CombinedDashboardProps, DashboardTab } from './components/dashboard/CombinedDashboard';
-export { DASHBOARD_TABS, TAB_LABELS } from './components/dashboard/CombinedDashboard';
-export { AUTOMATION_RANGE_OPTIONS } from './components/dashboard/AutomationDashboard';
-export type { ShuffleCoreHostProps } from './types/host-props';
+export type { TenantManagementProps } from "./views/TenantManagement";
+export type { AutomationDashboardProps } from "./components/dashboard/AutomationDashboard";
+export type { AgentsDashboardProps } from "./components/dashboard/AgentsDashboard";
+export type { VulnerabilitiesDashboardProps } from "./components/dashboard/VulnerabilitiesDashboard";
+export type {
+  CombinedDashboardProps,
+  DashboardTab,
+} from "./components/dashboard/CombinedDashboard";
+export {
+  DASHBOARD_TABS,
+  TAB_LABELS,
+} from "./components/dashboard/CombinedDashboard";
+export { AUTOMATION_RANGE_OPTIONS } from "./components/dashboard/AutomationDashboard";
+export type { ShuffleCoreHostProps } from "./types/host-props";
 
 export default Usecases;
 
 export { ShuffleCoreThemeProvider };
 export type { ShuffleColorMode };
-export { usePageMeta } from './usePageMeta';
-export { toast, setToastImpl } from './toast';
-export { API_CONFIG, API_ENDPOINTS, getApiUrl, getAuthHeader, isCloudDomain, isShuffleCloudDomain, mapCloudRegionUrl, shuffleFetch, setRegionUrl, resetRegionUrl, applyRegionFromPayload, setHostBaseUrl, getHostBaseUrl } from './api';
-export { useSyncHostBaseUrl } from './useSyncHostBaseUrl';
-export { installFetchBreaker, registerProtectedOrigin } from './fetchBreaker';
+export { usePageMeta } from "./usePageMeta";
+export { toast, setToastImpl } from "./toast";
+export {
+  API_CONFIG,
+  API_ENDPOINTS,
+  getApiUrl,
+  getAuthHeader,
+  isCloudDomain,
+  isShuffleCloudDomain,
+  mapCloudRegionUrl,
+  shuffleFetch,
+  setRegionUrl,
+  resetRegionUrl,
+  applyRegionFromPayload,
+  setHostBaseUrl,
+  getHostBaseUrl,
+} from "./api";
+export { useSyncHostBaseUrl } from "./useSyncHostBaseUrl";
+export { installFetchBreaker, registerProtectedOrigin } from "./fetchBreaker";
 
 // Onboarding flow — shared between Shuffle Core and Shuffle Security.
-import { OnboardingFlow as OnboardingFlowRaw, ProductChoiceStep as ProductChoiceStepRaw } from './onboarding';
-export const OnboardingFlow = withTheme(OnboardingFlowRaw, 'OnboardingFlow');
-export const ProductChoiceStep = withTheme(ProductChoiceStepRaw, 'ProductChoiceStep');
-export type { OnboardingFlowProps, OnboardingProduct } from './onboarding';
+import {
+  OnboardingFlow as OnboardingFlowRaw,
+  ProductChoiceStep as ProductChoiceStepRaw,
+} from "./onboarding";
+export const OnboardingFlow = withTheme(OnboardingFlowRaw, "OnboardingFlow");
+export const ProductChoiceStep = withTheme(
+  ProductChoiceStepRaw,
+  "ProductChoiceStep",
+);
+export type { OnboardingFlowProps, OnboardingProduct } from "./onboarding";
 
 // Add-app modal — shared between Shuffle Core and Shuffle Security.
 import {
   AddAppDialog as AddAppDialogRaw,
   AddAppButton as AddAppButtonRaw,
-} from './components/AddAppDialog';
-export const AddAppDialog = withTheme(AddAppDialogRaw, 'AddAppDialog');
-export const AddAppButton = withTheme(AddAppButtonRaw, 'AddAppButton');
-export type { AddAppDialogProps, AddAppButtonProps } from './components/AddAppDialog';
+} from "./components/AddAppDialog";
+export const AddAppDialog = withTheme(AddAppDialogRaw, "AddAppDialog");
+export const AddAppButton = withTheme(AddAppButtonRaw, "AddAppButton");
+export type {
+  AddAppDialogProps,
+  AddAppButtonProps,
+} from "./components/AddAppDialog";
 
 // Workflow run explorer — shared between Shuffle Automation and Shuffle Security.
 import {
   WorkflowRunExplorer as WorkflowRunExplorerRaw,
   WorkflowRunExplorerDrawer as WorkflowRunExplorerDrawerRaw,
-} from './components/WorkflowRunExplorer';
-export const WorkflowRunExplorer = withTheme(WorkflowRunExplorerRaw, 'WorkflowRunExplorer');
-export const WorkflowRunExplorerDrawer = withTheme(WorkflowRunExplorerDrawerRaw, 'WorkflowRunExplorerDrawer');
+} from "./components/WorkflowRunExplorer";
+export const WorkflowRunExplorer = withTheme(
+  WorkflowRunExplorerRaw,
+  "WorkflowRunExplorer",
+);
+export const WorkflowRunExplorerDrawer = withTheme(
+  WorkflowRunExplorerDrawerRaw,
+  "WorkflowRunExplorerDrawer",
+);
 export type {
   WorkflowRunExplorerProps,
   WorkflowRunExplorerDrawerProps,
   WorkflowExecution,
-} from './components/WorkflowRunExplorer';
+} from "./components/WorkflowRunExplorer";
 
 // Category automations dialog — shared between Shuffle Core and Shuffle Security.
-import { CategoryAutomationsDialog as CategoryAutomationsDialogRaw } from './components/CategoryAutomationsDialog';
-export const CategoryAutomationsDialog = withTheme(CategoryAutomationsDialogRaw, 'CategoryAutomationsDialog');
-export type { CategoryAutomationsDialogProps } from './components/CategoryAutomationsDialog';
-
+import { CategoryAutomationsDialog as CategoryAutomationsDialogRaw } from "./components/CategoryAutomationsDialog";
+export const CategoryAutomationsDialog = withTheme(
+  CategoryAutomationsDialogRaw,
+  "CategoryAutomationsDialog",
+);
+export type { CategoryAutomationsDialogProps } from "./components/CategoryAutomationsDialog";
 
 // Notifications drawer — usable anywhere in the platform.
-import NotificationsDrawerRaw from './components/NotificationsDrawer';
-export const NotificationsDrawer = withTheme(NotificationsDrawerRaw, 'NotificationsDrawer');
-export { NOTIFICATIONS_OPEN_EVENT } from './components/NotificationsDrawer';
+import NotificationsDrawerRaw from "./components/NotificationsDrawer";
+export const NotificationsDrawer = withTheme(
+  NotificationsDrawerRaw,
+  "NotificationsDrawer",
+);
+export { NOTIFICATIONS_OPEN_EVENT } from "./components/NotificationsDrawer";
 export type {
   NotificationsDrawerProps,
   ExecutionNotification,
-} from './components/NotificationsDrawer';
+} from "./components/NotificationsDrawer";
 
 // Notification settings (device push, critical pager, agent requests, general
 // alerts) + on-call duty menu — usable anywhere in the platform.
 import {
   PagerNotificationSettings as PagerNotificationSettingsRaw,
   type PagerNotificationSettingsProps,
-} from './components/notifications/PagerNotificationSettings';
+} from "./components/notifications/PagerNotificationSettings";
 export const NotificationSettings = withTheme<PagerNotificationSettingsProps>(
   PagerNotificationSettingsRaw,
-  'NotificationSettings',
+  "NotificationSettings",
 );
-export type { PagerNotificationSettingsProps as NotificationSettingsProps } from './components/notifications/PagerNotificationSettings';
+export type { PagerNotificationSettingsProps as NotificationSettingsProps } from "./components/notifications/PagerNotificationSettings";
 
 // On-call scheduling — the schedule manager rendered inside NotificationSettings.
-import { OnCallScheduleManager as OnCallScheduleManagerRaw } from './components/users/OnCallScheduleManager';
-export const OnCallScheduleManager = withTheme(OnCallScheduleManagerRaw as any, 'OnCallScheduleManager');
-export { computeDefaultPolicy } from './components/users/OnCallScheduleManager';
+import { OnCallScheduleManager as OnCallScheduleManagerRaw } from "./components/users/OnCallScheduleManager";
+export const OnCallScheduleManager = withTheme(
+  OnCallScheduleManagerRaw as any,
+  "OnCallScheduleManager",
+);
+export { computeDefaultPolicy } from "./components/users/OnCallScheduleManager";
 export type {
   OnCallUser,
   AssignmentConfig,
   UserSchedule,
   EscalationLevel,
-} from './components/users/OnCallScheduleManager';
+} from "./components/users/OnCallScheduleManager";
 
 // Notification services powering the surfaces above.
 export {
@@ -206,8 +293,12 @@ export {
   dispatchCriticalPage,
   dispatchAgentRequestNotification,
   dispatchGeneralNotification,
-} from './services/pagerNotificationService';
-export type { PagerSettings, PagerIncident, NotificationType } from './services/pagerNotificationService';
+} from "./services/pagerNotificationService";
+export type {
+  PagerSettings,
+  PagerIncident,
+  NotificationType,
+} from "./services/pagerNotificationService";
 export {
   fetchNotificationDevices,
   saveNotificationDevice,
@@ -215,8 +306,11 @@ export {
   getLocalDeviceId,
   getLocalDeviceName,
   getLocalDevicePlatform,
-} from './services/notificationDevices';
-export type { NotificationDevice, DevicePreferences } from './services/notificationDevices';
+} from "./services/notificationDevices";
+export type {
+  NotificationDevice,
+  DevicePreferences,
+} from "./services/notificationDevices";
 
 // OAuth 2.1 authorization consent surface for MCPs and integrations
 import {
@@ -225,10 +319,10 @@ import {
   type OAuthScopeDetail,
   type OrganizationLike,
   type UserInfoLike,
-} from './components/oauth/OAuthAuthorizeView';
+} from "./components/oauth/OAuthAuthorizeView";
 export const OAuthAuthorizeView = withTheme<OAuthAuthorizeViewProps>(
   OAuthAuthorizeViewRaw,
-  'OAuthAuthorizeView',
+  "OAuthAuthorizeView",
 );
 export type {
   OAuthAuthorizeViewProps,
@@ -237,3 +331,21 @@ export type {
   UserInfoLike,
 };
 
+// Cross-domain authentication handoff between Shuffle Security and Shuffle Core
+export {
+  navigateToShuffleCore,
+  navigateToShuffleSecurity,
+  isShuffleCoreUrl,
+  isShuffleSecurityUrl,
+  resolveShuffleCoreTargetUrl,
+  resolveShuffleSecurityTargetUrl,
+  UK_SHUFFLE_SECURITY_BASE,
+  UK_SHUFFLE_CORE_BASE,
+  UK_AUTH_HANDOFF_ENDPOINT,
+  UK_AUTH_EXCHANGE_ENDPOINT,
+  UK_SHUFFLE_SECURITY_AUTH_HANDOFF_ENDPOINT,
+  UK_SHUFFLE_SECURITY_AUTH_EXCHANGE_ENDPOINT,
+  UK_SHUFFLE_CORE_AUTH_HANDOFF_ENDPOINT,
+  UK_SHUFFLE_CORE_AUTH_EXCHANGE_ENDPOINT,
+} from "./lib/authHandoff";
+export type { HandoffOptions } from "./lib/authHandoff";
