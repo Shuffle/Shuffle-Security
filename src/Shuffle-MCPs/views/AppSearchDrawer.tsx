@@ -117,6 +117,10 @@ interface AppSearchDrawerProps extends ShuffleHostProps {
   subtitle?: string;
   anchor?: 'left' | 'right';
   width?: number;
+  /** Minimum drawer width in px. Defaults to 400. */
+  minWidth?: number;
+  /** Maximum drawer width in px. Defaults to 720. */
+  maxWidth?: number;
   /** Show the Shuffle Pipelines banner above search results */
   showPipelinesBanner?: boolean;
   /** If provided, selecting an app calls this instead of opening AppDetailDrawer */
@@ -170,6 +174,8 @@ export default function AppSearchDrawer({
   subtitle = 'Search and configure a tool',
   anchor = 'right',
   width = 560,
+  minWidth = 400,
+  maxWidth = 720,
   showPipelinesBanner = false,
   onQuickSelect,
   onSelectOverride,
@@ -222,6 +228,8 @@ export default function AppSearchDrawer({
   }, [open, highlightAppName, highlightDelayMs]);
 
   const drawerWidth = `min(${width}px, 100vw)`;
+  const drawerMinWidth = `min(${minWidth}px, 100vw)`;
+  const drawerMaxWidth = `min(${maxWidth}px, 100vw)`;
 
   const handleClose = () => {
     setDetailAppName(null);
@@ -319,8 +327,8 @@ export default function AppSearchDrawer({
       // looks identical on every host (Shuffle Security, /agents,
       // test page, embedded library, etc.). No breakpoint variance.
       width: drawerWidth,
-      minWidth: drawerWidth,
-      maxWidth: drawerWidth,
+      minWidth: drawerMinWidth,
+      maxWidth: drawerMaxWidth,
       flex: `0 0 ${drawerWidth}`,
       height: '100vh',
       display: 'flex',
@@ -348,8 +356,8 @@ export default function AppSearchDrawer({
           '& .MuiDrawer-paper': {
             boxSizing: 'border-box',
             width: `${drawerWidth} !important`,
-            minWidth: `${drawerWidth} !important`,
-            maxWidth: `${drawerWidth} !important`,
+            minWidth: `${drawerMinWidth} !important`,
+            maxWidth: `${drawerMaxWidth} !important`,
             flex: `0 0 ${drawerWidth} !important`,
           },
         }}

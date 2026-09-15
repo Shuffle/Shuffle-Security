@@ -127,8 +127,8 @@ const NotificationsDrawer = ({
   executionId,
   workflowId,
   width = 600,
-  minWidth = 600,
-  maxWidth = 600,
+  minWidth = 420,
+  maxWidth = 900,
 }: NotificationsDrawerProps) => {
   const [items, setItems] = useState<ExecutionNotification[]>([]);
   const [agentItems, setAgentItems] = useState<ExecutionNotification[]>([]);
@@ -146,6 +146,8 @@ const NotificationsDrawer = ({
   const [notificationWorkflow, setNotificationWorkflow] = useState<string>('');
   const [savingWorkflow, setSavingWorkflow] = useState(false);
   const [workflowConfigLoading, setWorkflowConfigLoading] = useState(false);
+  const [workflowSelectOpen, setWorkflowSelectOpen] = useState(false);
+  const [workflowTooltipOpen, setWorkflowTooltipOpen] = useState(false);
 
 
   // Load the active org (for its `defaults`) and the available workflows so the
@@ -360,6 +362,10 @@ const NotificationsDrawer = ({
     filtering && visibleCount !== totalCount ? `${visibleCount}/${totalCount}` : totalCount;
 
 
+  const drawerWidth = `min(${width}px, 100vw)`;
+  const drawerMinWidth = `min(${minWidth}px, 100vw)`;
+  const drawerMaxWidth = `min(${maxWidth}px, 100vw)`;
+
   return (
     <Drawer
       anchor="right"
@@ -367,17 +373,19 @@ const NotificationsDrawer = ({
       onClose={onClose}
       sx={{
         '& .MuiDrawer-paper': {
-          width: { xs: '100vw', sm: `${width}px` },
-          minWidth: { xs: '100vw', sm: `${minWidth}px` },
-          maxWidth: { xs: '100vw', sm: `${maxWidth}px` },
-          flex: { xs: '0 0 100vw', sm: `0 0 ${width}px` },
+          boxSizing: 'border-box',
+          width: { xs: '100vw', sm: drawerWidth },
+          minWidth: { xs: '100vw', sm: drawerMinWidth },
+          maxWidth: { xs: '100vw', sm: drawerMaxWidth },
+          flex: { xs: '0 0 100vw', sm: `0 0 ${drawerWidth}` },
         },
       }}
       PaperProps={{
         sx: {
-          width: { xs: '100vw', sm: `${width}px` },
-          minWidth: { xs: '100vw', sm: `${minWidth}px` },
-          maxWidth: { xs: '100vw', sm: `${maxWidth}px` },
+          boxSizing: 'border-box',
+          width: { xs: '100vw', sm: drawerWidth },
+          minWidth: { xs: '100vw', sm: drawerMinWidth },
+          maxWidth: { xs: '100vw', sm: drawerMaxWidth },
           flexShrink: 0,
           backgroundColor: 'hsl(var(--background))',
           backgroundImage: 'none',
@@ -420,14 +428,26 @@ const NotificationsDrawer = ({
                 Loading notification workflow...
               </Box>
             ) : (
-              <Tooltip title="Workflow executed when a notification is created" arrow>
+              <Tooltip
+                title="Workflow executed when a notification is created"
+                arrow
+                open={!workflowSelectOpen && workflowTooltipOpen}
+                onOpen={() => setWorkflowTooltipOpen(true)}
+                onClose={() => setWorkflowTooltipOpen(false)}
+                disableFocusListener
+              >
                 <TextField
                   select
                   size="small"
                   value={notificationWorkflow}
                   onChange={(e) => saveNotificationWorkflow(e.target.value)}
                   disabled={!orgId || savingWorkflow}
-                  SelectProps={{ displayEmpty: true, MenuProps: { PaperProps: { sx: { maxHeight: 360 } } } }}
+                  SelectProps={{
+                    displayEmpty: true,
+                    onOpen: () => setWorkflowSelectOpen(true),
+                    onClose: () => setWorkflowSelectOpen(false),
+                    MenuProps: { PaperProps: { sx: { maxHeight: 360 } } },
+                  }}
                   sx={{
                     minWidth: 200,
                     '& .MuiOutlinedInput-root': {

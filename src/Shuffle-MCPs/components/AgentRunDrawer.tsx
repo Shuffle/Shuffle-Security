@@ -64,6 +64,10 @@ export interface AgentRunDrawerProps extends ShuffleHostProps {
   agentUIProps?: Partial<AgentUIProps> & { key?: React.Key };
   /** Drawer width override (default: 595 px on >=sm, full-width on xs). */
   width?: number;
+  /** Minimum drawer width in px. Defaults to 420. */
+  minWidth?: number;
+  /** Maximum drawer width in px. Defaults to 900. */
+  maxWidth?: number;
   /** Header title. Default: "Agent". */
   title?: React.ReactNode;
   /** Header subtitle. Default: "Run actions and manage permissions". */
@@ -93,6 +97,8 @@ const AgentRunDrawer = ({
   permissionsDisabledTooltip = 'Coming soon',
   agentUIProps,
   width = 595,
+  minWidth = 420,
+  maxWidth = 900,
   title = 'Agent',
   subtitle = 'Run actions and manage permissions',
   className,
@@ -207,18 +213,33 @@ const AgentRunDrawer = ({
     };
   }, [open, safeActiveTab]);
 
+  const drawerWidth = `min(${width}px, 100vw)`;
+  const drawerMinWidth = `min(${minWidth}px, 100vw)`;
+  const drawerMaxWidth = `min(${maxWidth}px, 100vw)`;
+
   return (
     <Drawer
       anchor="right"
       open={open}
       onClose={onClose}
+      sx={{
+        '& .MuiDrawer-paper': {
+          boxSizing: 'border-box',
+          width: { xs: '100vw', sm: drawerWidth },
+          minWidth: { xs: '100vw', sm: drawerMinWidth },
+          maxWidth: { xs: '100vw', sm: drawerMaxWidth },
+        },
+      }}
       slotProps={{
         paper: {
           ref: paperRef,
           className: [themeScope?.scopeClassName, className].filter(Boolean).join(' ') || undefined,
           sx: [
             {
-              width: { xs: '100%', sm: width },
+              width: { xs: '100vw', sm: drawerWidth },
+              minWidth: { xs: '100vw', sm: drawerMinWidth },
+              maxWidth: { xs: '100vw', sm: drawerMaxWidth },
+              boxSizing: 'border-box',
               background: 'linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)',
               borderLeft: '1px solid hsl(var(--border))',
               boxShadow: '-8px 0 32px hsla(0, 0%, 0%, 0.4)',

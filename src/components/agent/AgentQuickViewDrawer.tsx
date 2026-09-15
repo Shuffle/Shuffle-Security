@@ -321,7 +321,20 @@ const AgentQuickViewDrawer = ({ open, onClose, item, entityBasePath, onApprove, 
   const sevLabel = data.severity?.label || data.severityRaw || null;
 
   return (
-    <Drawer anchor="right" open={open} onClose={handleClose} PaperProps={{ sx: drawerPaperSx }}>
+    <Drawer
+      anchor="right"
+      open={open}
+      onClose={handleClose}
+      sx={{
+        '& .MuiDrawer-paper': {
+          boxSizing: 'border-box',
+          width: { xs: '100vw', sm: 720 },
+          minWidth: { xs: '100vw', sm: 480 },
+          maxWidth: { xs: '100vw', sm: 960 },
+        },
+      }}
+      PaperProps={{ sx: drawerPaperSx }}
+    >
       {/* Header — title instead of "Quick View" */}
       <Box sx={{
         px: 3, py: 2.5,
@@ -607,6 +620,9 @@ const statusChipSx = (token: string) => ({
 
 const drawerPaperSx = {
   width: { xs: '100%', sm: 720 },
+  minWidth: { xs: '100vw', sm: 480 },
+  maxWidth: { xs: '100vw', sm: 960 },
+  boxSizing: 'border-box',
   bgcolor: 'hsl(var(--background))',
   backgroundImage: 'none',
   borderLeft: '1px solid hsl(var(--border))',

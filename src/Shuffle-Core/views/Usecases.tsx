@@ -6851,7 +6851,9 @@ function UsecasesPageInner() {
           className: cfgScopeClassName,
           sx: {
             width: { xs: '100%', sm: 720, md: 900 },
-            maxWidth: '100vw',
+            minWidth: { xs: '100vw', sm: 480, md: 640 },
+            maxWidth: { xs: '100vw', sm: '90vw', md: 1000 },
+            boxSizing: 'border-box',
             // Tokens resolve via the scope class on this paper. Fallback HSL
             // values guarantee the drawer is never transparent even if the
             // host CSS does not define --background / --foreground.
@@ -6860,7 +6862,15 @@ function UsecasesPageInner() {
             backgroundImage: 'none',
           },
         }}
-        sx={{ zIndex: 9999 }}
+        sx={{
+          zIndex: 9999,
+          '& .MuiDrawer-paper': {
+            boxSizing: 'border-box',
+            width: { xs: '100%', sm: 720, md: 900 },
+            minWidth: { xs: '100vw', sm: 480, md: 640 },
+            maxWidth: { xs: '100vw', sm: '90vw', md: 1000 },
+          },
+        }}
       >
         <Box sx={{
           display: 'flex',
@@ -7641,9 +7651,27 @@ export interface UsecaseDrawerProps extends UsecasesPageProps {
   flowId?: string | null;
   /** Optional width override. Defaults match the inline drawer in /usecases. */
   width?: number | { xs?: string | number; sm?: number; md?: number };
+  /** Optional min-width override. Defaults match the inline drawer in /usecases. */
+  minWidth?: number | { xs?: string | number; sm?: number; md?: number };
+  /** Optional max-width override. Defaults match the inline drawer in /usecases. */
+  maxWidth?: number | { xs?: string | number; sm?: number; md?: number };
 }
 
-function UsecaseDrawerInner({ open, onClose, flowId }: { open: boolean; onClose: () => void; flowId: string | null }) {
+function UsecaseDrawerInner({
+  open,
+  onClose,
+  flowId,
+  width,
+  minWidth,
+  maxWidth,
+}: {
+  open: boolean;
+  onClose: () => void;
+  flowId: string | null;
+  width?: number | { xs?: string | number; sm?: number; md?: number };
+  minWidth?: number | { xs?: string | number; sm?: number; md?: number };
+  maxWidth?: number | { xs?: string | number; sm?: number; md?: number };
+}) {
   const navigate = useNavigate();
   const { apiUrl, authHeader } = useApi();
   const { usecases } = useUsecasesLite();
@@ -7769,14 +7797,24 @@ function UsecaseDrawerInner({ open, onClose, flowId }: { open: boolean; onClose:
       PaperProps={{
         className: cfgScopeClassName,
         sx: {
-          width: { xs: '100%', sm: 720, md: 900 },
-          maxWidth: '100vw',
+          width: width || { xs: '100%', sm: 720, md: 900 },
+          minWidth: minWidth || { xs: '100vw', sm: 480, md: 640 },
+          maxWidth: maxWidth || { xs: '100vw', sm: '90vw', md: 1000 },
+          boxSizing: 'border-box',
           bgcolor: 'hsl(var(--background, 0 0% 10%))',
           color: 'hsl(var(--foreground, 0 0% 100%))',
           backgroundImage: 'none',
         },
       }}
-      sx={{ zIndex: 9999 }}
+      sx={{
+        zIndex: 9999,
+        '& .MuiDrawer-paper': {
+          boxSizing: 'border-box',
+          width: width || { xs: '100%', sm: 720, md: 900 },
+          minWidth: minWidth || { xs: '100vw', sm: 480, md: 640 },
+          maxWidth: maxWidth || { xs: '100vw', sm: '90vw', md: 1000 },
+        },
+      }}
     >
       <Box sx={{
         display: 'flex',
@@ -7842,6 +7880,9 @@ export function UsecaseDrawer(props: UsecaseDrawerProps) {
     open,
     onClose,
     flowId = null,
+    width,
+    minWidth,
+    maxWidth,
     globalUrl,
     userdata,
     isLoaded,
@@ -7894,7 +7935,14 @@ export function UsecaseDrawer(props: UsecaseDrawerProps) {
   return (
     <UsecasesPageConfigContext.Provider value={config}>
       <div className={themeClass ? `${SCOPE_CLASS} ${themeClass}` : SCOPE_CLASS}>
-        <UsecaseDrawerInner open={open} onClose={onClose} flowId={flowId} />
+        <UsecaseDrawerInner
+          open={open}
+          onClose={onClose}
+          flowId={flowId}
+          width={width}
+          minWidth={minWidth}
+          maxWidth={maxWidth}
+        />
       </div>
     </UsecasesPageConfigContext.Provider>
   );

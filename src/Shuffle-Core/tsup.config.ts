@@ -33,6 +33,7 @@ export default defineConfig({
     '@mui/icons-material',
     '@mui/x-data-grid',
     '@mui/x-date-pickers',
+    '@mui/x-date-pickers/AdapterDayjs',
     '@mui/x-date-pickers/AdapterDayjs/index.js',
     /^@mui\/x-date-pickers/,
     '@emotion/react',

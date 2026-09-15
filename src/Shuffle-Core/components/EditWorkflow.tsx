@@ -410,11 +410,21 @@ const EditWorkflow = (props) => {
 			onClose={() => {
 				setModalOpen(false);
 			}}
+			sx={{
+				'& .MuiDrawer-paper': {
+					boxSizing: 'border-box',
+					width: isMobile ? '90%' : '650px',
+					minWidth: isMobile ? '90%' : '480px',
+					maxWidth: isMobile ? '95%' : '800px',
+				},
+			}}
 			PaperProps={{
 				sx: {
-				color: "hsl(var(--foreground))",
-					minWidth: isMobile ? "90%" : "650px",
-					maxWidth: isMobile ? "90%" : "650px",
+					boxSizing: 'border-box',
+					color: "hsl(var(--foreground))",
+					width: isMobile ? "90%" : "650px",
+					minWidth: isMobile ? "90%" : "480px",
+					maxWidth: isMobile ? "95%" : "800px",
 					minHeight: "400px",
 		    		borderRadius: "8px 0 0 8px",
 		    		backgroundColor: "hsl(var(--background))",

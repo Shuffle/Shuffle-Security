@@ -34,6 +34,10 @@ export interface AgentExecutionDrawerProps extends ShuffleHostProps {
   run: AgentRun | null;
   /** Drawer width. Default: 720 px on >=sm, full-width on xs. */
   width?: number;
+  /** Minimum drawer width in px. Defaults to 480. */
+  minWidth?: number;
+  /** Maximum drawer width in px. Defaults to 960. */
+  maxWidth?: number;
   /** Optional Shuffle API key, forwarded to the embedded AgentUI. */
   apiKey?: string;
   /** Optional Shuffle backend base URL, forwarded to the embedded AgentUI. */
@@ -63,6 +67,8 @@ const AgentExecutionDrawer = ({
   onClose,
   run,
   width = 720,
+  minWidth = 480,
+  maxWidth = 960,
   apiKey,
   apiBaseUrl,
   orgId,
@@ -73,10 +79,16 @@ const AgentExecutionDrawer = ({
   topBanner,
   onSchedule,
   isSupport,
+  globalUrl,
+  userdata,
+  isLoaded,
+  isLoggedIn,
+  serverside,
   theme,
   colorMode,
 }: AgentExecutionDrawerProps) => {
   const themeScope = useShuffleMcpTheme();
+
   // Optimistic body: the run data is already in hand, so the timeline is
   // rendered on the very next frame instead of waiting for the slide-in
   // animation (or any network request) to settle.
@@ -93,6 +105,10 @@ const AgentExecutionDrawer = ({
   const cfg = STATUS_CONFIG[statusKey] || STATUS_CONFIG.WAITING;
   const duration = run ? formatDuration(run) : '';
 
+  const drawerWidth = `min(${width}px, 100vw)`;
+  const drawerMinWidth = `min(${minWidth}px, 100vw)`;
+  const drawerMaxWidth = `min(${maxWidth}px, 100vw)`;
+
   return (
     <Drawer
       anchor="right"
@@ -100,14 +116,24 @@ const AgentExecutionDrawer = ({
       onClose={onClose}
       keepMounted
       transitionDuration={{ enter: 120, exit: 100 }}
-      sx={{ zIndex: 10011 }}
+      sx={{
+        zIndex: 10011,
+        '& .MuiDrawer-paper': {
+          boxSizing: 'border-box',
+          width: { xs: '100vw', sm: drawerWidth },
+          minWidth: { xs: '100vw', sm: drawerMinWidth },
+          maxWidth: { xs: '100vw', sm: drawerMaxWidth },
+        },
+      }}
       slotProps={{
         paper: {
           className: [themeScope?.scopeClassName, className].filter(Boolean).join(' ') || undefined,
           sx: [
             {
-              width: { xs: '100%', sm: width },
-              maxWidth: '100vw',
+              width: { xs: '100vw', sm: drawerWidth },
+              minWidth: { xs: '100vw', sm: drawerMinWidth },
+              maxWidth: { xs: '100vw', sm: drawerMaxWidth },
+              boxSizing: 'border-box',
               bgcolor: 'hsl(var(--background))',
               color: 'hsl(var(--foreground))',
               backgroundImage: 'none',

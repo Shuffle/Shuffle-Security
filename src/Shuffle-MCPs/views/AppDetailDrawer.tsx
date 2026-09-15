@@ -24,6 +24,10 @@ export interface AppDetailDrawerProps extends ShuffleHostProps {
   anchor?: 'left' | 'right';
   /** Width in px */
   width?: number;
+  /** Minimum drawer width in px. Defaults to 380. */
+  minWidth?: number;
+  /** Maximum drawer width in px. Defaults to 720. */
+  maxWidth?: number;
   /** Called when drawer closes so parent can refresh data */
   onRefresh?: () => void;
   onAddToCanvas?: (app: { name: string; icon: string; algoliaId?: string | null }) => void;
@@ -42,6 +46,8 @@ export default function AppDetailDrawer({
   appId,
   anchor = 'right',
   width = 520,
+  minWidth = 380,
+  maxWidth = 720,
   onRefresh,
   onAddToCanvas,
   isAuthenticated = true,
@@ -58,6 +64,8 @@ export default function AppDetailDrawer({
   const themeScope = useShuffleMcpTheme();
   const scopeClassName = themeScope?.scopeClassName ?? (theme === 'dark' ? 'shuffle-mcp-scope dark' : theme === 'light' ? 'shuffle-mcp-scope' : undefined);
   const drawerWidth = `min(${width}px, 100vw)`;
+  const drawerMinWidth = `min(${minWidth}px, 100vw)`;
+  const drawerMaxWidth = `min(${maxWidth}px, 100vw)`;
 
   const handleClose = () => {
     onRefresh?.();
@@ -68,8 +76,8 @@ export default function AppDetailDrawer({
     className: scopeClassName,
     sx: {
       width: drawerWidth,
-      minWidth: drawerWidth,
-      maxWidth: drawerWidth,
+      minWidth: drawerMinWidth,
+      maxWidth: drawerMaxWidth,
       flex: `0 0 ${drawerWidth}`,
       height: '100vh',
       display: 'flex',
@@ -95,8 +103,8 @@ export default function AppDetailDrawer({
         '& .MuiDrawer-paper': {
           boxSizing: 'border-box',
           width: `${drawerWidth} !important`,
-          minWidth: `${drawerWidth} !important`,
-          maxWidth: `${drawerWidth} !important`,
+          minWidth: `${drawerMinWidth} !important`,
+          maxWidth: `${drawerMaxWidth} !important`,
           flex: `0 0 ${drawerWidth} !important`,
         },
       }}

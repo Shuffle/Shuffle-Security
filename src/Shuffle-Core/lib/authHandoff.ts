@@ -124,6 +124,51 @@ export const resolveShuffleSecurityTargetUrl = (
   return `${secBase}${cleanPath}`;
 };
 
+export function hasActiveSession(): boolean {
+  if (typeof window === "undefined") return false;
+  const token = getSessionToken();
+  if (token && token.trim().length > 0) return true;
+
+  try {
+    const cookies = document.cookie || "";
+    if (
+      cookies.includes("session=") ||
+      cookies.includes("user_id=") ||
+      cookies.includes("token=")
+    ) {
+      return true;
+    }
+    const userInfo =
+      localStorage.getItem("shuffle_user_info") ||
+      localStorage.getItem("user_id");
+    if (userInfo && userInfo.trim().length > 0 && userInfo !== "null") {
+      return true;
+    }
+  } catch {
+    /* ignore storage access error */
+  }
+
+  return false;
+}
+
+export function directNavigate(
+  targetUrl: string,
+  popupWindow: Window | null,
+): boolean {
+  if (popupWindow) {
+    try {
+      popupWindow.location.href = targetUrl;
+    } catch {
+      if (typeof window !== "undefined") {
+        window.location.href = targetUrl;
+      }
+    }
+  } else if (typeof window !== "undefined") {
+    window.location.href = targetUrl;
+  }
+  return true;
+}
+
 /**
  * Requests an auth handoff ticket from the backend and navigates to Shuffle Core
  * via the ticket exchange endpoint.
@@ -179,51 +224,6 @@ export async function navigateToShuffleCore(
   const isSameDomain = Boolean(
     currentRoot && targetRoot && currentRoot === targetRoot,
   );
-
-function hasActiveSession(): boolean {
-  if (typeof window === "undefined") return false;
-  const token = getSessionToken();
-  if (token && token.trim().length > 0) return true;
-
-  try {
-    const cookies = document.cookie || "";
-    if (
-      cookies.includes("session=") ||
-      cookies.includes("user_id=") ||
-      cookies.includes("token=")
-    ) {
-      return true;
-    }
-    const userInfo =
-      localStorage.getItem("shuffle_user_info") ||
-      localStorage.getItem("user_id");
-    if (userInfo && userInfo.trim().length > 0 && userInfo !== "null") {
-      return true;
-    }
-  } catch {
-    /* ignore storage access error */
-  }
-
-  return false;
-}
-
-function directNavigate(
-  targetUrl: string,
-  popupWindow: Window | null,
-): boolean {
-  if (popupWindow) {
-    try {
-      popupWindow.location.href = targetUrl;
-    } catch {
-      if (typeof window !== "undefined") {
-        window.location.href = targetUrl;
-      }
-    }
-  } else if (typeof window !== "undefined") {
-    window.location.href = targetUrl;
-  }
-  return true;
-}
 
   if (
     (!isCloudDomain() && !isShuffleBackend) ||

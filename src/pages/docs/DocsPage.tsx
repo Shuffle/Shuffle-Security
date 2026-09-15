@@ -196,7 +196,9 @@ const DocsPage = ({
         sx={{
           display: { xs: 'block', md: 'none' },
           '& .MuiDrawer-paper': {
+            boxSizing: 'border-box',
             width: 300,
+            minWidth: 260,
             maxWidth: '85vw',
             backgroundColor: 'background.default',
             display: 'flex',

@@ -1009,9 +1009,20 @@ const AllDataFlowsDrawer = ({
       variant="persistent"
       open={open}
       onClose={onClose}
+      sx={{
+        '& .MuiDrawer-paper': {
+          boxSizing: 'border-box',
+          width: { xs: '100vw', sm: 440 },
+          minWidth: { xs: '100vw', sm: 380 },
+          maxWidth: { xs: '100vw', sm: 600 },
+        },
+      }}
       PaperProps={{
         sx: {
+          boxSizing: 'border-box',
           width: { xs: '100%', sm: 440 },
+          minWidth: { xs: '100vw', sm: 380 },
+          maxWidth: { xs: '100vw', sm: 600 },
           background: 'linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)',
           borderLeft: '1px solid hsl(var(--border))',
           boxShadow: '-8px 0 32px rgba(0,0,0,0.4)',
@@ -1293,9 +1304,20 @@ const EdgeDetailDrawer = ({
       variant="persistent"
       open={open}
       onClose={onClose}
+      sx={{
+        '& .MuiDrawer-paper': {
+          boxSizing: 'border-box',
+          width: { xs: '100vw', sm: 440 },
+          minWidth: { xs: '100vw', sm: 380 },
+          maxWidth: { xs: '100vw', sm: 600 },
+        },
+      }}
       PaperProps={{
         sx: {
+          boxSizing: 'border-box',
           width: { xs: '100%', sm: 440 },
+          minWidth: { xs: '100vw', sm: 380 },
+          maxWidth: { xs: '100vw', sm: 600 },
           background: 'linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)',
           borderLeft: '1px solid hsl(var(--border))',
           boxShadow: '-8px 0 32px rgba(0,0,0,0.4)',
@@ -1750,9 +1772,20 @@ const CategoryDetailDrawer = ({
       anchor="right"
       open={open}
       onClose={onClose}
+      sx={{
+        '& .MuiDrawer-paper': {
+          boxSizing: 'border-box',
+          width: { xs: '100vw', sm: 440 },
+          minWidth: { xs: '100vw', sm: 380 },
+          maxWidth: { xs: '100vw', sm: 600 },
+        },
+      }}
       PaperProps={{
         sx: {
+          boxSizing: 'border-box',
           width: { xs: '100%', sm: 440 },
+          minWidth: { xs: '100vw', sm: 380 },
+          maxWidth: { xs: '100vw', sm: 600 },
           background: 'linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)',
           borderLeft: '1px solid hsl(var(--border))',
           boxShadow: '-8px 0 32px rgba(0,0,0,0.4)',

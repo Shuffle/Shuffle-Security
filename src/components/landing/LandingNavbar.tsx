@@ -231,7 +231,12 @@ export const LandingNavbar = ({ onMobileMenuClick }: LandingNavbarProps = {}) =>
         open={mobileOpen}
         onClose={handleDrawerToggle}
         sx={{
-          '& .MuiDrawer-paper': { width: 280 },
+          '& .MuiDrawer-paper': {
+            boxSizing: 'border-box',
+            width: 280,
+            minWidth: 240,
+            maxWidth: '85vw',
+          },
         }}
       >
         <Box sx={{ py: 2 }}>

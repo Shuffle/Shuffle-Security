@@ -359,6 +359,8 @@ export type {
 export {
   navigateToShuffleCore,
   navigateToShuffleSecurity,
+  directNavigate,
+  hasActiveSession,
   isShuffleCoreUrl,
   isShuffleSecurityUrl,
   resolveShuffleCoreTargetUrl,
