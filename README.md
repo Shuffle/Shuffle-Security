@@ -45,8 +45,8 @@
 ## Install (self-hosted)
 
 ```bash
-git clone https://github.com/shuffle/shuffle-security
-cd shuffle-security
+git clone https://github.com/Shuffle/shuffle.security
+cd shuffle.security
 docker compose up -d
 ```
 
@@ -56,7 +56,7 @@ That is it. Open **http://localhost:3002**. Defaults in `.env` work out of the b
 * [Discord](https://discord.gg/B2CBzUm)
 * [Twitter](https://twitter.com/shuffleio)
 * [Email](mailto:support@shuffler.io)
-* [Open issue](https://github.com/shuffle/shuffle-security/issues/new)
+* [Open issue](https://github.com/Shuffle/shuffle.security/issues/new)
 * [Shuffler.io](https://shuffler.io/contact)
 
 ## Related repositories

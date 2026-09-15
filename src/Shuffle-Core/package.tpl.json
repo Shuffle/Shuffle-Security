@@ -5,9 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Shuffle/security.git"
+    "url": "git+https://github.com/Shuffle/shuffle.security.git"
   },
-  "homepage": "https://github.com/Shuffle/security#readme",
+  "homepage": "https://github.com/Shuffle/shuffle.security#readme",
+  "bugs": {
+    "url": "https://github.com/Shuffle/shuffle.security/issues"
+  },
   "keywords": [
     "react",
     "shuffle",

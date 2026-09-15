@@ -770,7 +770,7 @@ const ShuffleMcpTestPage = () => {
           </Box>
           <Box
             component="a"
-            href="https://github.com/shuffle/shuffle-security"
+            href="https://github.com/Shuffle/shuffle.security"
             target="_blank"
             rel="noopener noreferrer"
             sx={{

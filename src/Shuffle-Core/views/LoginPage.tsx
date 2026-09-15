@@ -1344,7 +1344,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               {effectiveSubtitle.toLowerCase().startsWith('open source') ? (
                 <>
                   <a
-                    href="https://github.com/shuffle/security"
+                    href="https://github.com/Shuffle/shuffle.security"
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{

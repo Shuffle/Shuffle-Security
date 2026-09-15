@@ -175,9 +175,9 @@ export const MarkdownRenderer = ({
   const editUrl = useMemo(() => {
     if (meta?.link) return meta.link;
     if (slug && slug !== 'index') {
-      return `https://github.com/shuffle/shuffle-security/blob/main/docs/${slug}.md`;
+      return `https://github.com/Shuffle/shuffle.security/blob/main/docs/${slug}.md`;
     }
-    return 'https://github.com/shuffle/shuffle-security';
+    return 'https://github.com/Shuffle/shuffle.security';
   }, [meta?.link, slug]);
 
   const readingTime = useMemo(() => {
