@@ -664,7 +664,7 @@ import { switchActiveLLM } from '@/Shuffle-MCPs/llmActiveProvider';
 import { appRequiresAuthentication, isNoAuthApp, normalizeAppName } from '@/Shuffle-MCPs/noAuthApps';
 import { parseScheduleHint } from '@/Shuffle-MCPs/scheduleHint';
 import AgentRunDiagnosisBanner from '@/Shuffle-MCPs/components/AgentRunDiagnosisBanner';
-import { isAiAuthFailure } from '@/Shuffle-MCPs/agentDiagnosis';
+import { isAiAuthFailure, isAiAuthText } from '@/Shuffle-MCPs/agentDiagnosis';
 import AiAuthSuggestion from '@/Shuffle-MCPs/components/AiAuthSuggestion';
 import AgentAttachmentsButton from '@/Shuffle-MCPs/components/AgentAttachmentsButton';
 import { collectLlmImageAttachments } from '@/Shuffle-MCPs/agentAttachments';
@@ -4742,10 +4742,14 @@ const AgentUI: React.FC<AgentUIProps> = ({
   }, [onChooseLLM]);
 
   const isAiAuthIssue = useMemo(() => {
-    // If the agent completed with a valid final answer, it did not fail AI authentication.
-    if (finishAnswer && finishAnswer.trim().length > 0) return false;
+    // If the agent completed with a valid final answer that is NOT an AI auth error,
+    // it did not fail AI authentication.
+    if (finishAnswer && finishAnswer.trim().length > 0 && !isAiAuthText(finishAnswer)) {
+      const diagnosable = execution?.results?.length ? execution : (agentData as any);
+      if (!isAiAuthFailure(diagnosable, error || '')) return false;
+    }
     const diagnosable = execution?.results?.length ? execution : (agentData as any);
-    return isAiAuthFailure(diagnosable, error || '');
+    return isAiAuthFailure(diagnosable, error || finishAnswer || '');
   }, [execution, agentData, finishAnswer, error]);
 
   const aiAuthSuggestionNode = isAiAuthIssue ? (

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { getApiUrl, getAuthHeader, API_CONFIG } from '@/Shuffle-MCPs/api';
-import { trackPredefinedEvent, GA_EVENTS } from '@/lib/analytics';
+import { trackPredefinedEvent, GA_EVENTS } from '@/Shuffle-Core/lib/analytics';
 
 export interface MonitoringGroupLike {
   id?: string;

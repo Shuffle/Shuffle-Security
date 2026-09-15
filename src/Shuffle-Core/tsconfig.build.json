@@ -16,6 +16,7 @@
     "typeRoots": ["./node_modules/@types"],
     "baseUrl": "..",
     "paths": {
+      "@/*": ["*"],
       "@/Shuffle-Core": ["Shuffle-Core/index.tsx", "Shuffle-Core/index.ts"],
       "@/Shuffle-Core/*": ["Shuffle-Core/*"],
       "@/assets/*": ["assets/*"],

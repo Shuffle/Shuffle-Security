@@ -20,6 +20,7 @@ import {
   extractDecisionIndex,
   getFailureInfo,
   hasOutputWarning,
+  parseRunResult,
   type DiagnosableRun,
 } from '@/Shuffle-MCPs/agentDiagnosis';
 
@@ -89,6 +90,25 @@ const AgentRunDiagnosisBanner = ({ run, sx, onJumpToEvidence, onFocusContinue, e
   // card in the timeline. Suppress it from the top banner to avoid redundant stacked warnings.
   if (status === 'FINISHED' && (diagnosis?.kind === 'ai_auth' || diagnosis?.isAiAuth)) {
     return null;
+  }
+
+  // Generic "Authentication failed" (pointing to Apps -> Authentication) is strictly
+  // for intermediate tool/action decisions failing (e.g. Jira, Slack 401).
+  // If the run is finished and the failure does not originate from an intermediate decision, suppress it.
+  if (status === 'FINISHED' && diagnosis?.kind === 'auth') {
+    const firstEvidence = diagnosis?.evidence?.[0] || null;
+    const jumpDecisionIndex = firstEvidence ? extractDecisionIndex(firstEvidence.path) : null;
+    if (jumpDecisionIndex === null) return null;
+    const { parsed } = parseRunResult(run);
+    const decs = parsed?.decisions || (run as any)?.decisions;
+    if (Array.isArray(decs) && decs[jumpDecisionIndex]) {
+      const d = decs[jumpDecisionIndex];
+      const action = String(d?.action || d?.details?.action || '').toLowerCase();
+      const category = String(d?.category || '').toLowerCase();
+      if (['finish', 'finalise'].includes(action) || ['finish', 'finalise'].includes(category)) {
+        return null;
+      }
+    }
   }
 
   const isCritical = !!failureInfo || diagnosis?.kind === 'token_limit' || diagnosis?.kind === 'ai_auth' || Boolean(diagnosis?.isAiAuth);

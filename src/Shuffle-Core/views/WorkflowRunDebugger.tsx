@@ -21,7 +21,7 @@ import {
 
 import { toast } from 'react-toastify';
 import dayjs, { Dayjs } from 'dayjs';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs/index.js';
 import {
   DateTimePicker,
   LocalizationProvider,

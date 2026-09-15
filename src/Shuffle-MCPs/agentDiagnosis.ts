@@ -171,19 +171,6 @@ const getDiagnosableScope = (parsed: any): unknown => {
       d && typeof d === 'object' && d.run_details ? d.run_details : null
     );
     if (runDetails.some((rd: unknown) => rd !== null)) scope.run_details = runDetails;
-    const finalDecisions = parsed.decisions.map((d: any) => {
-      if (!d || typeof d !== 'object') return null;
-      const action = String(d.action || d.details?.action || '').toLowerCase();
-      const category = String(d.category || '').toLowerCase();
-      if (!['finish', 'finalise'].includes(action) && !['finish', 'finalise'].includes(category)) return null;
-      // Intentionally exclude `fields` — those are the agent's final output
-      // payload (titles, descriptions, status codes from observed data) and
-      // routinely contain incidental tokens like "401" or "unauthorized"
-      // that are NOT errors. Only the agent's own stated `reason` is
-      // diagnostically meaningful here.
-      return { reason: d.reason };
-    });
-    if (finalDecisions.some((d: unknown) => d !== null)) scope.decisions = finalDecisions;
   }
   if (parsed.decision_string !== undefined) scope.decision_string = parsed.decision_string;
   return Object.keys(scope).length > 0 ? scope : null;
@@ -206,14 +193,14 @@ export const isAiAuthText = (text: string | null | undefined): boolean => {
   const lower = text.toLowerCase();
 
   const hasAuthSignal =
-    /\b(401|unauthori[sz]ed|invalid[_\s-]*(api[_\s-]*key|credentials?)|incorrect\s+api\s+key|missing[_\s-]*(api[_\s-]*key|authorization)|authentication[_\s-]*(failed|required|error))\b/.test(
+    /\b(401|unauthori[sz]ed|invalid[_\s-]*(api[_\s-]*key|credentials?|token|auth|key)|incorrect\s+api\s+key|missing[_\s-]*(api[_\s-]*key|authorization|credentials?)|authentication[_\s-]*(failed|required|error)|ai\s+credentials)\b/.test(
       lower
-    );
+    ) || /check\s+your\s+ai\s+credentials/.test(lower);
 
   if (!hasAuthSignal) return false;
 
   const hasAiSignal =
-    /\b(failed\s+to\s+start\s+ai\s+agent|failed\s+to\s+run\s+ai\s+agent|ai\s+agent\s+(failed|error|crash)|runactionai|llm\s+request|failed\s+to\s+run\s+llm|no\s+llm|openai|anthropic|mistral|groq|deepseek|together\.ai|together\.xyz|openrouter|gemini|googleapis\.com|ollama|lm\s*studio|platform\.openai\.com|api\.openai\.com|local\s*llm)\b/.test(
+    /\b(failed\s+to\s+start\s+ai\s+agent|failed\s+to\s+run\s+ai(\s+(agent|query))?|failed\s+to\s+run\s+ai|ai\s+agent\s+(failed|error|crash|aborted)|ai\s+query|ai\s+credentials|shuffler\.io\/agents|runactionai|llm\s+request|failed\s+to\s+run\s+llm|no\s+llm|openai|anthropic|mistral|groq|deepseek|together\.ai|together\.xyz|openrouter|gemini|googleapis\.com|ollama|lm\s*studio|platform\.openai\.com|api\.openai\.com|local\s*llm)\b/.test(
       lower
     ) ||
     /error\s+from\s+['"][^'"]*(openai|anthropic|mistral|groq|deepseek|together|openrouter|googleapis|ollama|lmstudio)/.test(
@@ -339,13 +326,20 @@ export const diagnoseOutputWarning = (run: DiagnosableRun): OutputDiagnosis | nu
   const isFinished = (run.status || '').toUpperCase() === 'FINISHED';
   const hasSuccessfulFinish = (() => {
     if (!parsed || typeof parsed !== 'object') return false;
+    if (parsed.error && String(parsed.error).trim().length > 0) return false;
+    if (parsed.success === false) return false;
+
     if (Array.isArray(parsed.decisions) && parsed.decisions.length > 0) {
       const last = parsed.decisions[parsed.decisions.length - 1];
       if (last && typeof last === 'object') {
         const action = String(last.action || last.details?.action || '').toLowerCase();
         const category = String(last.category || '').toLowerCase();
         if (['finish', 'finalise'].includes(action) || ['finish', 'finalise'].includes(category)) {
-          return last.success !== false;
+          if (last.success === false || last.status === 'FAILED') return false;
+          if (isAiAuthText(last.reason) || isAiAuthText(last.output) || isAiAuthText(last.details?.output)) return false;
+          const reasonStr = String(last.reason || '').toLowerCase();
+          if (reasonStr.startsWith('failed to') || reasonStr.includes('error,')) return false;
+          return true;
         }
       }
     }
@@ -362,19 +356,24 @@ export const diagnoseOutputWarning = (run: DiagnosableRun): OutputDiagnosis | nu
       if (typeof parsed.error === 'string') candidates.push(parsed.error);
       if (typeof parsed.reason === 'string') candidates.push(parsed.reason);
       if (typeof parsed.message === 'string') candidates.push(parsed.message);
+      if (typeof parsed.output === 'string') candidates.push(parsed.output);
 
       if (Array.isArray(parsed.decisions)) {
         for (const d of parsed.decisions) {
           if (typeof d?.run_details?.error === 'string') candidates.push(d.run_details.error);
-          if (d?.success === false || d?.status === 'FAILED') {
-            if (typeof d?.reason === 'string') candidates.push(d.reason);
-            if (typeof d?.run_details?.result === 'string') candidates.push(d.run_details.result);
+          if (typeof d?.reason === 'string') candidates.push(d.reason);
+          if (typeof d?.run_details?.result === 'string') candidates.push(d.run_details.result);
+          if (typeof d?.output === 'string') candidates.push(d.output);
+          if (Array.isArray(d?.fields)) {
+            for (const f of d.fields) {
+              if (typeof f?.value === 'string') candidates.push(f.value);
+            }
           }
         }
       }
     }
-    // If no decisions were produced at all, check raw error output
-    if (raw && (!parsed || !Array.isArray(parsed.decisions) || parsed.decisions.length === 0)) {
+    // If raw error output is available
+    if (raw) {
       candidates.push(raw);
     }
     return candidates.find((v) => isAiAuthText(v)) || null;
@@ -710,31 +709,48 @@ export const isAiAuthFailure = (
   if (isAiAuthText(extraText)) return true;
   if (!run) return false;
 
-  const status = (run.status || '').toUpperCase();
-  const isFinished = status === 'FINISHED';
-
-  // 1. Failure info for FAILED/ABORTED runs
-  const fail = getFailureInfo(run);
-  if (fail && isAiAuthText(fail.reason)) return true;
-
-  // 2. Direct diagnosis (which checks token limits, auth failures, etc.)
+  // 1. Direct diagnosis (which checks token limits, auth failures, etc.)
   const diagnosis = diagnoseOutputWarning(run);
   if (diagnosis?.kind === 'ai_auth' || diagnosis?.isAiAuth) return true;
 
-  // If the run has finished and produced no diagnosis/failure info, it succeeded.
-  if (isFinished) return false;
+  // 2. Failure info for FAILED/ABORTED runs
+  const fail = getFailureInfo(run);
+  if (fail && isAiAuthText(fail.reason)) return true;
 
-  // 3. Decisions list: inspect only actions that explicitly errored or failed
-  const decisions = (run as any)?.decisions;
+  // 3. Raw result payload or top-level output/error
+  const anyRun = run as any;
+  if (typeof anyRun.result === 'string' && isAiAuthText(anyRun.result)) return true;
+  if (typeof anyRun.output === 'string' && isAiAuthText(anyRun.output)) return true;
+  if (typeof anyRun.error === 'string' && isAiAuthText(anyRun.error)) return true;
+
+  // 4. Results array
+  if (Array.isArray(run.results)) {
+    for (const r of run.results) {
+      if (typeof r?.result === 'string' && isAiAuthText(r.result)) return true;
+      if (typeof r?.error === 'string' && isAiAuthText(r.error)) return true;
+    }
+  }
+
+  // 5. Decisions list (e.g. finalise reason or failed AI agent action)
+  const decisions = anyRun?.decisions;
   if (Array.isArray(decisions)) {
     for (const d of decisions) {
+      if (isAiAuthText(d?.reason)) return true;
+      if (typeof d?.output === 'string' && isAiAuthText(d.output)) return true;
       if (typeof d?.run_details?.error === 'string' && isAiAuthText(d.run_details.error)) return true;
-      if (d?.success === false || d?.status === 'FAILED') {
-        if (isAiAuthText(d?.reason)) return true;
-        if (typeof d?.run_details?.result === 'string' && isAiAuthText(d.run_details.result)) return true;
+      if (typeof d?.run_details?.result === 'string' && isAiAuthText(d.run_details.result)) return true;
+      if (Array.isArray(d?.fields)) {
+        for (const f of d.fields) {
+          if (isAiAuthText(f?.value)) return true;
+        }
       }
     }
   }
+
+  const status = (run.status || '').toUpperCase();
+  const isFinished = status === 'FINISHED';
+  // If the run has finished and produced no diagnosis/failure info, it succeeded.
+  if (isFinished) return false;
 
   return false;
 };

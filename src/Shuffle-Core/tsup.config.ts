@@ -33,7 +33,7 @@ export default defineConfig({
     '@mui/icons-material',
     '@mui/x-data-grid',
     '@mui/x-date-pickers',
-    '@mui/x-date-pickers/AdapterDayjs',
+    '@mui/x-date-pickers/AdapterDayjs/index.js',
     /^@mui\/x-date-pickers/,
     '@emotion/react',
     '@emotion/styled',
@@ -55,7 +55,6 @@ export default defineConfig({
     /^@tanstack\//,
     /^@capacitor\//,
     /^firebase\//,
-    /^@\//,
     'tailwind-merge',
     'clsx',
     'recharts',
@@ -86,6 +85,37 @@ export default defineConfig({
         }));
       },
     },
+    // Generic resolver for all `@/*` path aliases:
+    // Resolves any `@/<path>` import (except `@/lib/router-compat` which is rewritten to react-router-dom)
+    // to `<repo-root>/src/<path>`, matching Vite and tsconfig path alias behavior.
+    {
+      name: 'resolve-at-alias',
+      setup(build) {
+        build.onResolve({ filter: /^@\// }, (args) => {
+          if (args.path === '@/lib/router-compat') {
+            return undefined;
+          }
+          const subpath = args.path.replace(/^@\//, '');
+          const srcDir = path.resolve(__dirname, '..');
+          const target = path.resolve(srcDir, subpath);
+          return build.resolve(target, {
+            resolveDir: args.resolveDir,
+            kind: args.kind,
+          });
+        });
+      },
+    },
+    // Rewrite extensionless `@mui/x-date-pickers/Adapter*` imports to append `/index.js`
+    // so downstream Webpack 5 consumers under strict ESM (fullySpecified) can resolve them.
+    {
+      name: 'mui-x-date-pickers-esm-rewrite',
+      setup(build) {
+        build.onResolve({ filter: /^@mui\/x-date-pickers\/Adapter[A-Za-z0-9]+$/ }, (args) => ({
+          path: `${args.path}/index.js`,
+          external: true,
+        }));
+      },
+    },
   ],
   esbuildOptions(options) {
     options.alias = {
@@ -93,7 +123,7 @@ export default defineConfig({
       '@/Shuffle-Core': path.resolve(__dirname, '.'),
       '@/assets': path.resolve(__dirname, '../assets'),
       '@/Shuffle-MCPs': path.resolve(__dirname, '../Shuffle-MCPs'),
-      '@/lib': path.resolve(__dirname, '../lib'),
+      '@': path.resolve(__dirname, '..'),
     };
   },
 });

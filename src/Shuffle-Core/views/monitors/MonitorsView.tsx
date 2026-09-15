@@ -30,7 +30,7 @@ import { DEFAULT_AGENT_PERMISSIONS } from '@/hooks/useAgentPermissions';
 import { fetchHostSupplements, mergeHosts } from '@/lib/mergeMonitorHosts';
 import { HostDetailPanel } from './HostDetailPanel';
 import { MonitorHostTable } from './MonitorHostTable';
-import { trackPredefinedEvent, GA_EVENTS } from '@/lib/analytics';
+import { trackPredefinedEvent, GA_EVENTS } from '@/Shuffle-Core/lib/analytics';
 import { isDemoActive } from '@/services/demoMode';
 import { DEMO_HOST_HOSTNAME } from '@/services/demoLiveEnvironment';
 import { fetchEnvironmentsCached } from '../appsFetchCache';
