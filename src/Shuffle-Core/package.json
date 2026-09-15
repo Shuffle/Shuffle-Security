@@ -40,7 +40,7 @@
     "**/*.css"
   ],
   "scripts": {
-    "build": "tsup && cp shuffle-core.css dist/shuffle-core.css || true",
+    "build": "tsup && cp shuffle-core.css dist/shuffle-core.css",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {

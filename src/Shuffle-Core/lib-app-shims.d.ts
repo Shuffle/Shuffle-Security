@@ -94,6 +94,7 @@ declare module '@/context/ThemeContext' {
 
 declare module '@/hooks/useUsers' {
   export function invalidateUsersCache(...args: any[]): any;
+  export function useUsers(...args: any[]): any;
 }
 
 declare module '@/hooks/useAgentPermissions' {
@@ -119,6 +120,7 @@ declare module '@/hooks/useVulnerabilities' {
 
 declare module '@/services/demoLiveEnvironment' {
   export const DEMO_HOST_HOSTNAME: string;
+  export function restoreOriginalIngestTicketsApps(...args: any[]): any;
 }
 
 declare module '@/services/demoMode' {
@@ -167,6 +169,7 @@ declare module '@/components/ui/alert-dialog' {
 declare module '@/components/ui/button' {
   import * as React from 'react';
   export const Button: React.ForwardRefExoticComponent<any>;
+  export const buttonVariants: any;
   export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: any;
     size?: any;

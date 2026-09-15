@@ -144,6 +144,7 @@ export const DateTimePicker: React.FC<DateTimePickerProps> = ({
   sx,
   popoverSx,
   slotProps,
+  renderTrigger,
 }) => {
   const defaultFormat = useMemo(() => {
     if (customFormat) return customFormat;
