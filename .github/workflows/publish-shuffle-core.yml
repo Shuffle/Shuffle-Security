@@ -77,6 +77,8 @@ jobs:
 
       - name: Build library
         working-directory: src/Shuffle-Core
+        env:
+          NODE_PATH: ${{ github.workspace }}/src/Shuffle-Core/node_modules
         run: npm run build
 
       - name: Pack

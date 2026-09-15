@@ -114,9 +114,30 @@ export default defineConfig({
         });
       },
     },
+    // When files in sibling directories (such as ../Shuffle-MCPs or ../lib)
+    // import bare dependencies installed in Shuffle-Core's node_modules (e.g. rehype-sanitize),
+    // resolve them using Shuffle-Core as the base directory.
+    {
+      name: 'resolve-sibling-imports-from-core',
+      setup(build) {
+        build.onResolve({ filter: /^[^./@]/ }, (args) => {
+          if (args.resolveDir && !args.resolveDir.startsWith(__dirname)) {
+            return build.resolve(args.path, {
+              resolveDir: __dirname,
+              kind: args.kind,
+            });
+          }
+          return undefined;
+        });
+      },
+    },
   ],
   esbuildOptions(options) {
     options.assetNames = '[name]';
+    options.nodePaths = [
+      path.resolve(__dirname, 'node_modules'),
+      ...(options.nodePaths || []),
+    ];
     options.alias = {
       ...(options.alias || {}),
       '@/Shuffle-Core': path.resolve(__dirname, '.'),
