@@ -349,3 +349,25 @@ export {
   UK_SHUFFLE_CORE_AUTH_EXCHANGE_ENDPOINT,
 } from "./lib/authHandoff";
 export type { HandoffOptions } from "./lib/authHandoff";
+
+// Host monitor control and deployment — shared between Shuffle Security and Shuffle Automation
+import {
+  MonitorHostTable as MonitorHostTableRaw,
+  type MonitorHostTableProps,
+} from "./views/monitors/MonitorHostTable";
+export const MonitorHostTable = withTheme<MonitorHostTableProps>(
+  MonitorHostTableRaw,
+  "MonitorHostTable",
+);
+export type { MonitorHostTableProps } from "./views/monitors/MonitorHostTable";
+
+import {
+  AddHostDialog as AddHostDialogRaw,
+  type AddHostDialogProps,
+  type MonitoringGroupLike,
+} from "./views/monitors/AddHostDialog";
+export const AddHostDialog = withTheme<AddHostDialogProps>(
+  AddHostDialogRaw,
+  "AddHostDialog",
+);
+export type { AddHostDialogProps, MonitoringGroupLike };

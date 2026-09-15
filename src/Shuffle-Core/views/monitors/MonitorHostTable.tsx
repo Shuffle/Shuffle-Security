@@ -11,7 +11,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNavigate } from '@/lib/router-compat';
 import {
   ChevronRight, HardDrive, Lock, Package, FileCode, Zap, Activity, Laptop,
-  Play, Loader2, Maximize2, Terminal, CheckCircle2, ShieldX,
+  Play, Loader2, Maximize2, Terminal, CheckCircle2, ShieldX, Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -30,6 +30,7 @@ import { terminalStorageKey, readStoredSession, registerHostIdentity } from '@/u
 import { hostUrlSegment } from '@/utils/hostUrlSegment';
 import { ActionOutputView } from './ActionOutputView';
 import { HostNameDisplay } from '@/components/monitors/HostNameDisplay';
+import { AddHostDialog, MonitoringGroupLike } from './AddHostDialog';
 
 
 // ── Helpers (identical to the originals on VulnAssetsPage) ─────────────────
@@ -125,14 +126,18 @@ type ActionDebugEntry = {
   actionSuccess?: boolean;
 };
 
-interface MonitorHostTableProps {
+export interface MonitorHostTableProps {
   hosts: MonitorHost[];
   /** Called after a successful action to let the parent reload data. */
   onRefresh?: () => void;
+  /** If true, renders the Add Host button in the header bar and empty state. */
+  showAddHost?: boolean;
+  /** Optional monitoring group information for binding new host deployments directly to this group. */
+  group?: MonitoringGroupLike;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
-export const MonitorHostTable = ({ hosts, onRefresh }: MonitorHostTableProps) => {
+export const MonitorHostTable = ({ hosts, onRefresh, showAddHost, group }: MonitorHostTableProps) => {
   const navigate = useNavigate();
   const [expandedHosts, setExpandedHosts] = useState<Set<string>>(new Set());
   const [sortCol, setSortCol] = useState<string | null>(null);
@@ -142,6 +147,7 @@ export const MonitorHostTable = ({ hosts, onRefresh }: MonitorHostTableProps) =>
   const [pendingDisableRce, setPendingDisableRce] = useState<null | { actionId: string; actionName: string; hostname: string; groupName: string; hostUuid: string; isPredefined: boolean }>(null);
   const [customAction, setCustomAction] = useState('');
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [addHostOpen, setAddHostOpen] = useState(false);
   
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
   const pollingActiveRef = useRef<Map<string, boolean>>(new Map());
@@ -480,7 +486,28 @@ export const MonitorHostTable = ({ hosts, onRefresh }: MonitorHostTableProps) =>
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
-      <div className="border-t border-border">
+      <div className="border border-border rounded-lg overflow-hidden bg-card">
+        {(showAddHost || group) && (
+          <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-muted/20">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">
+                {group?.name || group?.Name || 'Monitored Hosts'}
+              </span>
+              <span className="text-xs text-muted-foreground font-mono">
+                ({allHosts.length} {allHosts.length === 1 ? 'host' : 'hosts'})
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 h-8 text-xs"
+              onClick={() => setAddHostOpen(true)}
+            >
+              <Plus size={13} />
+              Add Host
+            </Button>
+          </div>
+        )}
         {/* Table header */}
         <div className="grid grid-cols-[2rem_1.5fr_2rem_2rem_2rem_2rem_2rem_2rem_0.7fr_0.8fr_2.5rem] gap-2 px-5 py-2 border-b border-border bg-muted/30 items-center">
           <TooltipProvider delayDuration={200}>
@@ -502,7 +529,28 @@ export const MonitorHostTable = ({ hosts, onRefresh }: MonitorHostTableProps) =>
           <span className="text-xs font-semibold text-muted-foreground">Actions</span>
         </div>
         {/* Host rows */}
-        {allHosts.map((host, idx) => {
+        {allHosts.length === 0 ? (
+          <div className="px-5 py-12 flex flex-col items-center justify-center text-center gap-3">
+            <Laptop size={32} className="text-muted-foreground/30" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">No hosts registered yet</p>
+              <p className="text-xs text-muted-foreground max-w-sm">
+                Deploy a lightweight monitor on an endpoint to start checking posture and compliance.
+              </p>
+            </div>
+            {(showAddHost || group) && (
+              <Button
+                size="sm"
+                className="gap-1.5 mt-2"
+                onClick={() => setAddHostOpen(true)}
+              >
+                <Plus size={14} />
+                Add Host
+              </Button>
+            )}
+          </div>
+        ) : (
+          allHosts.map((host, idx) => {
           const checkinDate = host.checkin ? new Date(host.checkin * 1000) : null;
           const isRecent = checkinDate ? (Date.now() - checkinDate.getTime()) < 5 * 60 * 1000 : false;
           const hdState = triState(host.hd_encrypted);
@@ -850,7 +898,8 @@ export const MonitorHostTable = ({ hosts, onRefresh }: MonitorHostTableProps) =>
               )}
             </div>
           );
-        })}
+        })
+      )}
       </div>
 
       <AlertDialog open={!!pendingDisableRce} onOpenChange={(o) => { if (!o) setPendingDisableRce(null); }}>
@@ -877,6 +926,14 @@ export const MonitorHostTable = ({ hosts, onRefresh }: MonitorHostTableProps) =>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AddHostDialog
+        open={addHostOpen}
+        onOpenChange={setAddHostOpen}
+        group={group}
+        onHostDetected={onRefresh}
+        onRefresh={onRefresh}
+      />
     </>
   );
 };
