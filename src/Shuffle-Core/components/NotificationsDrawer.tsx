@@ -9,7 +9,7 @@
  * `notifications:open` window event with an optional `{ executionId }`.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '../toast';
 import {
   Box,
   Button,

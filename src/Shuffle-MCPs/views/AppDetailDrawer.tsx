@@ -5,7 +5,7 @@
  * Delegates state and views to AppDetailContent (single source of truth).
  */
 
-import Drawer from '@mui/material/Drawer';
+import { Drawer } from '@mui/material';
 import { useShuffleMcpTheme } from '@/Shuffle-MCPs/ShuffleMcpThemeProvider';
 import type { ShuffleHostProps } from '@/Shuffle-MCPs/host-props';
 import AppDetailContent, { checkAppNameMatch } from '@/Shuffle-MCPs/views/AppDetailContent';
@@ -64,27 +64,32 @@ export default function AppDetailDrawer({
     onClose();
   };
 
+  const drawerPaperProps = {
+    className: scopeClassName,
+    sx: {
+      width: drawerWidth,
+      minWidth: drawerWidth,
+      maxWidth: drawerWidth,
+      flex: `0 0 ${drawerWidth}`,
+      height: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      overflow: 'hidden',
+      background: 'linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)',
+      borderLeft: anchor === 'right' ? '1px solid hsl(var(--border))' : 'none',
+      borderRight: anchor === 'left' ? '1px solid hsl(var(--border))' : 'none',
+    },
+  };
+
   return (
     <Drawer
       anchor={anchor}
       open={open}
       onClose={handleClose}
-      PaperProps={{
-        className: scopeClassName,
-        sx: {
-          width: drawerWidth,
-          minWidth: drawerWidth,
-          maxWidth: drawerWidth,
-          flex: `0 0 ${drawerWidth}`,
-          height: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          background: 'linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)',
-          borderLeft: anchor === 'right' ? '1px solid hsl(var(--border))' : 'none',
-          borderRight: anchor === 'left' ? '1px solid hsl(var(--border))' : 'none',
-        },
+      slotProps={{
+        paper: drawerPaperProps,
       }}
+      {...({ PaperProps: drawerPaperProps } as any)}
       sx={{
         zIndex: 9999,
         '& .MuiDrawer-paper': {

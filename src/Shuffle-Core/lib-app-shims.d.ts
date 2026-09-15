@@ -371,3 +371,113 @@ declare module '@shuffleio/shuffle-mcps' {
 
 declare module '@shuffleio/shuffle-mcps/*';
 
+declare module '@mui/x-date-pickers/AdapterDayjs' {
+  export class AdapterDayjs {
+    constructor(...args: any[]);
+  }
+}
+
+declare module '@mui/x-date-pickers' {
+  import * as React from 'react';
+  export const DateTimePicker: React.FC<any>;
+  export const LocalizationProvider: React.FC<any>;
+  export const DatePicker: React.FC<any>;
+  export const TimePicker: React.FC<any>;
+}
+
+declare module '@mui/x-data-grid' {
+  import * as React from 'react';
+  export const DataGrid: React.FC<any>;
+  export type GridColDef = any;
+  export type GridRowsProp = any;
+  export type GridRowId = any;
+  export type GridCellParams = any;
+  export type GridRowParams = any;
+  export type GridRenderCellParams = any;
+}
+
+declare module '@mui/icons-material' {
+  import * as React from 'react';
+  export const OpenInNew: React.FC<any>;
+  export const PlayArrow: React.FC<any>;
+  export const Insights: React.FC<any>;
+  export const Replay: React.FC<any>;
+  export const EditNote: React.FC<any>;
+  export const AccountTree: React.FC<any>;
+  export const FilterAltOff: React.FC<any>;
+  export const Send: React.FC<any>;
+  export const Visibility: React.FC<any>;
+  export const Search: React.FC<any>;
+  export const Clear: React.FC<any>;
+  export const Add: React.FC<any>;
+  export const Delete: React.FC<any>;
+  export const Check: React.FC<any>;
+  export const Close: React.FC<any>;
+  export const ArrowForward: React.FC<any>;
+  export const ArrowBack: React.FC<any>;
+  export const ArrowLeft: React.FC<any>;
+  export const Stop: React.FC<any>;
+  export const ContentCopy: React.FC<any>;
+  export const Link: React.FC<any>;
+  export const Block: React.FC<any>;
+  export const CheckCircleOutline: React.FC<any>;
+  export const WarningAmber: React.FC<any>;
+  export const Draw: React.FC<any>;
+  export const Done: React.FC<any>;
+  export const RestaurantRounded: React.FC<any>;
+  export const Cloud: React.FC<any>;
+  export const CheckCircle: React.FC<any>;
+  export const Padding: React.FC<any>;
+  export const Edit: React.FC<any>;
+  export const Cancel: React.FC<any>;
+  export const Shield: React.FC<any>;
+  export const LockOutlined: React.FC<any>;
+  export const FlashOn: React.FC<any>;
+  export const People: React.FC<any>;
+  export const FmdGoodOutlined: React.FC<any>;
+  export const Palette: React.FC<any>;
+  export const Info: React.FC<any>;
+  export const Email: React.FC<any>;
+  export const Receipt: React.FC<any>;
+  export const Security: React.FC<any>;
+  export const Speed: React.FC<any>;
+  export const Group: React.FC<any>;
+  export const CreditCard: React.FC<any>;
+  export const TrendingUp: React.FC<any>;
+  export const Description: React.FC<any>;
+  export const Launch: React.FC<any>;
+  export const Error: React.FC<any>;
+  export const Schedule: React.FC<any>;
+  export const Refresh: React.FC<any>;
+  export const Warning: React.FC<any>;
+  export const VpnKey: React.FC<any>;
+  export const Notifications: React.FC<any>;
+  export const NotificationsActive: React.FC<any>;
+  export const NotificationsOff: React.FC<any>;
+}
+
+declare module '@mui/icons-material/*';
+
+declare module 'firebase/app' {
+  export interface FirebaseApp {
+    [key: string]: any;
+  }
+  export function initializeApp(...args: any[]): FirebaseApp;
+  export function getApps(): FirebaseApp[];
+  export function getApp(...args: any[]): FirebaseApp;
+}
+
+declare module 'firebase/messaging' {
+  export interface Messaging {
+    [key: string]: any;
+  }
+  export function getMessaging(...args: any[]): Messaging;
+  export function getToken(...args: any[]): Promise<string>;
+  export function onMessage(...args: any[]): any;
+}
+
+declare module 'sonner' {
+  export const toast: any;
+}
+
+
