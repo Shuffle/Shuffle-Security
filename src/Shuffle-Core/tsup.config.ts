@@ -18,6 +18,7 @@ export default defineConfig({
   },
   sourcemap: false,
   clean: true,
+  noExternal: ['rehype-sanitize'],
   external: [
     'react',
     'react-dom',
