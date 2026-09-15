@@ -409,3 +409,20 @@ export const WorkflowRunDebugger = withTheme<WorkflowRunDebuggerProps>(
 );
 export type { WorkflowRunDebuggerProps };
 
+// Date & Time pickers — shared zero-dependency date pickers replacing @mui/x-date-pickers
+export {
+  DateTimePicker,
+  DatePicker,
+  TimePicker,
+  DateRangePicker,
+  LocalizationProvider,
+  AdapterDayjs,
+} from "./components/DateTimePicker";
+export type {
+  DateTimePickerProps,
+  DateTimePickerMode,
+  DateTimePreset,
+  DateRangePickerProps,
+} from "./components/DateTimePicker";
+
+

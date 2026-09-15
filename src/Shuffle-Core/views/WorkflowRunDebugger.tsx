@@ -21,11 +21,7 @@ import {
 
 import { toast } from 'react-toastify';
 import dayjs, { Dayjs } from 'dayjs';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import {
-  DateTimePicker,
-  LocalizationProvider,
-} from '@mui/x-date-pickers';
+import { DateTimePicker } from '../components/DateTimePicker';
 
 import {
   OpenInNew as OpenInNewIcon,
@@ -1067,34 +1063,32 @@ export const WorkflowRunDebugger: React.FC<WorkflowRunDebuggerProps> = ({
           )}
         />
 
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DateTimePicker
-            slotProps={{
-              textField: {
-                size: 'small',
-                sx: { minWidth: 200 },
-              },
-            }}
-            ampm={false}
-            label="Search from"
-            format="YYYY-MM-DD HH:mm:ss"
-            value={startTime}
-            onChange={(date) => setStartTime(date)}
-          />
-          <DateTimePicker
-            slotProps={{
-              textField: {
-                size: 'small',
-                sx: { minWidth: 200 },
-              },
-            }}
-            ampm={false}
-            label="Search until"
-            format="YYYY-MM-DD HH:mm:ss"
-            value={endTime}
-            onChange={(date) => setEndTime(date)}
-          />
-        </LocalizationProvider>
+        <DateTimePicker
+          slotProps={{
+            textField: {
+              size: 'small',
+              sx: { minWidth: 200 },
+            },
+          }}
+          ampm={false}
+          label="Search from"
+          format="YYYY-MM-DD HH:mm:ss"
+          value={startTime}
+          onChange={(date) => setStartTime(date)}
+        />
+        <DateTimePicker
+          slotProps={{
+            textField: {
+              size: 'small',
+              sx: { minWidth: 200 },
+            },
+          }}
+          ampm={false}
+          label="Search until"
+          format="YYYY-MM-DD HH:mm:ss"
+          value={endTime}
+          onChange={(date) => setEndTime(date)}
+        />
 
         <Tooltip title="Clear all filters and search parameters">
           <IconButton

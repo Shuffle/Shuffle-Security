@@ -371,26 +371,6 @@ declare module '@shuffleio/shuffle-mcps' {
 
 declare module '@shuffleio/shuffle-mcps/*';
 
-declare module '@mui/x-date-pickers/AdapterDayjs' {
-  export class AdapterDayjs {
-    constructor(...args: any[]);
-  }
-}
-
-declare module '@mui/x-date-pickers/AdapterDayjs/index.js' {
-  export class AdapterDayjs {
-    constructor(...args: any[]);
-  }
-}
-
-declare module '@mui/x-date-pickers' {
-  import * as React from 'react';
-  export const DateTimePicker: React.FC<any>;
-  export const LocalizationProvider: React.FC<any>;
-  export const DatePicker: React.FC<any>;
-  export const TimePicker: React.FC<any>;
-}
-
 declare module '@mui/x-data-grid' {
   import * as React from 'react';
   export const DataGrid: React.FC<any>;

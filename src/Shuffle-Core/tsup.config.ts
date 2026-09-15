@@ -33,10 +33,6 @@ export default defineConfig({
     '@mui/system/styled',
     '@mui/icons-material',
     '@mui/x-data-grid',
-    '@mui/x-date-pickers',
-    '@mui/x-date-pickers/AdapterDayjs',
-    '@mui/x-date-pickers/AdapterDayjs/index.js',
-    /^@mui\/x-date-pickers/,
     '@emotion/react',
     '@emotion/styled',
     '@emotion/cache',
@@ -116,17 +112,6 @@ export default defineConfig({
             kind: args.kind,
           });
         });
-      },
-    },
-    // Rewrite extensionless `@mui/x-date-pickers/Adapter*` imports to append `/index.js`
-    // so downstream Webpack 5 consumers under strict ESM (fullySpecified) can resolve them.
-    {
-      name: 'mui-x-date-pickers-esm-rewrite',
-      setup(build) {
-        build.onResolve({ filter: /^@mui\/x-date-pickers\/Adapter[A-Za-z0-9]+$/ }, (args) => ({
-          path: `${args.path}/index.js`,
-          external: true,
-        }));
       },
     },
   ],

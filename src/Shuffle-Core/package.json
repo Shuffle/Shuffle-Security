@@ -49,7 +49,6 @@
     "@mui/material": ">=5",
     "@mui/icons-material": ">=5",
     "@mui/x-data-grid": ">=6",
-    "@mui/x-date-pickers": ">=6",
     "@emotion/react": ">=11",
     "@emotion/styled": ">=11",
     "lucide-react": ">=0.300.0",
@@ -63,9 +62,6 @@
       "optional": true
     },
     "@mui/x-data-grid": {
-      "optional": true
-    },
-    "@mui/x-date-pickers": {
       "optional": true
     }
   },
@@ -104,7 +100,6 @@
     "@mui/material": "^5.15.0",
     "@mui/icons-material": "^5.15.0",
     "@mui/x-data-grid": "^6.19.0",
-    "@mui/x-date-pickers": "^6.19.0",
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
     "react": "^18.0.0",
