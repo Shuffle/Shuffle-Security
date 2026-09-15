@@ -20,7 +20,7 @@
  */
 
 import { getApiUrl, getAuthHeader, hasShuffleAuth } from '@/Shuffle-MCPs/api';
-import { fetchJsonCached } from '@/Shuffle-Core/views/appsFetchCache';
+import { invalidateAuthCache } from '@/Shuffle-Core/views/appsFetchCache';
 
 export interface AuthenticatedAppRaw {
   id?: string;
@@ -80,10 +80,12 @@ const doFetch = async (crossOrgId?: string | null): Promise<AuthenticatedAppRaw[
     ...getAuthHeader(crossOrgId ?? undefined),
   };
   try {
-    const result = await fetchJsonCached(getApiUrl('/api/v1/apps/authentication'), {
+    const resp = await fetch(getApiUrl('/api/v1/apps/authentication'), {
       credentials: 'include',
       headers,
     });
+    if (!resp.ok) return [];
+    const result = await resp.json();
     const data = result?.data || result;
     return Array.isArray(data) ? applyValidationStaleness(data) : [];
   } catch {
@@ -129,7 +131,8 @@ export const fetchAuthenticatedApps = (crossOrgId?: string | null): Promise<Auth
 export const invalidateAuthenticatedAppsCache = (crossOrgId?: string | null) => {
   if (crossOrgId === undefined) {
     cache.clear();
-    return;
+  } else {
+    cache.delete(cacheKey(crossOrgId));
   }
-  cache.delete(cacheKey(crossOrgId));
+  invalidateAuthCache();
 };

@@ -371,3 +371,15 @@ export const AddHostDialog = withTheme<AddHostDialogProps>(
   "AddHostDialog",
 );
 export type { AddHostDialogProps, MonitoringGroupLike };
+
+// Workflow run debugger — shared between Shuffle Security and Shuffle Automation
+import {
+  WorkflowRunDebugger as WorkflowRunDebuggerRaw,
+  type WorkflowRunDebuggerProps,
+} from "./views/WorkflowRunDebugger";
+export const WorkflowRunDebugger = withTheme<WorkflowRunDebuggerProps>(
+  WorkflowRunDebuggerRaw,
+  "WorkflowRunDebugger",
+);
+export type { WorkflowRunDebuggerProps };
+

@@ -89,6 +89,7 @@ import { Route as DashTicketsIndexRouteImport } from './routes/_dash.tickets.ind
 import { Route as DashTicketsIdRouteImport } from './routes/_dash.tickets.$id'
 import { Route as DashWorkflowsIndexRouteImport } from './routes/_dash.workflows.index'
 import { Route as DashWorkflowsIdRouteImport } from './routes/_dash.workflows.$id'
+import { Route as DashWorkflowsDebugRouteImport } from './routes/_dash.workflows.debug'
 import { Route as OnboardingOnboardingIndexRouteImport } from './routes/_onboarding.onboarding.index'
 import { Route as OnboardingOnboardingAuthenticateRouteImport } from './routes/_onboarding.onboarding.authenticate'
 import { Route as OnboardingOnboardingAutomateRouteImport } from './routes/_onboarding.onboarding.automate'
@@ -508,6 +509,11 @@ const DashWorkflowsIdRoute = DashWorkflowsIdRouteImport.update({
   path: '/workflows/$id',
   getParentRoute: () => DashRoute,
 } as any)
+const DashWorkflowsDebugRoute = DashWorkflowsDebugRouteImport.update({
+  id: '/workflows/debug',
+  path: '/workflows/debug',
+  getParentRoute: () => DashRoute,
+} as any)
 const OnboardingOnboardingIndexRoute =
   OnboardingOnboardingIndexRouteImport.update({
     id: '/onboarding/',
@@ -639,6 +645,7 @@ export interface FileRoutesByFullPath {
   '/software/$': typeof DashSoftwareSplatRoute
   '/tickets/$id': typeof DashTicketsIdRoute
   '/workflows/$id': typeof DashWorkflowsIdRoute
+  '/workflows/debug': typeof DashWorkflowsDebugRoute
   '/onboarding/authenticate': typeof OnboardingOnboardingAuthenticateRoute
   '/onboarding/automate': typeof OnboardingOnboardingAutomateRoute
   '/onboarding/product': typeof OnboardingOnboardingProductRoute
@@ -730,6 +737,7 @@ export interface FileRoutesByTo {
   '/software/$': typeof DashSoftwareSplatRoute
   '/tickets/$id': typeof DashTicketsIdRoute
   '/workflows/$id': typeof DashWorkflowsIdRoute
+  '/workflows/debug': typeof DashWorkflowsDebugRoute
   '/onboarding/authenticate': typeof OnboardingOnboardingAuthenticateRoute
   '/onboarding/automate': typeof OnboardingOnboardingAutomateRoute
   '/onboarding/product': typeof OnboardingOnboardingProductRoute
@@ -825,6 +833,7 @@ export interface FileRoutesById {
   '/_dash/software/$': typeof DashSoftwareSplatRoute
   '/_dash/tickets/$id': typeof DashTicketsIdRoute
   '/_dash/workflows/$id': typeof DashWorkflowsIdRoute
+  '/_dash/workflows/debug': typeof DashWorkflowsDebugRoute
   '/_onboarding/onboarding/authenticate': typeof OnboardingOnboardingAuthenticateRoute
   '/_onboarding/onboarding/automate': typeof OnboardingOnboardingAutomateRoute
   '/_onboarding/onboarding/product': typeof OnboardingOnboardingProductRoute
@@ -918,6 +927,7 @@ export interface FileRouteTypes {
     | '/software/$'
     | '/tickets/$id'
     | '/workflows/$id'
+    | '/workflows/debug'
     | '/onboarding/authenticate'
     | '/onboarding/automate'
     | '/onboarding/product'
@@ -1009,6 +1019,7 @@ export interface FileRouteTypes {
     | '/software/$'
     | '/tickets/$id'
     | '/workflows/$id'
+    | '/workflows/debug'
     | '/onboarding/authenticate'
     | '/onboarding/automate'
     | '/onboarding/product'
@@ -1103,6 +1114,7 @@ export interface FileRouteTypes {
     | '/_dash/software/$'
     | '/_dash/tickets/$id'
     | '/_dash/workflows/$id'
+    | '/_dash/workflows/debug'
     | '/_onboarding/onboarding/authenticate'
     | '/_onboarding/onboarding/automate'
     | '/_onboarding/onboarding/product'
@@ -1722,6 +1734,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashWorkflowsIdRouteImport
       parentRoute: typeof DashRoute
     }
+    '/_dash/workflows/debug': {
+      id: '/_dash/workflows/debug'
+      path: '/workflows/debug'
+      fullPath: '/workflows/debug'
+      preLoaderRoute: typeof DashWorkflowsDebugRouteImport
+      parentRoute: typeof DashRoute
+    }
     '/_onboarding/onboarding/': {
       id: '/_onboarding/onboarding/'
       path: '/onboarding'
@@ -1871,6 +1890,7 @@ interface DashRouteChildren {
   DashSoftwareSplatRoute: typeof DashSoftwareSplatRoute
   DashTicketsIdRoute: typeof DashTicketsIdRoute
   DashWorkflowsIdRoute: typeof DashWorkflowsIdRoute
+  DashWorkflowsDebugRoute: typeof DashWorkflowsDebugRoute
   DashAdminIndexRoute: typeof DashAdminIndexRoute
   DashAgentsIndexRoute: typeof DashAgentsIndexRoute
   DashAlertsIndexRoute: typeof DashAlertsIndexRoute
@@ -1927,6 +1947,7 @@ const DashRouteChildren: DashRouteChildren = {
   DashSoftwareSplatRoute: DashSoftwareSplatRoute,
   DashTicketsIdRoute: DashTicketsIdRoute,
   DashWorkflowsIdRoute: DashWorkflowsIdRoute,
+  DashWorkflowsDebugRoute: DashWorkflowsDebugRoute,
   DashAdminIndexRoute: DashAdminIndexRoute,
   DashAgentsIndexRoute: DashAgentsIndexRoute,
   DashAlertsIndexRoute: DashAlertsIndexRoute,

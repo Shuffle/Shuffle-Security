@@ -61,8 +61,10 @@ import {
   CircularProgress,
   ClickAwayListener,
   Dialog,
+  Divider,
   IconButton,
   InputBase,
+  Menu,
   MenuItem,
   MenuList,
   Paper,
@@ -648,9 +650,15 @@ import AppDetailDrawer from '@/Shuffle-MCPs/views/AppDetailDrawer';
 import { getApiUrl, getAuthHeader, API_CONFIG, getShuffleCoreFormUrl } from '@/Shuffle-MCPs/api';
 import { fetchApps } from '@/Shuffle-MCPs/appsCache';
 import { resolveApps } from '@/Shuffle-MCPs/resolveApp';
-import { toast } from '@/Shuffle-MCPs/toast';
-import { detectLLMProvider, getProviderLogoUrl, SHUFFLE_AI_PRESET, resolveActiveLLMProvider } from '@/Shuffle-MCPs/llmProviderDetect';
-import { runAgent, resolveAgentNodeId } from '@/Shuffle-MCPs/agentRun';
+import {
+  detectLLMProvider,
+  getProviderLogoUrl,
+  SHUFFLE_AI_PRESET,
+  resolveActiveLLMProvider,
+  isOpenAICompatibleAuthEntry,
+  providerLabelOfAuthEntry,
+} from '@/Shuffle-MCPs/llmProviderDetect';
+import { switchActiveLLM } from '@/Shuffle-MCPs/llmActiveProvider';
 import { appRequiresAuthentication, isNoAuthApp, normalizeAppName } from '@/Shuffle-MCPs/noAuthApps';
 import { parseScheduleHint } from '@/Shuffle-MCPs/scheduleHint';
 import AgentRunDiagnosisBanner from '@/Shuffle-MCPs/components/AgentRunDiagnosisBanner';
@@ -2627,6 +2635,8 @@ const AgentUI: React.FC<AgentUIProps> = ({
   // Populated by `loadAuthenticatedApps` so the "Choose LLM" chip can show
   // the matching vendor logo and label.
   const [detectedLLM, setDetectedLLM] = useState<{ label: string; url: string; logo: string } | null>(null);
+  const [configuredLLMOptions, setConfiguredLLMOptions] = useState<Array<{ label: string; id?: string }>>([]);
+  const [llmMenuAnchor, setLlmMenuAnchor] = useState<null | HTMLElement>(null);
   // Apps actually allowed for the current execution, derived from the agent's
   // `allowed_actions` field (format: "app:<id>:<name>"). Falls back to
   // `chosenApps` when the field is missing (legacy runs).
@@ -3295,6 +3305,22 @@ const AgentUI: React.FC<AgentUIProps> = ({
       // the chip and the sidebar can never disagree. Runs on the RAW list
       // (validation state must not hide an active provider).
       setDetectedLLM(resolveActiveLLMProvider(list));
+
+      const llmEntries = list.filter(isOpenAICompatibleAuthEntry);
+      const configuredMap = new Map<string, string>();
+      for (const entry of llmEntries) {
+        const label = providerLabelOfAuthEntry(entry);
+        if (label && label !== SHUFFLE_AI_PRESET && entry?.id) {
+          configuredMap.set(label, entry.id);
+        }
+      }
+      const opts: Array<{ label: string; id?: string }> = [
+        { label: SHUFFLE_AI_PRESET },
+      ];
+      for (const [label, id] of configuredMap.entries()) {
+        opts.push({ label, id });
+      }
+      setConfiguredLLMOptions(opts);
     } catch {
       // silent — caller can still pick apps manually
     } finally {
@@ -3316,7 +3342,16 @@ const AgentUI: React.FC<AgentUIProps> = ({
   // banner reactive without a page reload.
   useEffect(() => {
     if (!hasApiKey) return;
-    const handler = () => { loadAuthenticatedApps(); };
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      if (customEvent?.detail?.activeProvider) {
+        const label = customEvent.detail.activeProvider;
+        const url = customEvent.detail.url || '';
+        const logo = customEvent.detail.logo || getProviderLogoUrl(label, url);
+        setDetectedLLM({ label, url, logo });
+      }
+      loadAuthenticatedApps();
+    };
     window.addEventListener('integrations-changed', handler);
     return () => window.removeEventListener('integrations-changed', handler);
   }, [hasApiKey, loadAuthenticatedApps]);
@@ -6732,11 +6767,17 @@ const AgentUI: React.FC<AgentUIProps> = ({
                 }}
               >
                 {!hideChooseLLM && (
-                <Tooltip title="Configure the local LLM used for this agent">
+                <Tooltip title={configuredLLMOptions.length > 1 ? 'Switch or configure AI provider' : 'Configure the AI provider used for this agent'}>
                   <Box
                     component="button"
                     type="button"
-                    onClick={openLocalLlmArea}
+                    onClick={(e) => {
+                      if (configuredLLMOptions.length > 1) {
+                        setLlmMenuAnchor(e.currentTarget);
+                      } else {
+                        openLocalLlmArea();
+                      }
+                    }}
                     sx={{
                       all: 'unset', cursor: 'pointer',
                       display: 'inline-flex', alignItems: 'center', gap: 0.5,
@@ -6768,6 +6809,86 @@ const AgentUI: React.FC<AgentUIProps> = ({
                     {!isPhone && (detectedLLM?.label || 'Shuffle AI')}
                   </Box>
                 </Tooltip>
+                )}
+                {!hideChooseLLM && configuredLLMOptions.length > 1 && (
+                  <Menu
+                    anchorEl={llmMenuAnchor}
+                    open={Boolean(llmMenuAnchor)}
+                    onClose={() => setLlmMenuAnchor(null)}
+                    slotProps={{
+                      paper: {
+                        sx: {
+                          bgcolor: 'hsl(var(--popover))',
+                          color: 'hsl(var(--popover-foreground))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: 1.5,
+                          minWidth: 190,
+                          py: 0.5,
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                        },
+                      },
+                    }}
+                  >
+                    <Box sx={{ px: 1.5, py: 0.5, fontSize: '0.72rem', fontWeight: 600, color: 'hsl(var(--muted-foreground))', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      AI Provider
+                    </Box>
+                    {configuredLLMOptions.map((opt) => {
+                      const isActive = (detectedLLM?.label || SHUFFLE_AI_PRESET) === opt.label;
+                      return (
+                        <MenuItem
+                          key={opt.label}
+                          onClick={async () => {
+                            setLlmMenuAnchor(null);
+                            const target = opt.label === SHUFFLE_AI_PRESET ? SHUFFLE_AI_PRESET : (opt.id || opt.label);
+                            setDetectedLLM({
+                              label: opt.label,
+                              url: '',
+                              logo: getProviderLogoUrl(opt.label, ''),
+                            });
+                            await switchActiveLLM(target);
+                            loadAuthenticatedApps();
+                          }}
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 1.5,
+                            fontSize: '0.8rem',
+                            py: 0.75,
+                            px: 1.5,
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box
+                              component="img"
+                              src={getProviderLogoUrl(opt.label, '')}
+                              alt=""
+                              sx={{ width: 14, height: 14, borderRadius: '2px', objectFit: 'contain' }}
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                            />
+                            <Typography sx={{ fontSize: '0.8rem', fontWeight: isActive ? 600 : 400 }}>
+                              {opt.label}
+                            </Typography>
+                          </Box>
+                          {isActive && (
+                            <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'hsl(var(--primary))' }}>
+                              Active
+                            </Typography>
+                          )}
+                        </MenuItem>
+                      );
+                    })}
+                    <Divider sx={{ my: 0.5 }} />
+                    <MenuItem
+                      onClick={() => {
+                        setLlmMenuAnchor(null);
+                        openLocalLlmArea();
+                      }}
+                      sx={{ fontSize: '0.8rem', py: 0.75, px: 1.5, color: 'hsl(var(--muted-foreground))' }}
+                    >
+                      Configure providers...
+                    </MenuItem>
+                  </Menu>
                 )}
                 {!hideChooseLLM && (
                   <Box

@@ -1130,6 +1130,12 @@ export interface WorkflowRunExplorerDrawerProps extends WorkflowRunExplorerProps
   minWidth?: number;
   /** Maximum drawer width in px. Defaults to 900. */
   maxWidth?: number;
+  /** Optional theme override ('light' | 'dark') */
+  theme?: string;
+  /** Optional user profile context */
+  userdata?: any;
+  /** Optional API host URL override */
+  globalUrl?: string;
 }
 
 export const WorkflowRunExplorerDrawer: React.FC<WorkflowRunExplorerDrawerProps> = ({

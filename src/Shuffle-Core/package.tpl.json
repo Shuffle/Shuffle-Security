@@ -42,6 +42,8 @@
     "react": ">=18",
     "react-dom": ">=18",
     "@mui/material": ">=5",
+    "@mui/x-data-grid": ">=6",
+    "@mui/x-date-pickers": ">=6",
     "@emotion/react": ">=11",
     "@emotion/styled": ">=11",
     "lucide-react": ">=0.300.0",
@@ -49,6 +51,14 @@
     "@shuffleio/shuffle-mcps": ">=0.0.32",
     "html2canvas-pro": ">=2",
     "jspdf": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "@mui/x-data-grid": {
+      "optional": true
+    },
+    "@mui/x-date-pickers": {
+      "optional": true
+    }
   },
   "dependencies": {
     "algoliasearch": "^5.0.0",

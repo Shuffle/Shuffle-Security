@@ -24,7 +24,7 @@ import { AlertCircle, RefreshCw, Zap, Workflow, Activity, ExternalLink } from 'l
 import { SegmentedControl } from '../ui/segmented-control';
 import { useWorkflows } from '../../hooks/useWorkflows';
 import { getApiUrl, getAuthHeader, getShuffleCoreUrl, getShuffleCoreWorkflowUrl } from '../../api';
-import { navigateToShuffleCore } from '@/lib/authHandoff';
+import { navigateToShuffleCore, isShuffleSecurityUrl } from '@/lib/authHandoff';
 import { NEON, TooltipContent, KpiTile, Panel, EmptyState, buildBuckets, buildBucketsBetween, bucketIndexOf, useChartRangeDrag, ReferenceArea } from './_shared';
 import { useSyncHostBaseUrl } from '../../useSyncHostBaseUrl';
 
@@ -438,7 +438,13 @@ export const AutomationDashboard = ({
           label={`Successful ${isApps ? 'App' : 'Workflow'} Runs`}
           isLoading={loading}
           delay={0.05}
-          onClick={async () => await navigateToShuffleCore(getShuffleCoreUrl('/workflows/debug'), { newTab: true })}
+          onClick={async () => {
+            if (typeof window !== 'undefined' && isShuffleSecurityUrl(window.location.href)) {
+              window.location.href = '/workflows/debug';
+            } else {
+              await navigateToShuffleCore(getShuffleCoreUrl('/workflows/debug'), { newTab: true });
+            }
+          }}
         />
         <KpiTile
           icon={Zap}
@@ -447,7 +453,13 @@ export const AutomationDashboard = ({
           label={`Failed ${isApps ? 'App' : 'Workflow'} Runs`}
           isLoading={loading}
           delay={0.1}
-          onClick={async () => await navigateToShuffleCore(getShuffleCoreUrl('/workflows/debug'), { newTab: true })}
+          onClick={async () => {
+            if (typeof window !== 'undefined' && isShuffleSecurityUrl(window.location.href)) {
+              window.location.href = '/workflows/debug';
+            } else {
+              await navigateToShuffleCore(getShuffleCoreUrl('/workflows/debug'), { newTab: true });
+            }
+          }}
         />
         <KpiTile
           icon={Activity}

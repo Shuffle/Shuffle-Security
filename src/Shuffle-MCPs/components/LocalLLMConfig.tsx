@@ -31,6 +31,10 @@ import {
   detectLLMProvider,
   providerLabelOfAuthEntry,
 } from '@/Shuffle-MCPs/llmProviderDetect';
+import {
+  switchActiveLLM,
+  maskSecretFields,
+} from '@/Shuffle-MCPs/llmActiveProvider';
 
 const OPENAI_APP_NAME = 'OpenAI';
 const OPENAI_APP_ID = '5d19dd82517870c68d40cacad9b5ca91';
@@ -248,6 +252,8 @@ const LocalLLMConfig = ({ compact, globalUrl, userdata, isLoaded, isLoggedIn, se
   };
 
 
+  const [optimisticActiveProvider, setOptimisticActiveProvider] = useState<string | null>(null);
+
   /** The currently active (primary) OpenAI-compatible authentication.
    *  Separate from the fallback so we know whether `active: true` is set. */
   const activeEntryRaw = useMemo(
@@ -261,19 +267,23 @@ const LocalLLMConfig = ({ compact, globalUrl, userdata, isLoaded, isLoggedIn, se
    *  is the single source of truth for what should appear in the "Choose LLM"
    *  area, regardless of what the user last looked at in the drawer. */
   const activeProviderLabel = useMemo(() => {
+    if (optimisticActiveProvider !== null) {
+      return optimisticActiveProvider === SHUFFLE_AI_PRESET ? null : optimisticActiveProvider;
+    }
     if (!activeEntryRaw) return null;
     return providerOfEntry(activeEntryRaw);
-  }, [activeEntryRaw, providerOfEntry]);
+  }, [optimisticActiveProvider, activeEntryRaw, providerOfEntry]);
 
 
   const effectivePreset = useMemo(() => {
     if (selectedPreset) return selectedPreset;
+    if (optimisticActiveProvider !== null) return optimisticActiveProvider;
     if (activeEntryRaw) return providerOfEntry(activeEntryRaw);
     if (!currentUrl && !hasOpenAIEntries) return SHUFFLE_AI_PRESET;
     if (currentUrl) return detectLLMProvider(currentUrl)?.label || CUSTOM_PRESET;
     return SHUFFLE_AI_PRESET;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPreset, currentUrl, hasOpenAIEntries, activeEntryRaw]);
+  }, [selectedPreset, optimisticActiveProvider, currentUrl, hasOpenAIEntries, activeEntryRaw]);
 
   /** Saved authentications for the currently selected provider only.
    *  All providers share the OpenAI app auth (that is just the request FORMAT),
@@ -346,18 +356,11 @@ const LocalLLMConfig = ({ compact, globalUrl, userdata, isLoaded, isLoggedIn, se
       const shouldBeActive = entry.id === activeId;
       if (entry.active === shouldBeActive) continue;
 
-      const body: Record<string, any> = { ...entry, active: shouldBeActive };
-      if (Array.isArray(entry.fields)) {
-        body.fields = entry.fields.map((f: any) =>
-          typeof f?.value === 'string' ? { ...f, value: placeholder } : f,
-        );
-      } else if (entry.fields && typeof entry.fields === 'object') {
-        const masked: Record<string, any> = {};
-        for (const [key, val] of Object.entries(entry.fields)) {
-          masked[key] = typeof val === 'string' ? placeholder : val;
-        }
-        body.fields = masked;
-      }
+      const body: Record<string, any> = {
+        ...entry,
+        active: shouldBeActive,
+        fields: maskSecretFields(entry.fields),
+      };
 
       try {
         const resp = await fetch(getApiUrl('/api/v1/apps/authentication'), {
@@ -539,37 +542,50 @@ const LocalLLMConfig = ({ compact, globalUrl, userdata, isLoaded, isLoggedIn, se
     }
   };
 
+  const prevOpenRef = useRef(open);
+  const hasInitializedPresetRef = useRef(false);
+
   /** Keep the provider selector aligned with the currently active provider.
-   *  When the drawer opens, or the active provider changes elsewhere, reset
-   *  the UI so it shows the active one instead of the last one the user
-   *  merely looked at. */
+   *  When the drawer opens, reset the UI so it shows the active one instead
+   *  of the last one the user merely looked at. */
   useEffect(() => {
-    if (!open) return;
-    // Never reset while the auth list is still loading — doing so would flip
-    // the selector to Shuffle AI and persist it, then flip back once the
-    // active provider arrives (the inconsistency users saw).
+    const justOpened = Boolean(open && !prevOpenRef.current);
+    prevOpenRef.current = open;
+
     if (authLoading) return;
-    // When no OpenAI-compatible auth is active, the canonical provider is
-    // Shuffle AI. Reset the selector to that so the drawer doesn't reopen
-    // showing whatever provider the user merely looked at last time.
+    if (optimisticActiveProvider !== null) return;
+
     const target = activeProviderLabel || SHUFFLE_AI_PRESET;
-    if (selectedPreset === target) return;
-    setSelectedPreset(target);
-    rememberPreset(target);
+
+    if (justOpened) {
+      setSelectedPreset(target);
+      rememberPreset(target);
+      return;
+    }
+
+    if (!hasInitializedPresetRef.current) {
+      hasInitializedPresetRef.current = true;
+      setSelectedPreset(target);
+      rememberPreset(target);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, activeProviderLabel, authLoading]);
+  }, [open, activeProviderLabel, authLoading, optimisticActiveProvider]);
 
   const applyShuffleAI = async () => {
     // Flip the UI to Shuffle AI immediately and deactivate the
     // saved LLM authentications. Nothing is deleted.
-    handleAuthChange(OPENAI_APP_ID, {});
+    setOptimisticActiveProvider(SHUFFLE_AI_PRESET);
     setSelectedPreset(SHUFFLE_AI_PRESET);
     rememberPreset(SHUFFLE_AI_PRESET);
     setCustomUrl('');
+    handleAuthChange(OPENAI_APP_ID, {});
     try {
-      await setActiveAuthEntry(null);
+      await switchActiveLLM(SHUFFLE_AI_PRESET);
+      await refreshAuth();
     } catch (err) {
       console.error('[LocalLLMConfig] Failed to deactivate provider auths:', err);
+    } finally {
+      setOptimisticActiveProvider(null);
     }
   };
 
@@ -586,7 +602,19 @@ const LocalLLMConfig = ({ compact, globalUrl, userdata, isLoaded, isLoggedIn, se
     // If this provider already has a saved authentication, make it the
     // primary one (active: true) and deactivate the others.
     const existing = openaiEntries.find((e: any) => e?.id && providerOfEntry(e) === label);
-    if (existing?.id) void setActiveAuthEntry(existing.id);
+    if (existing?.id) {
+      setOptimisticActiveProvider(label);
+      void (async () => {
+        try {
+          await switchActiveLLM(existing.id);
+          await refreshAuth();
+        } catch (err) {
+          console.error('[LocalLLMConfig] Failed to switch active LLM provider:', err);
+        } finally {
+          setOptimisticActiveProvider(null);
+        }
+      })();
+    }
 
     const preset = ENDPOINT_PRESETS.find((p) => p.label === label);
     if (!preset) return;
@@ -753,8 +781,7 @@ const LocalLLMConfig = ({ compact, globalUrl, userdata, isLoaded, isLoggedIn, se
           onChange={(_e, val) => val && handlePresetChange(val)}
           isOptionEqualToValue={(opt, val) => opt === val}
           renderOption={(props, option) => {
-            const preset = ENDPOINT_PRESETS.find((p) => p.label === option);
-            const activeProvider = activeEntryRaw ? providerOfEntry(activeEntryRaw) : SHUFFLE_AI_PRESET;
+            const activeProvider = optimisticActiveProvider ?? (activeEntryRaw ? providerOfEntry(activeEntryRaw) : SHUFFLE_AI_PRESET);
             const isSelected = option === activeProvider;
             const isValidated = option !== SHUFFLE_AI_PRESET && validatedProviderLabels.has(option);
             return (

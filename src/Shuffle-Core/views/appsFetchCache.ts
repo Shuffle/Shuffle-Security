@@ -280,6 +280,19 @@ export function invalidateAlluvialCache() {
   _alluvialCache = null;
 }
 
+export function invalidateAuthCache() {
+  for (const key of _jsonCache.keys()) {
+    if (key.includes('/api/v1/apps/authentication')) {
+      _jsonCache.delete(key);
+    }
+  }
+  for (const key of _inFlightPromises.keys()) {
+    if (key.includes('/api/v1/apps/authentication')) {
+      _inFlightPromises.delete(key);
+    }
+  }
+}
+
 export function invalidateAppsCache() {
   _jsonCache.clear();
   _inFlightPromises.clear();
@@ -295,3 +308,4 @@ export function invalidateAppsCache() {
     window.dispatchEvent(new CustomEvent('shuffle-apps-invalidated'));
   }
 }
+
