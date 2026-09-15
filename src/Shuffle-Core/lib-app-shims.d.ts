@@ -480,4 +480,16 @@ declare module 'sonner' {
   export const toast: any;
 }
 
+declare module '@capacitor/push-notifications' {
+  export const PushNotifications: any;
+}
+
+declare module '@capacitor/local-notifications' {
+  export const LocalNotifications: any;
+}
+
+declare module '@capacitor/haptics' {
+  export const Haptics: any;
+}
+
 

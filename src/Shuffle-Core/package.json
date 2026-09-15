@@ -1,6 +1,6 @@
 {
   "name": "@shuffleio/shuffle-core",
-  "version": "0.0.0-VERSION",
+  "version": "0.0.48",
   "description": "Standalone React surfaces from the Shuffle Security app — Usecases explorer, form control, and more.",
   "license": "MIT",
   "repository": {

@@ -53,8 +53,6 @@ export default defineConfig({
     /^dayjs\//,
     /^@shuffleio\//,
     /^@tanstack\//,
-    /^@capacitor\//,
-    /^firebase\//,
     'tailwind-merge',
     'clsx',
     'recharts',
@@ -82,6 +80,19 @@ export default defineConfig({
         build.onResolve({ filter: /^@\/lib\/router-compat$/ }, () => ({
           path: 'react-router-dom',
           external: true,
+        }));
+      },
+    },
+    // Resolve optional Capacitor & Firebase imports to safe in-tree runtime shims,
+    // so consuming web apps (such as Shaffuru) are not broken by missing native mobile / push packages.
+    {
+      name: 'resolve-optional-shims',
+      setup(build) {
+        build.onResolve({ filter: /^@capacitor\// }, () => ({
+          path: path.resolve(__dirname, 'shims/capacitor-shim.ts'),
+        }));
+        build.onResolve({ filter: /^firebase\// }, () => ({
+          path: path.resolve(__dirname, 'shims/firebase-shim.ts'),
         }));
       },
     },
@@ -118,6 +129,7 @@ export default defineConfig({
     },
   ],
   esbuildOptions(options) {
+    options.assetNames = '[name]';
     options.alias = {
       ...(options.alias || {}),
       '@/Shuffle-Core': path.resolve(__dirname, '.'),
@@ -125,5 +137,14 @@ export default defineConfig({
       '@/Shuffle-MCPs': path.resolve(__dirname, '../Shuffle-MCPs'),
       '@': path.resolve(__dirname, '..'),
     };
+  },
+  async onSuccess() {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const srcCss = path.resolve(__dirname, 'shuffle-core.css');
+    const destCss = path.resolve(__dirname, 'dist/shuffle-core.css');
+    if (fs.existsSync(srcCss)) {
+      fs.copyFileSync(srcCss, destCss);
+    }
   },
 });

@@ -258,6 +258,24 @@ export type {
   ExecutionNotification,
 } from "./components/NotificationsDrawer";
 
+// Unified Search Dialog (Command Palette) — shared between Shuffle Core and Shuffle Security
+import SearchDialogRaw from "./components/SearchDialog";
+export const SearchDialog = withTheme(
+  SearchDialogRaw,
+  "SearchDialog",
+);
+export { SEARCH_OPEN_EVENT } from "./components/SearchDialog";
+export type {
+  SearchDialogProps,
+  SearchResult,
+  NavResult,
+  OrgWorkflowResult,
+  PublicWorkflowResult,
+  AppResult,
+  DocResult,
+  CorrelationResult,
+} from "./components/SearchDialog";
+
 // Notification settings (device push, critical pager, agent requests, general
 // alerts) + on-call duty menu — usable anywhere in the platform.
 import {

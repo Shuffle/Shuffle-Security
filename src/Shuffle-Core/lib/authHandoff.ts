@@ -180,17 +180,62 @@ export async function navigateToShuffleCore(
     currentRoot && targetRoot && currentRoot === targetRoot,
   );
 
+function hasActiveSession(): boolean {
+  if (typeof window === "undefined") return false;
+  const token = getSessionToken();
+  if (token && token.trim().length > 0) return true;
+
+  try {
+    const cookies = document.cookie || "";
+    if (
+      cookies.includes("session=") ||
+      cookies.includes("user_id=") ||
+      cookies.includes("token=")
+    ) {
+      return true;
+    }
+    const userInfo =
+      localStorage.getItem("shuffle_user_info") ||
+      localStorage.getItem("user_id");
+    if (userInfo && userInfo.trim().length > 0 && userInfo !== "null") {
+      return true;
+    }
+  } catch {
+    /* ignore storage access error */
+  }
+
+  return false;
+}
+
+function directNavigate(
+  targetUrl: string,
+  popupWindow: Window | null,
+): boolean {
+  if (popupWindow) {
+    try {
+      popupWindow.location.href = targetUrl;
+    } catch {
+      if (typeof window !== "undefined") {
+        window.location.href = targetUrl;
+      }
+    }
+  } else if (typeof window !== "undefined") {
+    window.location.href = targetUrl;
+  }
+  return true;
+}
+
   if (
     (!isCloudDomain() && !isShuffleBackend) ||
     (targetHost && currentHost && targetHost === currentHost) ||
     isSameDomain
   ) {
-    if (popupWindow) {
-      popupWindow.location.href = targetUrl;
-    } else if (typeof window !== "undefined") {
-      window.location.href = targetUrl;
-    }
-    return true;
+    return directNavigate(targetUrl, popupWindow);
+  }
+
+  // If user is not logged in locally, bypass handoff and navigate directly
+  if (!hasActiveSession()) {
+    return directNavigate(targetUrl, popupWindow);
   }
 
   try {
@@ -224,28 +269,18 @@ export async function navigateToShuffleCore(
     });
 
     if (!response.ok) {
-      let reason = `Server error (${response.status})`;
-      try {
-        const errorData = await response.json();
-        if (errorData?.reason) {
-          reason = errorData.reason;
-        }
-      } catch {
-        // use default reason
-      }
-
-      if (popupWindow) popupWindow.close();
-      toast.error(`Authentication handoff failed: ${reason}`);
-      return false;
+      console.warn(
+        `[authHandoff] Handoff ticket request returned ${response.status}, falling back to direct navigation`,
+      );
+      return directNavigate(targetUrl, popupWindow);
     }
 
     const data = await response.json();
     if (!data?.success || !data?.ticket) {
-      if (popupWindow) popupWindow.close();
-      toast.error(
-        `Authentication handoff failed: ${data?.reason || "No ticket returned"}`,
+      console.warn(
+        `[authHandoff] No ticket returned (${data?.reason || "unknown"}), falling back to direct navigation`,
       );
-      return false;
+      return directNavigate(targetUrl, popupWindow);
     }
 
     // Determine target Core base for exchange:
@@ -306,10 +341,11 @@ export async function navigateToShuffleCore(
 
     return true;
   } catch (err: unknown) {
-    if (popupWindow) popupWindow.close();
-    const msg = err instanceof Error ? err.message : "Network error";
-    toast.error(`Failed to navigate to Shuffle Core: ${msg}`);
-    return false;
+    console.warn(
+      "[authHandoff] Error during handoff to Shuffle Core, falling back to direct navigation:",
+      err,
+    );
+    return directNavigate(targetUrl, popupWindow);
   }
 }
 
@@ -375,12 +411,12 @@ export async function navigateToShuffleSecurity(
     (targetHost && currentHost && targetHost === currentHost) ||
     isSameDomain
   ) {
-    if (popupWindow) {
-      popupWindow.location.href = targetUrl;
-    } else if (typeof window !== "undefined") {
-      window.location.href = targetUrl;
-    }
-    return true;
+    return directNavigate(targetUrl, popupWindow);
+  }
+
+  // If user is not logged in locally, bypass handoff and navigate directly
+  if (!hasActiveSession()) {
+    return directNavigate(targetUrl, popupWindow);
   }
 
   try {
@@ -413,28 +449,18 @@ export async function navigateToShuffleSecurity(
     });
 
     if (!response.ok) {
-      let reason = `Server error (${response.status})`;
-      try {
-        const errorData = await response.json();
-        if (errorData?.reason) {
-          reason = errorData.reason;
-        }
-      } catch {
-        // use default reason
-      }
-
-      if (popupWindow) popupWindow.close();
-      toast.error(`Authentication handoff failed: ${reason}`);
-      return false;
+      console.warn(
+        `[authHandoff] Handoff ticket request returned ${response.status}, falling back to direct navigation`,
+      );
+      return directNavigate(targetUrl, popupWindow);
     }
 
     const data = await response.json();
     if (!data?.success || !data?.ticket) {
-      if (popupWindow) popupWindow.close();
-      toast.error(
-        `Authentication handoff failed: ${data?.reason || "No ticket returned"}`,
+      console.warn(
+        `[authHandoff] No ticket returned (${data?.reason || "unknown"}), falling back to direct navigation`,
       );
-      return false;
+      return directNavigate(targetUrl, popupWindow);
     }
 
     // Determine target Security base for exchange:
@@ -494,9 +520,10 @@ export async function navigateToShuffleSecurity(
 
     return true;
   } catch (err: unknown) {
-    if (popupWindow) popupWindow.close();
-    const msg = err instanceof Error ? err.message : "Network error";
-    toast.error(`Failed to navigate to Shuffle Security: ${msg}`);
-    return false;
+    console.warn(
+      "[authHandoff] Error during handoff to Shuffle Security, falling back to direct navigation:",
+      err,
+    );
+    return directNavigate(targetUrl, popupWindow);
   }
 }
