@@ -23,10 +23,10 @@ export default defineConfig({
     },
     resolve: {
       alias: {
-        // Internal Shuffle libraries vendored under src/ — same aliases the
-        // Classic vite.config.ts carried.
-        "@shuffleio/shuffle-mcps": path.resolve(dirname, "./src/Shuffle-MCPs"),
-        "@shuffleio/shuffle-core": path.resolve(dirname, "./src/Shuffle-Core"),
+        // Internal Shuffle libraries vendored under src/ — point directly to source entries
+        "@/Shuffle-Core": path.resolve(dirname, "./src/Shuffle-Core/index.tsx"),
+        "@shuffleio/shuffle-mcps": path.resolve(dirname, "./src/Shuffle-MCPs/index.ts"),
+        "@shuffleio/shuffle-core": path.resolve(dirname, "./src/Shuffle-Core/index.tsx"),
       },
     },
   },

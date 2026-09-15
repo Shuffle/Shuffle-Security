@@ -377,6 +377,12 @@ declare module '@mui/x-date-pickers/AdapterDayjs' {
   }
 }
 
+declare module '@mui/x-date-pickers/AdapterDayjs/index.js' {
+  export class AdapterDayjs {
+    constructor(...args: any[]);
+  }
+}
+
 declare module '@mui/x-date-pickers' {
   import * as React from 'react';
   export const DateTimePicker: React.FC<any>;

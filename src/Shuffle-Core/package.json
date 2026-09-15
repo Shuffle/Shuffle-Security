@@ -18,14 +18,14 @@
     "security",
     "soar"
   ],
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
+  "main": "./index.tsx",
+  "module": "./index.tsx",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "import": "./index.tsx",
+      "require": "./index.tsx"
     },
     "./shuffle-core.css": "./dist/shuffle-core.css",
     "./dist/*": "./dist/*"

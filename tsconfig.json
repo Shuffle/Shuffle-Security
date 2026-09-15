@@ -30,6 +30,8 @@
     "exactOptionalPropertyTypes": false,
     "noUncheckedSideEffectImports": true,
     "paths": {
+      "@/Shuffle-Core": ["./src/Shuffle-Core/index.tsx"],
+      "@/Shuffle-Core/*": ["./src/Shuffle-Core/*"],
       "@/*": ["./src/*"],
       "@shuffleio/shuffle-mcps": ["./src/Shuffle-MCPs/index.ts"],
       "@shuffleio/shuffle-mcps/*": ["./src/Shuffle-MCPs/*"],
