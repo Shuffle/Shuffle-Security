@@ -26,6 +26,11 @@ on:
         required: false
         type: boolean
         default: false
+    secrets:
+      NPM_TOKEN:
+        required: false
+      NODE_AUTH_TOKEN:
+        required: false
 
 jobs:
   publish:
@@ -87,4 +92,7 @@ jobs:
       - name: Publish to npm
         if: ${{ inputs.dry_run != true }}
         working-directory: src/Shuffle-MCPs
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN || secrets.NODE_AUTH_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN || secrets.NODE_AUTH_TOKEN }}
         run: npm publish --access public
