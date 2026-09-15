@@ -191,6 +191,12 @@ export {
   applyRegionFromPayload,
   setHostBaseUrl,
   getHostBaseUrl,
+  getShuffleCoreBaseUrl,
+  getShuffleCoreUrl,
+  getShuffleCoreWorkflowUrl,
+  getShuffleSecurityBaseUrl,
+  getShuffleSecurityUrl,
+  SHUFFLE_AUTOMATION_URL,
 } from "./api";
 export { useSyncHostBaseUrl } from "./useSyncHostBaseUrl";
 export { installFetchBreaker, registerProtectedOrigin } from "./fetchBreaker";
